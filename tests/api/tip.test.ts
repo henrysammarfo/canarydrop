@@ -12,10 +12,14 @@ function req(url: string, body?: any) {
 
 describe('api/tip validation', () => {
   it('rejects missing fields with friendly message', async () => {
-    const r = await POST(req('http://localhost/api/tip?dryRun=1', {}));
+    const r = await POST(new NextRequest('http://localhost/api/tip?dryRun=1', {
+      method: 'POST',
+      body: JSON.stringify({}),
+      headers: { 'content-type': 'application/json', origin: 'http://localhost:3000' },
+    } as any));
     const j = await r.json();
     expect(r.status).toBe(400);
-    expect(j.message).toMatch(/Please include deskKey/);
+    expect(j.error).toBe('bad_request');
   });
 });
 

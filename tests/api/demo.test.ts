@@ -8,7 +8,7 @@ function req(url: string, body?: any) {
   return new NextRequest(url, {
     method: 'POST',
     body: body ? JSON.stringify(body) : undefined,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', origin: 'http://localhost:3000' },
   } as any);
 }
 
@@ -18,11 +18,13 @@ describe('demo routes dry-run', () => {
     expect(r.status).toBe(200);
   });
   it('acknowledges renew dry-run', async () => {
-    const r = await renewDesk(req('http://localhost/api/demo/desk/renew?dryRun=1', { deskKey: '0x0', canaryKey: '0x0' }));
+    const hex = '0x' + '0'.repeat(64);
+    const r = await renewDesk(req('http://localhost/api/demo/desk/renew?dryRun=1', { deskKey: hex, canaryKey: hex }));
     expect(r.status).toBe(200);
   });
   it('acknowledges reply dry-run', async () => {
-    const r = await replyDesk(req('http://localhost/api/demo/reply?dryRun=1', { tipKey: '0x0', wireB64: 'AA==' }));
+    const hex = '0x' + '0'.repeat(64);
+    const r = await replyDesk(req('http://localhost/api/demo/reply?dryRun=1', { tipKey: hex, wireB64: 'AA==' }));
     expect(r.status).toBe(200);
   });
 });

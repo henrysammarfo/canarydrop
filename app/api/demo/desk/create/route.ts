@@ -4,15 +4,21 @@ import { tiramisu } from '@arkiv-network/sdk/chains';
 import { http, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { createDesk } from '@/lib/arkiv';
+import { z } from 'zod';
 
 export async function POST(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const dryRun = url.searchParams.get('dryRun') === '1' || req.headers.get('x-dry-run') === '1';
+    const origin = req.headers.get('origin') || '';
+    const host = req.nextUrl.host;
+    if (origin && !origin.includes(host)) return NextResponse.json({ error: 'bad_origin', message: 'Please use the site to operate the demo desk.' }, { status: 400 });
     const pk = process.env.DESK_PRIVATE_KEY as Hex | undefined;
     if (!pk && !dryRun) return NextResponse.json({ error: 'demo_disabled' }, { status: 403 });
-    const body = await req.json();
-    const { name, deskPubRawB64 } = body as { name: string; deskPubRawB64: string };
+    const schema = z.object({ name: z.string().min(1).max(60), deskPubRawB64: z.string().max(2048) }).strict();
+    const parsed = schema.safeParse(await req.json());
+    if (!parsed.success) return NextResponse.json({ error: 'bad_request', message: parsed.error.issues.map(i=>i.message).join('; ') }, { status: 400 });
+    const { name, deskPubRawB64 } = parsed.data;
     if (!name || !deskPubRawB64) return NextResponse.json({ error: 'bad_request' }, { status: 400 });
     if (dryRun) {
       const pubc = createPublicClient({ chain: tiramisu, transport: http() });

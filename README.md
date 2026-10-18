@@ -5,6 +5,18 @@ Tips that can’t be seized. Canaries that can’t be faked.
 
 Live demo: https://canarydrop-teamtitanlink.vercel.app
 
+Why the Privacy pillar
+----------------------
+Sources and whistleblowers are exposed when tip‑line databases are seized and when canary pages are quietly edited. CanaryDrop keeps plaintext off servers, locks every tip on the sender’s device, and makes canaries self‑expiring so the absence is the signal.
+
+Why Arkiv (and what stays off Arkiv)
+------------------------------------
+Arkiv is a Web3 database with entity expiration and lifetime extension. It lets us:
+- Prove sealed expiry: tips are read‑only and handed to a burn address; nobody can extend or delete them.
+- Tie reads to the real newsroom via `createdBy(...)`, so impostors never match.
+- Read directly from Arkiv in the browser; there is no read API to censor.
+Kept off Arkiv on purpose: plaintext tips, private keys, IP addresses, identities.
+
 What it is
 ----------
 
@@ -100,6 +112,10 @@ These are used in the demo and on‑chain tests. Keys are never committed; see `
 - Relay: `0xa6Aa6a1409eb54028550466169A29EAfd8f7a442`
 - Demo desk: `0x1da3c22c079c264536D831F6F1fCe638aB0b20B0`
 - Impersonator: `0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af`
+Explorer links:
+- Relay — https://hub.arkiv.network/tiramisu/address/0xa6Aa6a1409eb54028550466169A29EAfd8f7a442
+- Desk — https://hub.arkiv.network/tiramisu/address/0x1da3c22c079c264536D831F6F1fCe638aB0b20B0
+- Impersonator — https://hub.arkiv.network/tiramisu/address/0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af
 
 Run locally
 -----------
@@ -233,6 +249,21 @@ Submission checklist (Arkiv Global Tour Stop)
 - Docs page with schema and notes: Yes
 - Demo-mode toggle and no keys shipped to client by default: Yes
 - Tests and load checks included, results in README: Yes
+- Pre‑existing work: none, built Oct 9–18, 2026
+- Demo video: (link coming)
+
+How judges can reproduce
+------------------------
+1) Visit the live site and submit a synthetic tip to the demo desk.  
+2) Read replies with `/r`.  
+3) Run a readback locally:
+```bash
+npm i
+NEXT_PUBLIC_DESK_ADDRESS=0x1da3c22c079c264536D831F6F1fCe638aB0b20B0 \
+NEXT_PUBLIC_RELAY_ADDRESS=0xa6Aa6a1409eb54028550466169A29EAfd8f7a442 \
+npm run verify
+```
+4) (After we seed) Browse the on‑chain evidence in `arkiv/evidence.json` and click the explorer links.
 
 License
 -------
