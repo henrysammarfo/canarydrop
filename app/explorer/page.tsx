@@ -2,80 +2,149 @@
 
 import { useEffect, useState } from 'react';
 import type { Hex } from 'viem';
-import { pub, watchInbox, RELAY, PROJECT } from '@/lib/arkiv';
+import { eq } from '@arkiv-network/sdk/query';
+import { pub, PROJECT } from '@/lib/arkiv';
+import { addressUrl, entityUrl, isSealedOwner, shortHex } from '@/lib/chain';
+import { useToast } from '@/components/Toast';
 
-type Item = { key: Hex; type: string; createdAt?: bigint; owner: Hex };
+type Item = {
+  key: Hex;
+  type: string;
+  creator: Hex;
+  owner: Hex;
+  expires?: string;
+};
 
 export default function ExplorerPage() {
+  const push = useToast();
   const [items, setItems] = useState<Item[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  function mapRow(e: any): Item {
+    return {
+      key: e.key as Hex,
+      type: String(e.attributes?.type?.value ?? 'unknown'),
+      creator: (e.creator as Hex) || ('0x' as Hex),
+      owner: (e.owner as Hex) || (e.creator as Hex) || ('0x' as Hex),
+      expires: e.expiresAt != null ? String(e.expiresAt) : 'n/a',
+    };
+  }
 
   useEffect(() => {
     (async () => {
       try {
-        // Seed with recent entities (best-effort)
-        const r = await pub.select({ key: true, attributes: true, creator: true, createdAt: true })
-          .limit(20).fetch().catch(()=>({ entities:[], nextCursor:null } as any));
-        const base: Item[] = (r.entities ?? []).map((e: any) => ({
-          key: e.key as Hex, owner: e.creator as Hex, createdAt: e.createdAt,
-          type: e.attributes?.type?.value ?? 'unknown'
-        }));
-        setItems(base);
-        // @ts-ignore
+        setLoading(true);
+        const r = await pub
+          .select({ key: true, attributes: true, creator: true, owner: true, expiresAt: true, createdAt: true })
+          .where(eq('project', PROJECT))
+          .limit(20)
+          .fetch()
+          .catch(() => ({ entities: [], nextCursor: null } as any));
+        const rows = (r.entities ?? []).map(mapRow);
+        setItems(rows);
         setCursor(r.nextCursor ?? null);
-      } catch {}
+      } catch (e: any) {
+        const msg = String(e?.message ?? e);
+        setErr(msg);
+        push({ kind: 'error', text: msg });
+      } finally {
+        setLoading(false);
+      }
     })();
-    const un = (pub as any).watchEntityEvents ? (pub as any).watchEntityEvents({
-      onEntityCreated: async ({ entityKey, owner }: any) => {
-        try {
-          const e = await pub.getEntity(entityKey);
-          if (e.attributes?.project?.value !== PROJECT) return;
-          const t = String(e.attributes?.type?.value ?? 'unknown');
-          setItems((arr: Item[]) => [{ key: entityKey, type: t, owner }, ...arr].slice(0,50));
-        } catch {}
-      },
-      onError: (e: any) => setErr(String(e?.message ?? e)),
-    }) : () => {};
-    return () => { try { un(); } catch {} };
-  }, []);
+  }, [push]);
 
   async function loadMore() {
+    if (!cursor) return;
     try {
-      if (!cursor) return;
-      // @ts-ignore
-      const r = await pub.select({ key: true, attributes: true, creator: true, createdAt: true }).limit(20).cursor(cursor).fetch();
-      const more: Item[] = (r.entities ?? []).map((e: any) => ({
-        key: e.key as Hex, owner: e.creator as Hex, createdAt: e.createdAt,
-        type: e.attributes?.type?.value ?? 'unknown'
-      }));
+      setLoading(true);
+      const r = await pub
+        .select({ key: true, attributes: true, creator: true, owner: true, expiresAt: true, createdAt: true })
+        .where(eq('project', PROJECT))
+        .limit(20)
+        .cursor(cursor)
+        .fetch();
+      const more = (r.entities ?? []).map(mapRow);
       setItems((arr) => [...arr, ...more]);
-      // @ts-ignore
-      setCursor(r.nextCursor ?? null);
-    } catch {}
+      setCursor((r as any).nextCursor ?? null);
+      push({ kind: 'info', text: `Loaded ${more.length} more rows.` });
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
+      setErr(msg);
+      push({ kind: 'error', text: msg });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <section className="section">
       <div className="wrap">
+        <p className="kicker">Tiramisu</p>
         <h1 className="h2">Explorer</h1>
-        <p className="lead">Live feed of CanaryDrop entities on Tiramisu. Impersonator desks are ignored via creator filters in the app.</p>
-        <div className="card" style={{ marginTop: 12 }}>
-          <ul style={{ padding: 0, margin: 0 }}>
-            {items.map((it) => (
-              <li key={it.key} style={{ listStyle: 'none', padding: 10, borderBottom: '1px solid rgba(170,200,222,.12)' }}>
-                <code>{it.key}</code> · <span className="muted">{it.type}</span> · creator <code>{it.owner}</code>
-              </li>
-            ))}
-            {items.length === 0 && <li className="muted">Waiting for events…</li>}
-          </ul>
-          <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 10 }}>
-            <button className="btn" onClick={loadMore} disabled={!cursor}>Load more</button>
-          </div>
-          {err && <div className="muted" style={{ color: '#ffb048', marginTop: 8 }}>{err}</div>}
+        <p className="lead" style={{ marginTop: 10 }}>
+          Live CanaryDrop entities. Impostor desks are ignored in the app because reads are pinned to the real $creator.
+        </p>
+
+        <div className="table-wrap" style={{ marginTop: 18 }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Key</th>
+                <th>Creator</th>
+                <th>Owner</th>
+                <th>Expires</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it) => (
+                <tr key={it.key}>
+                  <td>{it.type}</td>
+                  <td>
+                    <a href={entityUrl(it.key)} target="_blank" rel="noreferrer">
+                      {shortHex(it.key, 8, 6)}
+                    </a>
+                  </td>
+                  <td>
+                    <a href={addressUrl(it.creator)} target="_blank" rel="noreferrer">
+                      {shortHex(it.creator)}
+                    </a>
+                  </td>
+                  <td>
+                    <div>{shortHex(it.owner)}</div>
+                    {isSealedOwner(it.owner) && (
+                      <span className="pill" style={{ marginTop: 6 }}>
+                        Sealed: nobody can change it
+                      </span>
+                    )}
+                  </td>
+                  <td>{it.expires}</td>
+                </tr>
+              ))}
+              {items.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="muted">
+                    {loading ? 'Loading…' : 'No rows yet.'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
+
+        <div className="ctaRow" style={{ justifyContent: 'flex-start' }}>
+          <button className="btn primary" onClick={loadMore} disabled={!cursor || loading} type="button">
+            {loading ? 'Loading' : 'Load more'} <span className="arrow" aria-hidden="true" />
+          </button>
+        </div>
+        {err && (
+          <div className="muted" style={{ color: '#ffb048', marginTop: 8 }}>
+            {err}
+          </div>
+        )}
       </div>
     </section>
   );
 }
-

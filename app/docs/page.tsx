@@ -1,8 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import Link from 'next/link';
 
 function readFile(p: string) {
-  try { return fs.readFileSync(p, 'utf8'); } catch { return null; }
+  try {
+    return fs.readFileSync(p, 'utf8').replace(/[\u2013\u2014]/g, ' ');
+  } catch {
+    return null;
+  }
 }
 
 export default function DocsPage() {
@@ -12,11 +17,25 @@ export default function DocsPage() {
   return (
     <section className="section">
       <div className="wrap" style={{ maxWidth: 980 }}>
+        <p className="kicker">For judges</p>
         <h1 className="h2">Documentation</h1>
-        <p className="lead">Architecture overview, schema, and how to run locally.</p>
-        <div className="card" style={{ marginTop: 16 }}>
-          <strong>Run locally</strong>
-          <pre className="muted" style={{ whiteSpace: 'pre-wrap', marginTop: 8 }}>{`npm i\nnpm run dev\n# Set RELAY_PRIVATE_KEY, DESK_PRIVATE_KEY, NEXT_PUBLIC_* envs`}</pre>
+        <p className="lead" style={{ marginTop: 10 }}>
+          How the tip line works, what lives on Arkiv, and how to run it locally.
+        </p>
+        <div className="grid cols-2" style={{ marginTop: 18 }}>
+          <div className="card">
+            <strong>Run locally</strong>
+            <pre className="muted" style={{ whiteSpace: 'pre-wrap', marginTop: 8 }}>{`npm i\nnpm run dev`}</pre>
+            <p className="muted" style={{ marginTop: 8 }}>Set RELAY_PRIVATE_KEY, DESK_PRIVATE_KEY and NEXT_PUBLIC values in a local env file. Do not commit them.</p>
+          </div>
+          <div className="card">
+            <strong>Live pages</strong>
+            <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 10 }}>
+              <Link className="btn" href="/submit">Submit <span className="arrow" aria-hidden="true" /></Link>
+              <Link className="btn" href="/desk">Desk <span className="arrow" aria-hidden="true" /></Link>
+              <Link className="btn" href="/explorer">Explorer <span className="arrow" aria-hidden="true" /></Link>
+            </div>
+          </div>
         </div>
         <div className="card" style={{ marginTop: 16 }}>
           <strong>Arkiv schema</strong>
@@ -30,4 +49,3 @@ export default function DocsPage() {
     </section>
   );
 }
-
