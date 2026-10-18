@@ -1,6 +1,8 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Sora } from 'next/font/google';
+import Nav from '@/components/Nav';
+import Footer from '@/components/Footer';
 
 const sora = Sora({
   subsets: ['latin'],
@@ -19,7 +21,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={sora.variable}>
-      <body>{children}</body>
+      <body>
+        <div className="container">
+          <Nav />
+          {children}
+          <Footer />
+        </div>
+      </body>
     </html>
   );
 }

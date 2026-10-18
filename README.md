@@ -28,6 +28,10 @@ Live pages
 - `/desk` — newsroom desk: MetaMask support (Tiramisu testnet) with an explicit Demo Mode toggle that signs on the server using a testnet‑only key, so judges can exercise the flow without an extension; create desk + canary; renew canary; live inbox; reply
 - `/d/[creator]` — source page: canary status, tip textarea with “SYNTHETIC DATA ONLY” banner, lifetime picker, submit; shows tip key, receipt code (JSON) and explorer link
 - `/r` — read replies with tip key + receipt code
+- `/submit` — submit flow with desk creator picker
+- `/explorer` — live feed of CanaryDrop entities on Tiramisu
+- `/canary/[creator]` — public canary status page
+- `/docs` — architecture, schema and friction report
 
 Design
 ------
@@ -175,6 +179,14 @@ What’s verified on-chain
 ---------------------------------------------
 
 Pending funding — the relay wallet `0xa6Aa6a1409eb54028550466169A29EAfd8f7a442` is not funded with GLM yet (Tiramisu faucet currently dry). End‑to‑end on‑chain tests (desk + canary creation, tip with sealed ownership to `0x…dEaD`, renewals, replies) will be executed as soon as funds land, and the exact tx hashes will be recorded here and in `arkiv/schema.md`. Until then, the app runs end‑to‑end off‑chain with synthetic data only.
+
+Tests
+-----
+
+- Unit: WebCrypto ECIES round‑trip (vitest) — PASS
+- Read‑only integration: block timing from Arkiv SDK — PASS
+- E2E: Playwright visits `/, /submit, /desk, /r, /explorer, /docs` at desktop, asserts no console errors — PASS
+- Screenshots: saved in `shots/` (generated via Playwright)
 
 License
 -------

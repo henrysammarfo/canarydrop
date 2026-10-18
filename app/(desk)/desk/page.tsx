@@ -56,6 +56,7 @@ export default function DeskPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [tx, setTx] = useState<Hex | null>(null);
+  const [tab, setTab] = useState<'inbox' | 'canary' | 'keys' | 'settings'>('inbox');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -312,138 +313,109 @@ export default function DeskPage() {
           )}
         </div>
       </header>
-      <main className="hero">
-        <div style={{ width: '100%', maxWidth: 980 }}>
-          <h1 className="title">Desk</h1>
-          <p className="sub">
-            Create the newsroom desk (a P‑256 encryption key) and a daily warrant canary. The inbox updates live and decrypts in
-            your browser.
-          </p>
-
-          <div className="ctaRow" style={{ marginTop: 16 }}>
-            <button className="cta" onClick={generateDeskKey}>
-              Generate desk key
-            </button>
-            <label className="cta secondary" style={{ cursor: 'pointer' }}>
-              Import key
-              <input
-                type="file"
-                accept="application/json"
-                onChange={(e) => e.target.files?.[0] && importDeskKey(e.target.files[0])}
-                style={{ display: 'none' }}
-              />
-            </label>
-            <button className="cta secondary" onClick={downloadDeskKey} disabled={!priv}>
-              Download backup
-            </button>
+      <main className="section" style={{ paddingTop: 'var(--space-6)' }}>
+        <div className="wrap">
+          <h1 className="h2">Desk</h1>
+          <p className="lead">Operate your newsroom desk. Inbox decrypts locally; canary renews daily.</p>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+            {(['inbox','canary','keys','settings'] as const).map(k => (
+              <button key={k} className={`btn ${tab===k?'primary':''}`} onClick={()=>setTab(k)}>{k.charAt(0).toUpperCase()+k.slice(1)}</button>
+            ))}
           </div>
 
           <div style={{ marginTop: 18 }}>
-            <label className="badge" style={{ display: 'block', marginBottom: 8 }}>
-              Desk name
-            </label>
-            <input
-              value={deskName}
-              onChange={(e) => setDeskName(e.target.value)}
-              style={{
-                width: '100%',
-                background: 'rgba(8,12,18,.45)',
-                border: '1px solid rgba(160,190,210,.35)',
-                color: 'var(--ink)',
-                borderRadius: 12,
-                padding: 12,
-                outline: 'none',
-              }}
-            />
-          </div>
-
-          <div className="ctaRow" style={{ marginTop: 12 }}>
-            <button className="cta" onClick={createDeskFlow} disabled={busy || !priv}>
-              <span className="dot" />
-              {busy ? 'Working…' : 'Create desk + canary'}
-            </button>
-            <button className="cta secondary" onClick={renewFlow} disabled={!deskKey || !canaryKey || busy}>
-              Renew today’s canary
-            </button>
-          </div>
-
-          <div style={{ marginTop: 16 }}>
-            <p className="sub">
-              Creator: <code>{creator ?? '—'}</code> · Desk: <code>{deskKey ?? '—'}</code> · Canary:{' '}
-              <code>{canaryKey ?? '—'}</code> · Status:{' '}
-              {alive === null ? (
-                'unknown'
-              ) : alive ? (
-                <span style={{ color: '#7ae6ff' }}>ALIVE</span>
-              ) : (
-                <span style={{ color: '#ffb048' }}>DEAD</span>
-              )}
-            </p>
-          </div>
-
-          <hr style={{ opacity: 0.2, margin: '16px 0' }} />
-
-          <h2 className="sub" style={{ fontSize: 18, marginBottom: 8 }}>
-            Inbox
-          </h2>
-          {tips.length === 0 ? (
-            <p className="sub">No tips yet. This view updates live.</p>
-          ) : (
-            <ul style={{ padding: 0 }}>
-              {tips.map((t) => (
-                <li key={t.key} style={{ listStyle: 'none', marginBottom: 14 }}>
-                  <div
-                    style={{
-                      background: 'rgba(8,12,18,.45)',
-                      border: '1px solid rgba(160,190,210,.35)',
-                      color: 'var(--ink)',
-                      borderRadius: 12,
-                      padding: 12,
-                    }}
-                  >
-                    <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>
-                      <code>{t.key}</code>
-                    </div>
-                    <div style={{ whiteSpace: 'pre-wrap' }}>{t.text}</div>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                      <input
-                        value={t.replyText ?? ''}
-                        onChange={(e) =>
-                          setTips((arr) => arr.map((x) => (x.key === t.key ? { ...x, replyText: e.target.value } : x)))
-                        }
-                        placeholder="Write a reply…"
-                        style={{
-                          flex: 1,
-                          background: 'rgba(8,12,18,.45)',
-                          border: '1px solid rgba(160,190,210,.35)',
-                          color: 'var(--ink)',
-                          borderRadius: 10,
-                          padding: 10,
-                          outline: 'none',
-                        }}
-                      />
-                      <button className="cta" onClick={() => sendReply(t)}>
-                        Send reply
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {tx && (
-            <div style={{ marginTop: 10 }}>
-              <a className="cta secondary" href={`https://hub.arkiv.network/tiramisu/tx/${tx}`} target="_blank" rel="noreferrer">
-                Tx: {tx.slice(0, 8)}…{tx.slice(-6)}
-              </a>
+            <div className="card" style={{ marginBottom: 12 }}>
+              <strong>Status</strong>
+              <div className="muted" style={{ marginTop: 6 }}>
+                Creator: <code>{creator ?? '—'}</code> · Desk: <code>{deskKey ?? '—'}</code> · Canary: <code>{canaryKey ?? '—'}</code> ·{' '}
+                Status: {alive === null ? 'unknown' : alive ? <span style={{ color: '#7ae6ff' }}>ALIVE</span> : <span style={{ color: '#ffb048' }}>DEAD</span>}
+              </div>
             </div>
-          )}
-          {err && (
-            <p className="sub" style={{ color: '#ffb048', marginTop: 10 }}>
-              {err}
-            </p>
-          )}
+
+            {tab === 'inbox' && (
+              <div className="card">
+                <strong>Inbox</strong>
+                {tips.length === 0 ? (
+                  <p className="muted" style={{ marginTop: 8 }}>No tips yet. This view updates live.</p>
+                ) : (
+                  <ul style={{ padding: 0, marginTop: 12 }}>
+                    {tips.map((t) => (
+                      <li key={t.key} style={{ listStyle: 'none', marginBottom: 14 }}>
+                        <div className="card" style={{ padding: 12 }}>
+                          <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>
+                            <code>{t.key}</code>
+                          </div>
+                          <div style={{ whiteSpace: 'pre-wrap' }}>{t.text}</div>
+                          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                            <input
+                              value={t.replyText ?? ''}
+                              onChange={(e) =>
+                                setTips((arr) => arr.map((x) => (x.key === t.key ? { ...x, replyText: e.target.value } : x)))
+                              }
+                              placeholder="Write a reply…"
+                            />
+                            <button className="btn primary" onClick={() => sendReply(t)}>Send reply</button>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {tab === 'canary' && (
+              <div className="card">
+                <strong>Canary</strong>
+                <div className="muted" style={{ marginTop: 6 }}>Daily TTL 26h; absence is the signal.</div>
+                <div className="ctaRow" style={{ justifyContent:'flex-start', marginTop: 12 }}>
+                  <button className="btn primary" onClick={renewFlow} disabled={!deskKey || !canaryKey || busy}>
+                    Renew today’s canary
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {tab === 'keys' && (
+              <div className="card">
+                <strong>Keys</strong>
+                <p className="muted" style={{ marginTop: 6 }}>Generate/import the desk’s P‑256 key. The private key stays in your browser; back it up.</p>
+                <div className="ctaRow" style={{ justifyContent:'flex-start', marginTop: 8 }}>
+                  <button className="btn primary" onClick={generateDeskKey}><span className="dot" />Generate desk key</button>
+                  <label className="btn" style={{ cursor: 'pointer' }}>
+                    Import key
+                    <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && importDeskKey(e.target.files[0])} style={{ display: 'none' }} />
+                  </label>
+                  <button className="btn" onClick={downloadDeskKey} disabled={!priv}>Download backup</button>
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <label className="small">Desk name</label>
+                  <input value={deskName} onChange={(e) => setDeskName(e.target.value)} />
+                </div>
+                <div className="ctaRow" style={{ justifyContent:'flex-start', marginTop: 12 }}>
+                  <button className="btn primary" onClick={createDeskFlow} disabled={busy || !priv}>
+                    <span className="dot" />{busy ? 'Working…' : 'Create desk + canary'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {tab === 'settings' && (
+              <div className="card">
+                <strong>Settings</strong>
+                <p className="muted" style={{ marginTop: 6 }}>Demo mode signs transactions server‑side with testnet keys. Never enable in production.</p>
+              </div>
+            )}
+
+            {tx && (
+              <div style={{ marginTop: 10 }}>
+                <a className="btn" href={`https://hub.arkiv.network/tiramisu/tx/${tx}`} target="_blank" rel="noreferrer">
+                  Tx: {tx.slice(0, 8)}…{tx.slice(-6)}
+                </a>
+              </div>
+            )}
+            {err && <p className="muted" style={{ color: '#ffb048', marginTop: 10 }}>{err}</p>}
+          </div>
         </div>
       </main>
       <footer className="footer">
