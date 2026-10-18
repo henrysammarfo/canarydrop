@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   title: 'CanaryDrop · Tips that cannot be seized',
   description:
     'Anonymous, encrypted tips for small newsrooms. Built on Arkiv (Tiramisu testnet).',
-  metadataBase: new URL('https://canarydrop-teamtitanlink.vercel.app'),
+  metadataBase: new URL('https://canarydrop.vercel.app'),
   icons: [{ rel: 'icon', url: '/icon.svg' }],
   openGraph: {
     title: 'CanaryDrop',

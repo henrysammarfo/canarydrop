@@ -3,9 +3,9 @@ CanaryDrop: anonymous encrypted tips on Arkiv (Tiramisu)
 
 Tips that can’t be seized. Canaries that can’t be faked.
 
-Live demo: https://canarydrop-teamtitanlink.vercel.app
+Live demo: https://canarydrop.vercel.app
 
-Demo video: https://canarydrop-teamtitanlink.vercel.app/demo.mp4
+Demo video: https://canarydrop.vercel.app/demo.mp4
 
 Why the Privacy pillar
 ----------------------
@@ -164,7 +164,7 @@ Set these Environment Variables (Production + Preview):
 - `NEXT_PUBLIC_RELAY_ADDRESS` : relay wallet address
 - `NEXT_PUBLIC_DESK_ADDRESS` : demo desk creator address
 
-Production URL: https://canarydrop-teamtitanlink.vercel.app
+Production URL: https://canarydrop.vercel.app
 
 Chain configuration
 -------------------
