@@ -20,6 +20,7 @@ for (const r of routes) {
 test('no horizontal overflow at 390px on home', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(process.env.PRODUCTION_URL ? process.env.PRODUCTION_URL : '/');
+  await page.waitForLoadState('load');
   const w = await page.evaluate(() => ({ sw: document.body.scrollWidth, iw: window.innerWidth }));
   expect(w.sw <= w.iw).toBeTruthy();
 });
