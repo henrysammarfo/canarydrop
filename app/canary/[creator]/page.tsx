@@ -54,7 +54,7 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
     lastRenewedBlock && timing ? asTime(timing, lastRenewedBlock) : 'Not renewed yet';
 
   return (
-    <section className="section">
+    <section className="section" style={{ paddingBottom: 48 }}>
       <div className="wrap" style={{ maxWidth: 860 }}>
         <p className="kicker">Public warrant canary</p>
         <h1 className="h2">Canary status</h1>

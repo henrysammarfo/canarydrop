@@ -61,7 +61,11 @@ export async function POST(req: NextRequest) {
     if (!dryRun) globalWrites.count++;
     if (dryRun) {
       const pub = createPublicClient({ chain: tiramisu, transport: http() });
-      const [pred] = await pub.predictEntityKeys({ owner: (process.env.NEXT_PUBLIC_RELAY_ADDRESS || '0x') as Hex, count: 1 });
+      const relayRaw = process.env.NEXT_PUBLIC_RELAY_ADDRESS || '';
+      const relay = (/^0x[0-9a-fA-F]{40}$/.test(relayRaw)
+        ? relayRaw
+        : '0xa6Aa6a1409eb54028550466169A29EAfd8f7a442') as Hex;
+      const [pred] = await pub.predictEntityKeys({ owner: relay, count: 1 });
       // Construct the attributes we would write
       const attributes = { project: PROJECT, type: 'tip', desk: key(deskKey as any) } as any;
       return NextResponse.json({

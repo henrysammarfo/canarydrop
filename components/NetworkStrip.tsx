@@ -6,7 +6,10 @@ export default async function NetworkStrip() {
   async function gather() {
     try {
       const timing = await pub.getBlockTiming();
-      const deskAddr = (process.env.NEXT_PUBLIC_DESK_ADDRESS || '0x') as `0x${string}`;
+      const rawDesk = process.env.NEXT_PUBLIC_DESK_ADDRESS || '';
+      const deskAddr = (/^0x[0-9a-fA-F]{40}$/.test(rawDesk)
+        ? rawDesk
+        : '0x1da3c22c079c264536D831F6F1fCe638aB0b20B0') as `0x${string}`;
       const relayAddr = (process.env.NEXT_PUBLIC_RELAY_ADDRESS || '0x') as `0x${string}`;
       let lastCanary: string | null = null;
       let tips = 0, desks = 0, canariesAlive = 0;

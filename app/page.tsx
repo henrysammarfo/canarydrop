@@ -1,7 +1,6 @@
 /* Landing page: hero (video scoped here), marquee, statement, steps, stats, bento, compare, FAQ, CTA */
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import Reveal from '@/components/Reveal';
 
 const VIDEO =
   'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260912_104303_0c6d60b2-9353-408e-944-585108a22fb5.mp4';
@@ -12,7 +11,6 @@ const NetworkStrip = dynamic(() => import('@/components/NetworkStrip'), { ssr: t
 export default function HomePage() {
   return (
     <>
-      <Reveal />
       <section id="hero" className="section">
         <video className="art" autoPlay muted loop playsInline preload="auto" aria-hidden="true" poster={POSTER} src={VIDEO} />
         <div className="veil" />
@@ -37,7 +35,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section aria-hidden="true" className="home-marquee reveal">
+      <section aria-hidden="true" className="home-marquee">
         <div className="home-marquee-track">
           <span>PRIVATE</span>
           <span>SEALED</span>
@@ -54,7 +52,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="home-band reveal">
+      <section className="home-band">
         <div className="wrap">
           <div className="home-band-text">
             THE TIP LINE THAT FORGETS, AND THE CANARY THAT CANNOT LIE.
@@ -62,7 +60,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="how" className="section reveal">
+      <section id="how" className="section">
         <div className="wrap">
           <div className="home-steps">
             <div className="cell">
@@ -89,7 +87,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="section reveal" style={{ paddingTop: 0 }}>
+      <section className="section" style={{ paddingTop: 0 }}>
         <div className="wrap">
           <div className="home-live">
             <span className="dot live" aria-hidden="true" />
@@ -99,7 +97,7 @@ export default function HomePage() {
         <NetworkStrip />
       </section>
 
-      <section className="section reveal">
+      <section className="section">
         <div className="wrap">
           <div className="home-bento">
             <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts#L20-L31" target="_blank" rel="noreferrer">
@@ -130,7 +128,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="section reveal" style={{ paddingTop: 0 }}>
+      <section className="section" style={{ paddingTop: 0 }}>
         <div className="wrap">
           <div className="home-compare card">
             <div className="head">
@@ -173,7 +171,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="faq" className="section reveal" style={{ paddingTop: 0 }}>
+      <section id="faq" className="section" style={{ paddingTop: 0 }}>
         <div className="wrap">
           <div className="home-faq">
             <details className="card" open>
@@ -204,10 +202,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="home-cta reveal">
+      <section id="home-cta" className="home-cta">
         <div className="wrap">
           <div className="home-cta-inner">
-            <div className="copy">Ready to try it?</div>
+            <h2 className="copy">Ready to try it?</h2>
             <div className="ctaRow" style={{ marginTop: 0 }}>
               <Link className="btn primary" href="/submit">Send a tip <span className="arrow" aria-hidden="true" /></Link>
               <Link className="btn" href="/desk">Open the desk <span className="arrow" aria-hidden="true" /></Link>

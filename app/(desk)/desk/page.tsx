@@ -41,7 +41,12 @@ export default function DeskPage() {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('canarydrop/demo') === '1';
   });
-  const [creator, setCreator] = useState<Hex | null>(process.env.NEXT_PUBLIC_DESK_ADDRESS as Hex | null);
+  const [creator, setCreator] = useState<Hex | null>(() => {
+    const raw = process.env.NEXT_PUBLIC_DESK_ADDRESS || '';
+    return /^0x[0-9a-fA-F]{40}$/.test(raw)
+      ? (raw as Hex)
+      : ('0x1da3c22c079c264536D831F6F1fCe638aB0b20B0' as Hex);
+  });
   const [connected, setConnected] = useState<Hex | null>(null);
   const [deskName, setDeskName] = useState('CanaryDrop Demo Desk');
   const [deskKey, setDeskKey] = useState<Hex | null>(null);

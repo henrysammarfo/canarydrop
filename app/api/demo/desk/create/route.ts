@@ -22,7 +22,11 @@ export async function POST(req: NextRequest) {
     if (!name || !deskPubRawB64) return NextResponse.json({ error: 'bad_request' }, { status: 400 });
     if (dryRun) {
       const pubc = createPublicClient({ chain: tiramisu, transport: http() });
-      const predicted = await pubc.predictEntityKeys({ owner: (process.env.NEXT_PUBLIC_DESK_ADDRESS as Hex) || '0x0000000000000000000000000000000000000000', count: 2 });
+      const deskRaw = process.env.NEXT_PUBLIC_DESK_ADDRESS || '';
+      const deskOwner = (/^0x[0-9a-fA-F]{40}$/.test(deskRaw)
+        ? deskRaw
+        : '0x1da3c22c079c264536D831F6F1fCe638aB0b20B0') as Hex;
+      const predicted = await pubc.predictEntityKeys({ owner: deskOwner, count: 2 });
       return NextResponse.json({ ok: true, dryRun: true, predicted: predicted.map((x) => x.key) });
     } else {
       const account = privateKeyToAccount(pk as Hex);

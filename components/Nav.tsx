@@ -10,7 +10,9 @@ export default function Nav() {
   const push = useToast();
   const [addr, setAddr] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const deskCreator = process.env.NEXT_PUBLIC_DESK_ADDRESS || '0x1da3c22c079c264536D831F6F1fCe638aB0b20B0';
+  const deskCreator = /^0x[0-9a-fA-F]{40}$/.test(process.env.NEXT_PUBLIC_DESK_ADDRESS || '')
+    ? process.env.NEXT_PUBLIC_DESK_ADDRESS!
+    : '0x1da3c22c079c264536D831F6F1fCe638aB0b20B0';
 
   async function connect() {
     const result = await connectTiramisu();

@@ -11,7 +11,12 @@ import { entityUrl, txUrl } from '@/lib/chain';
 
 export default function SubmitPage() {
   const push = useToast();
-  const [creator, setCreator] = useState<Hex>((process.env.NEXT_PUBLIC_DESK_ADDRESS as Hex) || ('0x1da3c22c079c264536D831F6F1fCe638aB0b20B0' as Hex));
+  const [creator, setCreator] = useState<Hex>(() => {
+    const raw = process.env.NEXT_PUBLIC_DESK_ADDRESS || '';
+    return /^0x[0-9a-fA-F]{40}$/.test(raw)
+      ? (raw as Hex)
+      : ('0x1da3c22c079c264536D831F6F1fCe638aB0b20B0' as Hex);
+  });
   const [desk, setDesk] = useState<any>(null);
   const [deskKey, setDeskKey] = useState<Hex | null>(null);
   const [alive, setAlive] = useState<boolean | null>(null);

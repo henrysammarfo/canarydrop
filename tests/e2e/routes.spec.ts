@@ -48,15 +48,83 @@ for (const width of [1440, 390] as const) {
   }
 }
 
-test('home FAQ is visible with nonzero opacity at 1440', async ({ page }) => {
+async function wheelUntil(page: import('@playwright/test').Page, locator: import('@playwright/test').Locator) {
+  await page.mouse.move(720, 420);
+  for (let i = 0; i < 36; i++) {
+    const box = await locator.boundingBox();
+    if (box) {
+      const y = box.y + box.height / 2;
+      if (y > 80 && y < 860) return box;
+    }
+    await page.mouse.wheel(0, 900);
+  }
+  return locator.boundingBox();
+}
+
+async function hitAtCenter(page: import('@playwright/test').Page, locator: import('@playwright/test').Locator) {
+  const box = await locator.boundingBox();
+  expect(box, 'target must have a box').toBeTruthy();
+  const x = box!.x + box!.width / 2;
+  const y = box!.y + box!.height / 2;
+  return page.evaluate(
+    ({ x, y }) => {
+      const n = document.elementFromPoint(x, y) as HTMLElement | null;
+      if (!n) return { ok: false, tag: '', text: '' };
+      return { ok: true, tag: n.tagName, text: (n.innerText || n.textContent || '').slice(0, 200) };
+    },
+    { x, y },
+  );
+}
+
+function lowerHalfNotFlat(png: Buffer) {
+  const raw = png.toString('binary');
+  expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+  const start = Math.floor(png.length / 2);
+  let min = 255;
+  let max = 0;
+  for (let i = start; i < png.length; i += 31) {
+    const v = png[i];
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  expect(max - min, 'full page lower half is a single color').toBeGreaterThan(20);
+  return raw.length;
+}
+
+test('home FAQ and footer CTA are hittable after mouse wheel at 1440', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(urlFor('/'), { waitUntil: 'load' });
-  const faq = page.locator('#faq');
-  await faq.scrollIntoViewIfNeeded();
-  await expect(faq).toBeVisible();
-  const opacity = await faq.evaluate((el) => Number(getComputedStyle(el).opacity));
-  expect(opacity).toBeGreaterThan(0);
-  await expect(page.getByText('Do sources need a wallet?')).toBeVisible();
+  const faqQ = page.getByText('Do sources need a wallet?');
+  await wheelUntil(page, faqQ);
+  await expect(faqQ).toBeVisible();
+  const faqHit = await hitAtCenter(page, faqQ);
+  expect(faqHit.ok, 'elementFromPoint missed FAQ').toBeTruthy();
+  expect(faqHit.text).toMatch(/Do sources need a wallet/i);
+
+  const cta = page.getByRole('heading', { name: /ready to try it/i });
+  await wheelUntil(page, cta);
+  await expect(cta).toBeVisible();
+  const ctaHit = await hitAtCenter(page, cta);
+  expect(ctaHit.ok, 'elementFromPoint missed CTA').toBeTruthy();
+  expect(ctaHit.text).toMatch(/ready to try it/i);
+
+  const shot = await page.screenshot({
+    fullPage: true,
+    path: path.join('shots', 'home_full_wheel.png'),
+  });
+  lowerHalfNotFlat(shot);
+});
+
+test('dry run tip submit shows a toast', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(urlFor('/submit'), { waitUntil: 'load' });
+  await page.locator('input').first().fill(desk);
+  await page.locator('textarea').first().fill('Synthetic judge dry run tip.');
+  const dry = page.getByRole('button', { name: 'Dry run' });
+  await expect(dry).toBeEnabled({ timeout: 20_000 });
+  await dry.click();
+  const toast = page.locator('.toast').filter({ hasText: /dry run/i });
+  await expect(toast).toBeVisible({ timeout: 20_000 });
 });
 
 test('hero CTAs are narrower than 260px', async ({ page }) => {
