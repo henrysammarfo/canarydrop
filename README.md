@@ -1,0 +1,181 @@
+CanaryDrop — anonymous encrypted tips on Arkiv (Tiramisu)
+=========================================================
+
+Tips that can’t be seized. Canaries that can’t be faked.
+
+What it is
+----------
+
+CanaryDrop is an anonymous, encrypted tip line for small newsrooms. A newsroom operates a “desk” identified by a P‑256 public key published on Arkiv. Sources don’t need a wallet: their tip is encrypted in the browser and posted via a server relay that pays gas. The relay creates the tip entity and, in the same batch, transfers ownership to `0x000000000000000000000000000000000000dEaD`, guaranteeing a sealed expiry: nobody can extend, patch or delete it after creation.
+
+A “warrant canary” entity is renewed daily. If it isn’t renewed within 26 hours, it lapses on its own — the absence is the signal. The newsroom reads tips via a live inbox that connects directly to the Arkiv RPC over WebSocket; decryption happens only in the browser. The desk can reply (encrypted), and the source reads replies at `/r` using their private receipt code stored only on their device.
+
+Why Arkiv (vs Postgres/IPFS/subgraph/own API)
+---------------------------------------------
+
+- Immutable expiry guarantees: the sealed-ownership pattern (create + ownership change to `0x…dEaD` in one batch) means even the relay cannot extend or delete a tip later. A database or even most chains without first‑class expirations would require an application policy that can be bypassed by the operator.
+- On‑chain access control: every read in the app is pinned to the real newsroom’s `createdBy(deskWallet)` address. An impersonator that publishes a desk with the same “name” from a different wallet is ignored reliably. With Postgres or IPFS this becomes a centralized allow‑list.
+- Censorship resistance for reads: the desk and source UIs read directly from Arkiv RPC/WS in the browser. There is no read API to censor. A subgraph or your own API would centralize read access again.
+- Built‑in expiry and leasing: canaries and desks use `extendEntity` to renew their leases. Expiry fires no event (see Friction §6), so the app polls the canonical `gt("$expiresAt", u64(head))` query.
+- What stays off Arkiv by design: plaintext, private keys (desk P‑256 in the browser with a downloadable backup; the source receipt private key remains only on the source’s device), IP addresses (the relay keeps no logs; platform logs are a residual risk).
+
+Live pages
+----------
+
+- `/` — explainer hero and entry points
+- `/desk` — newsroom desk: MetaMask support (Tiramisu testnet) with an explicit Demo Mode toggle that signs on the server using a testnet‑only key, so judges can exercise the flow without an extension; create desk + canary; renew canary; live inbox; reply
+- `/d/[creator]` — source page: canary status, tip textarea with “SYNTHETIC DATA ONLY” banner, lifetime picker, submit; shows tip key, receipt code (JSON) and explorer link
+- `/r` — read replies with tip key + receipt code
+
+Design
+------
+
+Full‑viewport dark hero with the Motion Sites “Neural Pathway” artwork as a looping video background (Sora font, subtle entrance animations that honour `prefers-reduced-motion`). Palette nudged to deep navy with cyan (alive) and amber (dead) accents. See `app/globals.css`. The poster frame and veil avoid flashes/illegibility over the video’s centre flare.
+
+Arkiv usage (feature-by-feature)
+--------------------------------
+
+All Arkiv calls are implemented in `lib/arkiv.ts` and `lib/relay.ts`, verified against `@arkiv-network/sdk` 0.8.1.
+
+- Create desk + canary in one batch using keys from `predictEntityKeys`:
+  - `createDesk(w, owner, name, deskPubRaw)` in `lib/arkiv.ts`
+- Renew canary + desk lease:
+  - `renew(w, deskKey, canaryKey)`
+- Source posts a tip via a relay:
+  - Server `postTip(deskKey, wire, life)` in `lib/relay.ts` uses
+    - `predictEntityKeys({ owner: relay })`
+    - `executeBatch({ creates:[…], ownershipChanges:[{ newOwner: 0x…dEaD }] })`
+- Read canary status and list tips:
+  - `getDesk(deskCreator)` — desk pinned to the newsroom’s wallet
+  - `canaryAlive(deskCreator, deskKey)` — polls (expiry fires no event)
+  - `inboxPage(deskKey)` — cursor‑paginated tips, `.createdBy(RELAY)` only
+  - `watchInbox(deskKey, onTip)` — WebSocket live events, then `getEntity` and decrypt client‑side
+- Reply (desk) and read replies (source):
+  - `reply(w, tipKey, wire)` and `repliesFor(tipKey, deskCreator)`
+
+Crypto
+------
+
+Browser‑only ECIES: P‑256 ECDH → HKDF‑SHA256 → AES‑256‑GCM. Tip plaintexts are padded to 2 KiB buckets to reduce length leakage. See `lib/crypto.ts`.
+
+- Source → desk: `sealTo(deskPubRaw, text)` returns `{ wire, receiptJwk }`, where `receiptJwk` is the source’s ephemeral private key in JWK form (kept only by the source).
+- Desk → source: `openAsDesk(deskPriv, wire)` returns `{ text, ephPub }` for replies; desk replies with `sealReply(deskPriv, ephPub, text)`.
+- Source reads replies with `openReply(receiptPriv, deskPub, wire)`.
+
+Exact queries (schema and indexes)
+----------------------------------
+
+Inlined in `arkiv/schema.md` under “Queries the app runs”; reproduced here for convenience:
+
+```ts
+// 1. Desk page (source side)
+select({key,creator,expiresAt,payload})
+  .where(eq("project",P), eq("type","desk"), gt("$expiresAt", u64(head)))
+  .createdBy(DESK).limit(1)
+// 2. Canary status
+select({key,expiresAt})
+  .where(eq("project",P), eq("type","canary"), eq("desk", key(deskKey)), gt("$expiresAt", u64(head)))
+  .createdBy(DESK).limit(1)
+// 3. Desk inbox
+select({key,createdAt,expiresAt,payload})
+  .where(eq("project",P), eq("type","tip"), eq("desk", key(deskKey)))
+  .createdBy(RELAY).limit(50).cursor(c)
+// 4. Replies a source can trust
+select({key,payload})
+  .where(eq("project",P), eq("type","reply"), eq("tip", key(tipKey)))
+  .createdBy(DESK).limit(20)
+```
+
+Wallet addresses (testnet only)
+-------------------------------
+
+These are used in the demo and on‑chain tests. Keys are never committed; see `/home/.../uploads/canarydrop-testnet-wallets_*.json` locally.
+
+- Relay: `0xa6Aa6a1409eb54028550466169A29EAfd8f7a442`
+- Demo desk: `0x1da3c22c079c264536D831F6F1fCe638aB0b20B0`
+- Impersonator: `0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af`
+
+Run locally
+-----------
+
+Prereqs: Node 20+, pnpm or npm.
+
+1) Install
+
+```bash
+npm i
+```
+
+2) Create `.env.local` with testnet values:
+
+```bash
+# server-only; pays gas for tips
+RELAY_PRIVATE_KEY=0x...           # DO NOT commit
+# optional demo mode for the desk (server-signed txns)
+DESK_PRIVATE_KEY=0x...            # DO NOT commit
+# public addrs to verify creator filters in the UI
+NEXT_PUBLIC_RELAY_ADDRESS=0xa6Aa6a1409eb54028550466169A29EAfd8f7a442
+NEXT_PUBLIC_DESK_ADDRESS=0x1da3c22c079c264536D831F6F1fCe638aB0b20B0
+```
+
+3) Dev
+
+```bash
+npm run dev
+```
+
+4) Build
+
+```bash
+npm run build
+```
+
+Vercel deployment
+-----------------
+
+Set these Environment Variables (Production + Preview):
+
+- `RELAY_PRIVATE_KEY` — server‑only
+- `DESK_PRIVATE_KEY` — optional, enables Demo Mode
+- `NEXT_PUBLIC_RELAY_ADDRESS` — relay wallet address
+- `NEXT_PUBLIC_DESK_ADDRESS` — demo desk creator address
+
+Chain configuration
+-------------------
+
+- Chain: Tiramisu testnet (`chainId = 7738577`, hex `0x7614d1`)
+- RPC: `https://rpc.tiramisu.db-chain.testnet.arkiv.network`
+- WS: `wss://rpc.tiramisu.db-chain.testnet.arkiv.network`
+- Native token: GLM (Golem)
+- Explorer: `https://hub.arkiv.network/tiramisu`
+
+Security notes
+--------------
+
+- Desk, canary and reply reads are all filtered with `.createdBy(deskWallet)`. The homepage also demonstrates an impersonator desk with the same “name” being ignored because it was created by a different wallet.
+- Tips are client‑side encrypted; the relay never sees plaintext.
+- The relay performs an in‑memory per‑IP rate limit. It keeps no application logs (platform logs are a residual risk).
+- Synthetic data only; never store personal data or private keys on Arkiv.
+
+Friction and SDK notes
+----------------------
+
+See `arkiv/friction.md` with exact versions and a runnable repro in `arkiv/repro/friction-repro.mjs`. Only issues reproduced in this repo are listed.
+
+AI usage
+--------
+
+This project’s UI was styled against a provided “Neural Pathway” motion design brief. Code generation assistants were used to scaffold Next.js pages and CSS and to speed up boilerplate, but all Arkiv calls were implemented by hand against the SDK and verified with the docs and the SDK’s source. All cryptography was implemented against WebCrypto and is tested by round‑trip.
+
+What’s verified on-chain (fill while testing)
+---------------------------------------------
+
+- predict‑then‑create‑and‑reference in one tx: …
+- tip create + ownership change to `0x…dEaD` in the same batch: … (tx hash)
+- extend earlier expiry reverts: …
+
+License
+-------
+
+MIT — see `LICENSE`.
+

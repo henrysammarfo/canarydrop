@@ -1,0 +1,17 @@
+# dependencies
+node_modules
+.next
+.env.local
+.env*
+.vercel
+.DS_Store
+
+# logs
+npm-debug.log*
+.yarn*
+
+# builds
+*.log
+
+# uploads (local only)
+/home/ubuntu/.cursor/projects/workspace/uploads/
