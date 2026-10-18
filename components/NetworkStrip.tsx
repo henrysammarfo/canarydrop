@@ -38,7 +38,7 @@ export default async function NetworkStrip() {
         <div><span className="muted">Canaries alive</span><div style={{ fontWeight: 600 }}>{data.canariesAlive}</div></div>
         <div>
           <span className="muted">Last canary renewal</span>
-          <div style={{ fontWeight: 600 }}>{data.lastCanary ? `expires@ ${data.lastCanary}` : 'None yet'}</div>
+          <div style={{ fontWeight: 600 }}>{data.lastCanary ? `Expires at block ${data.lastCanary}` : 'None yet'}</div>
         </div>
       </div>
     </div>

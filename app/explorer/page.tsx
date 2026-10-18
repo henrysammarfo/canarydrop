@@ -84,7 +84,7 @@ export default function ExplorerPage() {
         <p className="kicker">Tiramisu</p>
         <h1 className="h2">Explorer</h1>
         <p className="lead" style={{ marginTop: 10 }}>
-          Live CanaryDrop entities. Impostor desks are ignored in the app because reads are pinned to the real $creator.
+          Live CanaryDrop entities. Impostor desks are ignored because the app only trusts the real desk wallet.
         </p>
 
         <div className="table-wrap" style={{ marginTop: 18 }}>

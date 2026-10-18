@@ -7,7 +7,7 @@ import { sealTo } from '@/lib/crypto';
 import Link from 'next/link';
 import Modal from '@/components/Modal';
 import { useToast } from '@/components/Toast';
-import { entityUrl, txUrl } from '@/lib/chain';
+import { entityUrl, shortHex, txUrl } from '@/lib/chain';
 
 export default function SubmitPage() {
   const push = useToast();
@@ -71,7 +71,7 @@ export default function SubmitPage() {
       const j = await res.json();
       if (!res.ok) throw new Error(j?.message ?? j?.error ?? 'failed');
       if (dryRun) {
-        push({ kind: 'info', text: `Dry run ok. Predicted tip key ${j.predictedTipKey ?? 'unknown'}. Nothing was sent.` });
+        push({ kind: 'info', text: `Dry run ok. Predicted tip key ${shortHex(String(j.predictedTipKey ?? ''), 6, 4) || 'unknown'}. Nothing was sent.` });
       } else {
         setOk({ tipKey: j.tipKey as Hex, txHash: j.txHash as Hex, receipt });
         setText('');

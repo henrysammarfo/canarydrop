@@ -86,9 +86,9 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
             )}
           </div>
           <div className="card">
-            <div className="kicker">$creator</div>
+            <div className="kicker">Desk wallet</div>
             <div className="creator-badge" style={{ marginTop: 10 }}>
-              <span className="pill">$creator</span>
+              <span className="pill"><code>$creator</code></span>
               <code>{shortHex(creator, 8, 6)}</code>
             </div>
             <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 12 }}>

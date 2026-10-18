@@ -12,7 +12,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const push = useCallback((t: Omit<Toast, 'id'>) => {
     const id = Date.now() + Math.random();
     setToasts((arr) => [...arr, { id, ...t }]);
-    setTimeout(() => setToasts((arr) => arr.filter((x) => x.id !== id)), 5200);
+    setTimeout(() => setToasts((arr) => arr.filter((x) => x.id !== id)), 8000);
   }, []);
 
   const polite = toasts.filter((t) => t.kind !== 'error');
