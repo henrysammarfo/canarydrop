@@ -28,7 +28,11 @@ for (const r of routes) {
     });
     await page.goto(urlFor(r), { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveTitle(/CanaryDrop|Canary/);
-    expect(errors, `Console errors on ${r}`).toEqual([]);
+    const unexpected = errors.filter((e) => {
+      if (r === '/__404__' && /404/.test(e)) return false;
+      return true;
+    });
+    expect(unexpected, `Console errors on ${r}`).toEqual([]);
     await page.screenshot({ path: path.join('shots', r.replace(/\W+/g, '_') + '.png'), fullPage: true });
   });
 }
@@ -89,7 +93,8 @@ test('mobile nav shows hamburger and hides inline links', async ({ page }) => {
   await expect(page.locator('.nav-links')).toBeHidden();
   await expect(page.locator('.home-marquee')).toBeVisible();
   await page.locator('.hamburger').click();
-  await expect(page.locator('#mobile-menu')).toBeVisible();
+  await expect(page.locator('#mobile-menu.open')).toBeVisible();
+  await expect(page.locator('#mobile-menu').getByRole('link', { name: 'Submit' })).toBeVisible();
 });
 
 test('production home has headline', async ({ page }) => {
