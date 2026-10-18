@@ -1,3 +1,5 @@
+import { TIRAMISU_EXPLORER } from '@/lib/chain';
+
 export default function Footer() {
   return (
     <footer className="footer">
@@ -5,16 +7,15 @@ export default function Footer() {
         <div style={{ opacity: 0.9 }}>
           MIT · Built for Arkiv Global Tour · Tiramisu testnet
         </div>
-        <div style={{ display: 'flex', gap: 14 }}>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
           <a className="btn" href="https://github.com/henrysammarfo/canarydrop" target="_blank" rel="noreferrer">
-            GitHub
+            GitHub <span className="arrow" aria-hidden="true" />
           </a>
-          <a className="btn" href="https://hub.arkiv.network/tiramisu" target="_blank" rel="noreferrer">
-            Arkiv Explorer
+          <a className="btn" href={TIRAMISU_EXPLORER} target="_blank" rel="noreferrer">
+            Arkiv Explorer <span className="arrow" aria-hidden="true" />
           </a>
         </div>
       </div>
     </footer>
   );
 }
-

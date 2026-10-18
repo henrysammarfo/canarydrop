@@ -22,7 +22,7 @@ export default async function NetworkStrip() {
       } catch {}
       return { block: timing.currentBlock.toString(), tips, desks, canariesAlive, lastCanary };
     } catch {
-      return { block: '—', tips: 0, desks: 0, canariesAlive: 0, lastCanary: null };
+      return { block: 'n/a', tips: 0, desks: 0, canariesAlive: 0, lastCanary: null };
     }
   }
   const data = await gather();

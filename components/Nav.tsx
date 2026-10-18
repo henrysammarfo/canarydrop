@@ -2,111 +2,112 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { shortHex } from '@/lib/chain';
+import { connectTiramisu, existingAccount } from '@/lib/wallet';
+import { useToast } from './Toast';
 
 export default function Nav() {
+  const push = useToast();
   const [addr, setAddr] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const deskCreator = process.env.NEXT_PUBLIC_DESK_ADDRESS || '0x';
+  const deskCreator = process.env.NEXT_PUBLIC_DESK_ADDRESS || '0x1da3c22c079c264536D831F6F1fCe638aB0b20B0';
 
   async function connect() {
-    try {
-      if (!(window as any).ethereum) return;
-      const [a] = await (window as any).ethereum.request({ method: 'eth_requestAccounts' });
-      setAddr(a);
-      setOpen(false);
-    } catch {}
+    const result = await connectTiramisu();
+    if ('error' in result) {
+      push({ kind: 'error', text: result.error });
+      return;
+    }
+    setAddr(result.address);
+    setOpen(false);
+    push({ kind: 'success', text: `Wallet connected ${shortHex(result.address)}` });
   }
 
   useEffect(() => {
     (async () => {
-      try {
-        if (!(window as any).ethereum) return;
-        const as = await (window as any).ethereum.request({ method: 'eth_accounts' });
-        if (as?.length) setAddr(as[0]);
-      } catch {}
+      const a = await existingAccount();
+      if (a) setAddr(a);
     })();
   }, []);
+
+  useEffect(() => {
+    function onResize() {
+      if (window.innerWidth > 900) setOpen(false);
+    }
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const links = (
+    <>
+      <a href="/#how" onClick={() => setOpen(false)}>
+        How it works
+      </a>
+      <Link href="/submit" onClick={() => setOpen(false)}>
+        Submit
+      </Link>
+      <Link href="/desk" onClick={() => setOpen(false)}>
+        Desk
+      </Link>
+      <Link href={`/canary/${deskCreator}`} onClick={() => setOpen(false)}>
+        Canary
+      </Link>
+      <Link href="/explorer" onClick={() => setOpen(false)}>
+        Explorer
+      </Link>
+      <Link href="/docs" onClick={() => setOpen(false)}>
+        Docs
+      </Link>
+    </>
+  );
 
   return (
     <div className="site-nav">
       <div className="wrap nav-inner">
-        <div className="nav-left" style={{ flexWrap: 'nowrap', alignItems:'center' }}>
+        <div className="nav-left">
           <Link href="/" className="logo" aria-label="Home">
-            <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', letterSpacing:'.08em' }}>[ CANARYDROP ]</span>
+            <span className="logo-mark">[ CANARYDROP ]</span>
           </Link>
-          <span className="pill" style={{ marginLeft: 6, fontSize:11 }}>TESTNET</span>
-          <nav className="nav-links" style={{ flexWrap: 'nowrap', overflow: 'hidden' }}>
-            <a href="/#how">How it works</a>
-            <Link href="/explorer">Explorer</Link>
-            <Link href="/docs">Docs</Link>
-            <a href="https://github.com/henrysammarfo/canarydrop" target="_blank" rel="noreferrer">GitHub</a>
+          <span className="pill testnet-pill">TESTNET</span>
+          <nav className="nav-links" aria-label="Primary">
+            {links}
           </nav>
         </div>
-        <div className="nav-right" style={{ flexWrap: 'nowrap' }}>
-          <span className="pill">Tiramisu testnet</span>
-          <button className="btn connect" onClick={connect}>
-            {addr ? `Wallet ${addr.slice(0, 6)}…${addr.slice(-4)}` : 'Connect wallet'}
+        <div className="nav-right">
+          <span className="pill network-pill">Tiramisu testnet</span>
+          <button type="button" className="btn connect" onClick={connect}>
+            {addr ? `Wallet ${shortHex(addr)}` : 'Connect wallet'}
+            <span className="arrow" aria-hidden="true" />
           </button>
           <button
-            className="btn"
-            aria-label="Menu"
+            type="button"
+            className="btn hamburger"
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            aria-expanded={open}
+            aria-controls="mobile-menu"
             onClick={() => setOpen((v) => !v)}
-            style={{ display: 'none' }}
-            id="hamburger"
           >
             ☰
           </button>
         </div>
       </div>
-      {/* Mobile panel */}
-      <div
-        className="wrap"
-        style={{
-          display: open ? 'block' : 'none',
-          paddingBottom: 12,
-        }}
-      >
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <Link href="/#how" onClick={() => setOpen(false)}>
-            How it works
-          </Link>
-          <Link href="/submit" onClick={() => setOpen(false)}>
-            Submit a tip
-          </Link>
-          <Link href="/desk" onClick={() => setOpen(false)}>
-            Desk
-          </Link>
-          <Link href="/r" onClick={() => setOpen(false)}>
-            Verify receipt
-          </Link>
-          <Link href={`/canary/${deskCreator}`} onClick={() => setOpen(false)}>
-            Canary
-          </Link>
-          <Link href="/explorer" onClick={() => setOpen(false)}>
-            Explorer
-          </Link>
-          <Link href="/docs" onClick={() => setOpen(false)}>
-            Docs
-          </Link>
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <span className="pill">Tiramisu testnet</span>
-            <button className="btn" onClick={connect}>
-              {addr ? `Wallet ${addr.slice(0, 6)}…${addr.slice(-4)}` : 'Connect wallet'}
-            </button>
+      <div id="mobile-menu" className={`nav-panel ${open ? 'open' : ''}`}>
+        <div className="wrap">
+          <div className="card nav-panel-inner">
+            {links}
+            <a href="https://github.com/henrysammarfo/canarydrop" target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>
+              GitHub
+            </a>
+            <div className="nav-panel-actions">
+              <span className="pill">Tiramisu testnet</span>
+              <button type="button" className="btn primary" onClick={connect}>
+                {addr ? `Wallet ${shortHex(addr)}` : 'Connect wallet'}
+                <span className="arrow" aria-hidden="true" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
-      <style jsx>{`
-        @media (max-width: 900px) {
-          .nav-links {
-            display: none;
-          }
-          #hamburger {
-            display: inline-flex !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }
-

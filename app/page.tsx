@@ -1,6 +1,7 @@
-/* Landing page rebuilt in Arkiv style: hero, marquee, statement, steps, live stats, bento, comparison, FAQ, CTA */
+/* Landing page: hero (video scoped here), marquee, statement, steps, stats, bento, compare, FAQ, CTA */
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import Reveal from '@/components/Reveal';
 
 const VIDEO =
   'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260912_104303_0c6d60b2-9353-408e-944-585108a22fb5.mp4';
@@ -11,44 +12,32 @@ const NetworkStrip = dynamic(() => import('@/components/NetworkStrip'), { ssr: t
 export default function HomePage() {
   return (
     <>
-      {/* HERO with video backdrop (only here) */}
-      <section id="hero" className="section" style={{ paddingTop: 'var(--space-8)', paddingBottom: 'var(--space-6)', position: 'relative' }}>
+      <Reveal />
+      <section id="hero" className="section">
         <video className="art" autoPlay muted loop playsInline preload="auto" aria-hidden="true" poster={POSTER} src={VIDEO} />
         <div className="veil" />
-        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none', zIndex: 1 }}>
-          <div
-            style={{
-              width: '70%',
-              maxWidth: 900,
-              height: 360,
-              background:
-                'radial-gradient(ellipse at center, rgba(5,8,14,.78), rgba(5,8,14,0) 70%)',
-            }}
-          />
-        </div>
-        <div className="wrap hero-head" style={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
+        <div className="wrap hero-head" style={{ textAlign: 'center', width: '100%' }}>
           <div className="kicker" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
             PRIVATE · SEALED · WALLET OWNED
           </div>
           <h1 className="h1" style={{ marginTop: 10, textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.02em' }}>
             TIPS THAT CANNOT BE SEIZED.
           </h1>
-          <p className="lead" style={{ marginTop: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+          <p className="lead">
             Your tip locks on your device. Only the newsroom can open it.
           </p>
           <div className="ctaRow" style={{ marginTop: 18, justifyContent: 'center' }}>
             <Link className="btn primary" href="/submit">
-              Send a tip
+              Send a tip <span className="arrow" aria-hidden="true" />
             </Link>
             <Link className="btn" href="/desk">
-              Open the desk
+              Open the desk <span className="arrow" aria-hidden="true" />
             </Link>
           </div>
         </div>
       </section>
 
-      {/* KEYWORD MARQUEE */}
-      <section aria-hidden="true" className="home-marquee">
+      <section aria-hidden="true" className="home-marquee reveal">
         <div className="home-marquee-track">
           <span>PRIVATE</span>
           <span>SEALED</span>
@@ -65,8 +54,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* STATEMENT BAND */}
-      <section className="home-band">
+      <section className="home-band reveal">
         <div className="wrap">
           <div className="home-band-text">
             THE TIP LINE THAT FORGETS, AND THE CANARY THAT CANNOT LIE.
@@ -74,8 +62,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* HOW IT WORKS ROW */}
-      <section id="how" className="section">
+      <section id="how" className="section reveal">
         <div className="wrap">
           <div className="home-steps">
             <div className="cell">
@@ -102,8 +89,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* LIVE STATS */}
-      <section className="section" style={{ paddingTop: 0 }}>
+      <section className="section reveal" style={{ paddingTop: 0 }}>
         <div className="wrap">
           <div className="home-live">
             <span className="dot live" aria-hidden="true" />
@@ -113,8 +99,7 @@ export default function HomePage() {
         <NetworkStrip />
       </section>
 
-      {/* BENTO GRID */}
-      <section className="section">
+      <section className="section reveal">
         <div className="wrap">
           <div className="home-bento">
             <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts#L20-L31" target="_blank" rel="noreferrer">
@@ -145,15 +130,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* COMPARISON TABLE */}
-      <section className="section" style={{ paddingTop: 0 }}>
+      <section className="section reveal" style={{ paddingTop: 0 }}>
         <div className="wrap">
           <div className="home-compare card">
             <div className="head">
               <div />
               <div>CanaryDrop</div>
               <div>Email tip line</div>
-              <div>Self‑hosted server</div>
+              <div>Self hosted server</div>
             </div>
             <div className="row">
               <div>Needs an account</div>
@@ -189,11 +173,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="section" style={{ paddingTop: 0 }}>
+      <section id="faq" className="section reveal" style={{ paddingTop: 0 }}>
         <div className="wrap">
           <div className="home-faq">
-            <details className="card">
+            <details className="card" open>
               <summary>Do sources need a wallet?</summary>
               No. A sponsor posts the tip for them.
             </details>
@@ -221,20 +204,18 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CTA FOOTER */}
-      <section className="home-cta">
+      <section className="home-cta reveal">
         <div className="wrap">
           <div className="home-cta-inner">
             <div className="copy">Ready to try it?</div>
             <div className="ctaRow" style={{ marginTop: 0 }}>
-              <Link className="btn primary" href="/submit">Send a tip</Link>
-              <Link className="btn" href="/desk">Open the desk</Link>
+              <Link className="btn primary" href="/submit">Send a tip <span className="arrow" aria-hidden="true" /></Link>
+              <Link className="btn" href="/desk">Open the desk <span className="arrow" aria-hidden="true" /></Link>
             </div>
             <div className="links">
               <a href="https://github.com/henrysammarfo/canarydrop" target="_blank" rel="noreferrer">GitHub</a>
-              <a href="/arkiv/schema.md" target="_blank" rel="noreferrer">schema.md</a>
-              <a href="/arkiv/friction.md" target="_blank" rel="noreferrer">friction.md</a>
-              <a href="https://hub.arkiv.network/tiramisu" target="_blank" rel="noreferrer">Explorer</a>
+              <a href="/docs">Docs</a>
+              <a href="https://tiramisu.explorer.arkiv.network" target="_blank" rel="noreferrer">Explorer</a>
               <a href="/LICENSE" target="_blank" rel="noreferrer">MIT</a>
             </div>
           </div>
@@ -243,4 +224,3 @@ export default function HomePage() {
     </>
   );
 }
-
