@@ -38,6 +38,10 @@ Repro script: `arkiv/repro/friction-repro.mjs` (read-only, needs no wallet).
 
 ### Tested paths that worked
 - `createPublicClient({ chain: tiramisu, transport: webSocket() }).watchEntityEvents(...)` — delivered events promptly in ~2–3 s.
-- `predictEntityKeys` + `executeBatch` create‑then‑reference in one tx — OK in dry‑run; to be confirmed on-chain after seeding.
-- Atomic tip creation + `ownershipChanges` to `0x…dEaD` — OK in dry‑run; on‑chain evidence to be added post‑seed.
-- `extendEntity` renew sets a later expiry and reverts earlier — OK (dry‑run); to be confirmed on-chain.
+- `predictEntityKeys` + `executeBatch` create‑then‑reference in one tx — on chain: https://tiramisu.explorer.arkiv.network/tx/0x6558bfd29237fd4b131fbee1d74f13ac3ce1152d88a5ae05d24d5f33a1dc35be
+- Atomic tip creation + `ownershipChanges` to `0x…dEaD` — on chain: https://tiramisu.explorer.arkiv.network/tx/0xfba666e2ed91c4cd35f0020959cfe48520247f3ab6a96efa1b5e0ed2868744d9 / https://tiramisu.explorer.arkiv.network/tx/0x2401d9b57ae4545d4f2aee716476db731bcd7cc260c9c1ae42f1ec5e0b6df83c / https://tiramisu.explorer.arkiv.network/tx/0x96c37ab0a3592f02abe6ac75565fb5b0c400bb451156d2c156246728f3fc886f
+- `extendEntity` renew later expiry — on chain: https://tiramisu.explorer.arkiv.network/tx/0x348fcd830adef7e6cbf5e8201d425e208ef01be8cc6321e41bfa1a6b5f5df466
+
+### New items from seeding day
+- Attribute key casing: using an uppercase letter in a key (e.g., `renewedAt`) made `executeBatch` revert with `Ident32InvalidByte(uint256 position, bytes1 value)` = (7, 0x41). Expected: a client‑side validation error. Suggestion: SDK should enforce “attribute keys must be lowercase a‑z, 0‑9, underscore” and fail early.
+- Bare JS numbers: a raw `Date.now()` attribute value reverted until wrapped with `u64(...)`. Suggestion: expand docs and examples; possibly coerce integers to `u64` when the target attribute is declared numeric.

@@ -64,7 +64,7 @@ export default function ExplorerPage() {
           <ul style={{ padding: 0, margin: 0 }}>
             {items.map((it) => (
               <li key={it.key} style={{ listStyle: 'none', padding: 10, borderBottom: '1px solid rgba(170,200,222,.12)' }}>
-                <code>{it.key}</code> · <span className="muted">{it.type}</span> · owner <code>{it.owner}</code>
+                <code>{it.key}</code> · <span className="muted">{it.type}</span> · creator <code>{it.owner}</code>
               </li>
             ))}
             {items.length === 0 && <li className="muted">Waiting for events…</li>}
