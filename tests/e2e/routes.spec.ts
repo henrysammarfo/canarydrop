@@ -22,6 +22,8 @@ test('no horizontal overflow at 390px on home', async ({ page }) => {
   await page.goto(process.env.PRODUCTION_URL ? process.env.PRODUCTION_URL : '/');
   await page.waitForLoadState('load');
   const w = await page.evaluate(() => ({ sw: document.body.scrollWidth, iw: window.innerWidth }));
+  // eslint-disable-next-line no-console
+  console.log('overflow-check', w);
   expect(w.sw <= w.iw).toBeTruthy();
 });
 
