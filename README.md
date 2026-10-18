@@ -5,6 +5,8 @@ Tips that can’t be seized. Canaries that can’t be faked.
 
 Live demo: https://canarydrop-teamtitanlink.vercel.app
 
+Demo video: https://canarydrop-teamtitanlink.vercel.app/demo.mp4
+
 Why the Privacy pillar
 ----------------------
 Sources and whistleblowers are exposed when tip‑line databases are seized and when canary pages are quietly edited. CanaryDrop keeps plaintext off servers, locks every tip on the sender’s device, and makes canaries self‑expiring so the absence is the signal.
