@@ -14,10 +14,10 @@ export default function HomePage() {
       <video className="art" autoPlay muted loop playsInline preload="auto" aria-hidden="true" poster={POSTER} src={VIDEO} />
       <div className="veil" />
       <header className="section" style={{ paddingTop: 'var(--space-8)', paddingBottom: 'var(--space-6)' }}>
-        <div className="wrap" style={{ textAlign: 'center' }}>
-          <div className="kicker">Anonymous tips · Sealed expiry · On‑chain canaries</div>
-          <h1 className="h1" style={{ marginTop: 10 }}>Tips that can’t be seized. Canaries that can’t be faked.</h1>
-          <p className="lead" style={{ marginTop: 12 }}>Encrypted in your browser. Posted via a relay. Read right from Arkiv.</p>
+        <div className="wrap hero-head" style={{ textAlign: 'center' }}>
+          <div className="kicker">Anonymous tips, sealed expiry, on chain</div>
+          <h1 className="h1" style={{ marginTop: 10 }}>Send news safely. Keep your canary alive.</h1>
+          <p className="lead" style={{ marginTop: 12 }}>Your tip is locked on your device before you send it. Only the newsroom can open it.</p>
           <div className="ctaRow" style={{ marginTop: 18 }}>
             <Link className="btn primary hero" href="/submit"><span className="dot" /> Submit a tip</Link>
             <Link className="btn hero" href="/desk">Open the desk</Link>
@@ -40,26 +40,34 @@ export default function HomePage() {
           <h2 className="h2">Built on Arkiv</h2>
           <div className="grid cols-2" style={{ marginTop: 'var(--space-3)' }}>
             <div className="card">
-              <strong>SDK calls we use</strong>
+              <strong>How it helps</strong>
               <ul className="muted" style={{ marginTop: 8 }}>
-                <li>predictEntityKeys → executeBatch (create + reference)</li>
-                <li>executeBatch.ownershipChanges to seal tips</li>
-                <li>createEntity (reply)</li>
-                <li>ExpirationTime & extendEntity (canary + desk lease)</li>
-                <li>select + createdBy filters; key(attr) queries</li>
-                <li>watchEntityEvents over webSocket()</li>
+                <li>Tips expire automatically. Nobody can extend or delete them.</li>
+                <li>Readers connect straight to Arkiv from the browser.</li>
+                <li>Desks are tied to a wallet, so copycats are ignored.</li>
               </ul>
             </div>
             <div className="card">
               <strong>Security model</strong>
               <ul className="muted" style={{ marginTop: 8 }}>
-                <li>Client‑side encryption; relay never sees plaintext</li>
-                <li>Read queries are creator‑pinned, so impersonators are ignored</li>
-                <li>Tips have sealed expiry; nobody can extend or delete</li>
-                <li>Canary must be renewed daily — the absence is the signal</li>
+                <li>Your browser locks your tip. The relay never sees the words.</li>
+                <li>Reads are pinned to the real desk wallet, so impostors do not show up.</li>
+                <li>Tips are created read‑only and handed to a burn address. They cannot be changed.</li>
+                <li>You renew your canary each day. If it is missing, that is the signal.</li>
               </ul>
             </div>
           </div>
+          <details className="card" style={{ marginTop: 'var(--space-3)' }}>
+            <summary>For developers</summary>
+            <ul className="muted" style={{ marginTop: 8 }}>
+              <li>predictEntityKeys then executeBatch (create, reference)</li>
+              <li>executeBatch.ownershipChanges to send tips to 0x…dEaD</li>
+              <li>createEntity for replies</li>
+              <li>ExpirationTime and extendEntity for canary and desk leases</li>
+              <li>select with createdBy filters; key(attr) queries</li>
+              <li>watchEntityEvents over webSocket()</li>
+            </ul>
+          </details>
           <div className="ctaRow" style={{ marginTop: 'var(--space-4)' }}>
             <Link className="btn primary" href="/docs">Read the docs</Link>
             <a className="btn" href="https://hub.arkiv.network/tiramisu" target="_blank">Open Arkiv Explorer</a>
@@ -70,10 +78,10 @@ export default function HomePage() {
         <div className="wrap">
           <h2 className="h2">FAQ</h2>
           <div className="grid cols-2" style={{ marginTop: 'var(--space-3)' }}>
-            <div className="card"><strong>Do sources need wallets?</strong><p className="muted">No. The relay creates entities and pays gas.</p></div>
-            <div className="card"><strong>What data hits Arkiv?</strong><p className="muted">Only encrypted payloads and small attributes. No personal data.</p></div>
-            <div className="card"><strong>How is censorship resistance achieved?</strong><p className="muted">All reads go straight from the browser to Arkiv RPC/WS — no read API.</p></div>
-            <div className="card"><strong>What if the relay is down?</strong><p className="muted">Reading still works. Posting tips requires the relay (or another sponsor).</p></div>
+            <div className="card"><strong>Do sources need wallets?</strong><p className="muted">No. A sponsor wallet posts the tip for them.</p></div>
+            <div className="card"><strong>What data goes on Arkiv?</strong><p className="muted">Only locked text and a few small labels. No personal data.</p></div>
+            <div className="card"><strong>How can it be read anywhere?</strong><p className="muted">The app reads straight from Arkiv in the browser. There is no read API to block.</p></div>
+            <div className="card"><strong>What if the sponsor is down?</strong><p className="muted">Reading still works. Sending new tips needs the sponsor.</p></div>
           </div>
           <div className="ctaRow" style={{ marginTop: 'var(--space-4)' }}>
             <Link className="btn primary" href="/submit"><span className="dot" /> Submit a tip</Link>

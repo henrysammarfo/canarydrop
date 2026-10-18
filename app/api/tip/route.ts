@@ -12,7 +12,7 @@ const RATE_LIMIT_MAX = 20; // per-IP per minute, in-memory
 const ipBuckets = new Map<string, { resetAt: number; count: number }>();
 
 function rateLimit(ip: string | null) {
-  if (!ip) return false;
+  if (!ip) return true;
   const now = Date.now();
   const b = ipBuckets.get(ip);
   if (!b || now >= b.resetAt) {
@@ -42,7 +42,14 @@ export async function POST(req: NextRequest) {
       lifetime: '1h' | '24h' | '72h' | '7d';
     };
     if (!deskKey || !wireB64 || !lifetime) {
-      return NextResponse.json({ error: 'bad_request' }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: 'missing_fields',
+          message:
+            'Please include deskKey, wireB64 (base64 ciphertext), and lifetime (one of 1h, 24h, 72h, 7d). Nothing was sent.',
+        },
+        { status: 400 },
+      );
     }
     const wire = Uint8Array.from(Buffer.from(wireB64, 'base64'));
     if (dryRun) {

@@ -71,7 +71,7 @@ export default function SubmitPage() {
     <section className="section">
       <div className="wrap" style={{ maxWidth: 860 }}>
         <h1 className="h2">Submit a tip</h1>
-        <p className="lead">SYNTHETIC DATA ONLY — encrypted locally, posted by a relay.</p>
+        <p className="lead">Synthetic data only. Your words are locked on this device, then posted by a sponsor wallet.</p>
         <div style={{ display: 'grid', gap: 16, marginTop: 18 }}>
           <div>
             <label className="small">Desk creator address</label>

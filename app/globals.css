@@ -209,3 +209,6 @@ input[type=\"text\"], input[type=\"search\"], input[type=\"url\"], input[type=\"
 }
 label.small { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
 
+/* Ensure hero heading is visible over video */
+.hero-head{ color: var(--ink); position: relative; z-index: 2; text-shadow: 0 2px 10px rgba(0,0,0,.45) }
+

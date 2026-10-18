@@ -308,7 +308,7 @@ export default function DeskPage() {
             <div className="card">
               <strong>Canary</strong>
               <div className="muted" style={{ marginTop: 6 }}>
-                {alive === null ? 'Unknown' : alive ? 'Alive' : 'Expired'}
+                {alive === null ? 'No canary yet. Create your desk to start one.' : alive ? 'Alive' : 'Expired'}
               </div>
               <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 10 }}>
                 <button className="btn primary" onClick={renewFlow} disabled={!deskKey || !canaryKey || busy}>
@@ -319,9 +319,9 @@ export default function DeskPage() {
             <div className="card">
               <strong>Desk</strong>
               <div className="muted" style={{ marginTop: 6 }}>
-                Creator <code>{creator ?? '—'}</code>
+                Creator <code>{creator ?? 'Not set'}</code>
                 <br />
-                Desk key <code>{deskKey ?? '—'}</code>
+                Desk key <code>{deskKey ?? 'Not set'}</code>
               </div>
             </div>
             <div className="card">
