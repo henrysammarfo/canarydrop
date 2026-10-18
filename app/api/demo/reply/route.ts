@@ -14,11 +14,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { tipKey, wireB64 } = body as { tipKey: Hex; wireB64: string };
     if (!tipKey || !wireB64) return NextResponse.json({ error: 'bad_request' }, { status: 400 });
-    const account = privateKeyToAccount((pk || '0x') as Hex);
-    const w = createWalletClient({ chain: tiramisu, transport: http(), account });
     if (dryRun) {
       return NextResponse.json({ ok: true, dryRun: true, wouldReplyTo: tipKey });
     } else {
+      const account = privateKeyToAccount(pk as Hex);
+      const w = createWalletClient({ chain: tiramisu, transport: http(), account });
       const out = await reply(w, tipKey, Uint8Array.from(Buffer.from(wireB64, 'base64')));
       return NextResponse.json({ ok: true, txHash: out.txHash });
     }

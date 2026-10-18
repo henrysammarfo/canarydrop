@@ -14,11 +14,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { deskKey, canaryKey } = body as { deskKey: Hex; canaryKey: Hex };
     if (!deskKey || !canaryKey) return NextResponse.json({ error: 'bad_request' }, { status: 400 });
-    const account = privateKeyToAccount((pk || '0x') as Hex);
-    const w = createWalletClient({ chain: tiramisu, transport: http(), account });
     if (dryRun) {
       return NextResponse.json({ ok: true, dryRun: true, wouldRenew: [deskKey, canaryKey] });
     } else {
+      const account = privateKeyToAccount(pk as Hex);
+      const w = createWalletClient({ chain: tiramisu, transport: http(), account });
       const out = await renew(w, deskKey, canaryKey);
       return NextResponse.json({ ok: true, txHash: out.txHash });
     }

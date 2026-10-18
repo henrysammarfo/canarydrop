@@ -14,13 +14,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, deskPubRawB64 } = body as { name: string; deskPubRawB64: string };
     if (!name || !deskPubRawB64) return NextResponse.json({ error: 'bad_request' }, { status: 400 });
-    const account = privateKeyToAccount((pk || '0x') as Hex);
-    const w = createWalletClient({ chain: tiramisu, transport: http(), account });
     if (dryRun) {
       const pubc = createPublicClient({ chain: tiramisu, transport: http() });
-      const predicted = await pubc.predictEntityKeys({ owner: account.address, count: 2 });
+      const predicted = await pubc.predictEntityKeys({ owner: (process.env.NEXT_PUBLIC_DESK_ADDRESS as Hex) || '0x0000000000000000000000000000000000000000', count: 2 });
       return NextResponse.json({ ok: true, dryRun: true, predicted: predicted.map((x) => x.key) });
     } else {
+      const account = privateKeyToAccount(pk as Hex);
+      const w = createWalletClient({ chain: tiramisu, transport: http(), account });
       const out = await createDesk(w, account.address, name, Uint8Array.from(Buffer.from(deskPubRawB64, 'base64')));
       return NextResponse.json({ ok: true, txHash: out.txHash, created: out.createdEntities });
     }
