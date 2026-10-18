@@ -304,6 +304,16 @@ export default function DeskPage() {
       </header>
       <main className="section" style={{ paddingTop: 'var(--space-2)' }}>
         <div className="wrap">
+          {!demo && !connected && (
+            <div className="card" style={{ textAlign:'center', padding:'32px', marginBottom:16 }}>
+              <h2 className="h2">Choose how to run the desk</h2>
+              <p className="lead">Connect a wallet to truly own your Arkiv entities, or use Demo mode signed on the server for judges without a wallet.</p>
+              <div className="ctaRow" style={{ justifyContent:'center', marginTop:12 }}>
+                <button className="btn primary" onClick={connect}>Connect wallet</button>
+                <button className="btn" onClick={()=>setDemo(true)}>Use Demo mode</button>
+              </div>
+            </div>
+          )}
           <div className="grid cols-3">
             <div className="card">
               <strong>Canary</strong>

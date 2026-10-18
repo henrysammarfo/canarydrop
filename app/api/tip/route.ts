@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       const pub = createPublicClient({ chain: tiramisu, transport: http() });
       const [pred] = await pub.predictEntityKeys({ owner: (process.env.NEXT_PUBLIC_RELAY_ADDRESS || '0x') as Hex, count: 1 });
       // Construct the attributes we would write
-      const attributes = { project: PROJECT, type: 'tip', desk: key(deskKey) } as any;
+      const attributes = { project: PROJECT, type: 'tip', desk: key(deskKey as any) } as any;
       return NextResponse.json({
         ok: true,
         dryRun: true,
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
         expires: lifetime in LIFETIMES ? lifetime : 'unknown',
       });
     } else {
-      const out = await postTip(deskKey, wire, lifetime);
+      const out = await postTip(deskKey as any, wire, lifetime);
       return NextResponse.json({ ok: true, ...out });
     }
   } catch (e: any) {

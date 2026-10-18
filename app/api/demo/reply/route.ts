@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     } else {
       const account = privateKeyToAccount(pk as Hex);
       const w = createWalletClient({ chain: tiramisu, transport: http(), account });
-      const out = await reply(w, tipKey, Uint8Array.from(Buffer.from(wireB64, 'base64')));
+      const out = await reply(w as any, tipKey as any, Uint8Array.from(Buffer.from(wireB64, 'base64')));
       return NextResponse.json({ ok: true, txHash: out.txHash });
     }
   } catch (e: any) {
