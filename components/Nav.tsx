@@ -30,18 +30,16 @@ export default function Nav() {
   return (
     <div className="site-nav">
       <div className="wrap nav-inner">
-        <div className="nav-left" style={{ flexWrap: 'nowrap' }}>
-          <Link href="/" className="logo">
-            <span>CANARYDROP</span>
+        <div className="nav-left" style={{ flexWrap: 'nowrap', alignItems:'center' }}>
+          <Link href="/" className="logo" aria-label="Home">
+            <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', letterSpacing:'.08em' }}>[ CANARYDROP ]</span>
           </Link>
+          <span className="pill" style={{ marginLeft: 6, fontSize:11 }}>TESTNET</span>
           <nav className="nav-links" style={{ flexWrap: 'nowrap', overflow: 'hidden' }}>
             <a href="/#how">How it works</a>
-            <Link href="/submit">Submit</Link>
-            <Link href="/desk">Desk</Link>
-            <Link href="/r">Verify</Link>
-            <Link href={`/canary/${deskCreator}`}>Canary</Link>
             <Link href="/explorer">Explorer</Link>
             <Link href="/docs">Docs</Link>
+            <a href="https://github.com/henrysammarfo/canarydrop" target="_blank" rel="noreferrer">GitHub</a>
           </nav>
         </div>
         <div className="nav-right" style={{ flexWrap: 'nowrap' }}>
