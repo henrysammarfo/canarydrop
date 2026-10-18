@@ -9,18 +9,21 @@ type Item = { key: Hex; type: string; createdAt?: bigint; owner: Hex };
 export default function ExplorerPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
         // Seed with recent entities (best-effort)
         const r = await pub.select({ key: true, attributes: true, creator: true, createdAt: true })
-          .limit(20).fetch().catch(()=>({ entities:[] } as any));
+          .limit(20).fetch().catch(()=>({ entities:[], nextCursor:null } as any));
         const base: Item[] = (r.entities ?? []).map((e: any) => ({
           key: e.key as Hex, owner: e.creator as Hex, createdAt: e.createdAt,
           type: e.attributes?.type?.value ?? 'unknown'
         }));
         setItems(base);
+        // @ts-ignore
+        setCursor(r.nextCursor ?? null);
       } catch {}
     })();
     const un = (pub as any).watchEntityEvents ? (pub as any).watchEntityEvents({
@@ -37,6 +40,21 @@ export default function ExplorerPage() {
     return () => { try { un(); } catch {} };
   }, []);
 
+  async function loadMore() {
+    try {
+      if (!cursor) return;
+      // @ts-ignore
+      const r = await pub.select({ key: true, attributes: true, creator: true, createdAt: true }).limit(20).cursor(cursor).fetch();
+      const more: Item[] = (r.entities ?? []).map((e: any) => ({
+        key: e.key as Hex, owner: e.creator as Hex, createdAt: e.createdAt,
+        type: e.attributes?.type?.value ?? 'unknown'
+      }));
+      setItems((arr) => [...arr, ...more]);
+      // @ts-ignore
+      setCursor(r.nextCursor ?? null);
+    } catch {}
+  }
+
   return (
     <section className="section">
       <div className="wrap">
@@ -51,6 +69,9 @@ export default function ExplorerPage() {
             ))}
             {items.length === 0 && <li className="muted">Waiting for events…</li>}
           </ul>
+          <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 10 }}>
+            <button className="btn" onClick={loadMore} disabled={!cursor}>Load more</button>
+          </div>
           {err && <div className="muted" style={{ color: '#ffb048', marginTop: 8 }}>{err}</div>}
         </div>
       </div>

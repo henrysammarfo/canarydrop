@@ -107,7 +107,8 @@ a { color: inherit; text-decoration: none; }
   justify-content: center;
   flex-wrap: wrap;
 }
-.ctaRow .btn, .ctaRow .cta { width: auto; padding: 12px 24px; }
+.ctaRow > * { flex: 0 0 auto !important; }
+.ctaRow .btn, .ctaRow .cta { width: auto !important; padding: 12px 24px; }
 .cta {
   position: relative;
   display: inline-flex;

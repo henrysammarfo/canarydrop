@@ -385,7 +385,7 @@ export default function DeskPage() {
             {tab === 'canary' && (
               <div className="card">
                 <strong>Canary</strong>
-                <div className="muted" style={{ marginTop: 6 }}>Daily TTL 26h; absence is the signal.</div>
+              <div className="muted" style={{ marginTop: 6 }}>Daily lifetime is 26 hours. If it is missing, that is the signal.</div>
                 <div className="ctaRow" style={{ justifyContent:'flex-start', marginTop: 12 }}>
                   <button className="btn primary" onClick={renewFlow} disabled={!deskKey || !canaryKey || busy}>
                     Renew today’s canary
