@@ -1,4 +1,4 @@
-CanaryDrop — anonymous encrypted tips on Arkiv (Tiramisu)
+CanaryDrop: anonymous encrypted tips on Arkiv (Tiramisu)
 =========================================================
 
 Tips that can’t be seized. Canaries that can’t be faked.
@@ -10,7 +10,7 @@ What it is
 
 CanaryDrop is an anonymous, encrypted tip line for small newsrooms. A newsroom operates a “desk” identified by a P‑256 public key published on Arkiv. Sources don’t need a wallet: their tip is encrypted in the browser and posted via a server relay that pays gas. The relay creates the tip entity and, in the same batch, transfers ownership to `0x000000000000000000000000000000000000dEaD`, guaranteeing a sealed expiry: nobody can extend, patch or delete it after creation.
 
-A “warrant canary” entity is renewed daily. If it isn’t renewed within 26 hours, it lapses on its own — the absence is the signal. The newsroom reads tips via a live inbox that connects directly to the Arkiv RPC over WebSocket; decryption happens only in the browser. The desk can reply (encrypted), and the source reads replies at `/r` using their private receipt code stored only on their device.
+A “warrant canary” entity is renewed daily. If it isn’t renewed within 26 hours, it lapses on its own. The absence is the signal. The newsroom reads tips via a live inbox that connects directly to the Arkiv RPC over WebSocket; decryption happens only in the browser. The desk can reply (encrypted), and the source reads replies at `/r` using their private receipt code stored only on their device.
 
 Why Arkiv (vs Postgres/IPFS/subgraph/own API)
 ---------------------------------------------
@@ -24,14 +24,14 @@ Why Arkiv (vs Postgres/IPFS/subgraph/own API)
 Live pages
 ----------
 
-- `/` — explainer hero and entry points
-- `/desk` — newsroom desk dashboard with tabs (Inbox, Canary, Keys, Settings). Single connect button in nav, demo mode toggle in header. Create desk + canary, renew canary, live inbox, reply
-- `/d/[creator]` — public desk page: canary badge, submit form
-- `/r` — read replies with tip key + receipt code
+- `/` : explainer hero and entry points
+- `/desk` : newsroom desk dashboard with tabs (Inbox, Canary, Keys, Settings). Single connect button in nav, demo mode toggle in header. Create desk + canary, renew canary, live inbox, reply
+- `/d/[creator]` : public desk page: canary badge, submit form
+- `/r` : read replies with tip key + receipt code
 - `/submit` — submit flow with desk creator picker
-- `/explorer` — live feed of CanaryDrop entities on Tiramisu
-- `/canary/[creator]` — public canary status page
-- `/docs` — architecture, schema and friction report
+- `/explorer` : live feed of CanaryDrop entities on Tiramisu
+- `/canary/[creator]` : public canary status page
+- `/docs` : architecture, schema and friction report
 
 Design
 ------
@@ -52,20 +52,20 @@ All Arkiv calls are implemented in `lib/arkiv.ts` and `lib/relay.ts`, verified a
     - `predictEntityKeys({ owner: relay })`
     - `executeBatch({ creates:[…], ownershipChanges:[{ newOwner: 0x…dEaD }] })`
 - Read canary status and list tips:
-  - `getDesk(deskCreator)` — desk pinned to the newsroom’s wallet
-  - `canaryAlive(deskCreator, deskKey)` — polls (expiry fires no event)
-  - `inboxPage(deskKey)` — cursor‑paginated tips, `.createdBy(RELAY)` only
-  - `watchInbox(deskKey, onTip)` — WebSocket live events, then `getEntity` and decrypt client‑side
+  - `getDesk(deskCreator)`: desk pinned to the newsroom’s wallet
+  - `canaryAlive(deskCreator, deskKey)`: polls (expiry fires no event)
+  - `inboxPage(deskKey)`: cursor‑paginated tips, `.createdBy(RELAY)` only
+  - `watchInbox(deskKey, onTip)`: WebSocket live events, then `getEntity` and decrypt client‑side
 - Reply (desk) and read replies (source):
   - `reply(w, tipKey, wire)` and `repliesFor(tipKey, deskCreator)`
 
 Crypto
 ------
 
-Browser‑only ECIES: P‑256 ECDH → HKDF‑SHA256 → AES‑256‑GCM. Tip plaintexts are padded to 2 KiB buckets to reduce length leakage. See `lib/crypto.ts`.
+Browser‑only ECIES: P‑256 ECDH to HKDF‑SHA256 to AES‑256‑GCM. Tip plaintexts are padded to 2 KiB buckets to reduce length leakage. See `lib/crypto.ts`.
 
-- Source → desk: `sealTo(deskPubRaw, text)` returns `{ wire, receiptJwk }`, where `receiptJwk` is the source’s ephemeral private key in JWK form (kept only by the source).
-- Desk → source: `openAsDesk(deskPriv, wire)` returns `{ text, ephPub }` for replies; desk replies with `sealReply(deskPriv, ephPub, text)`.
+- Source to desk: `sealTo(deskPubRaw, text)` returns `{ wire, receiptJwk }`, where `receiptJwk` is the source’s ephemeral private key in JWK form (kept only by the source).
+- Desk to source: `openAsDesk(deskPriv, wire)` returns `{ text, ephPub }` for replies; desk replies with `sealReply(deskPriv, ephPub, text)`.
 - Source reads replies with `openReply(receiptPriv, deskPub, wire)`.
 
 Exact queries (schema and indexes)
@@ -141,10 +141,10 @@ Vercel deployment
 
 Set these Environment Variables (Production + Preview):
 
-- `RELAY_PRIVATE_KEY` — server‑only
-- `DESK_PRIVATE_KEY` — optional, enables Demo Mode
-- `NEXT_PUBLIC_RELAY_ADDRESS` — relay wallet address
-- `NEXT_PUBLIC_DESK_ADDRESS` — demo desk creator address
+- `RELAY_PRIVATE_KEY` : server‑only
+- `DESK_PRIVATE_KEY` : optional, enables Demo Mode
+- `NEXT_PUBLIC_RELAY_ADDRESS` : relay wallet address
+- `NEXT_PUBLIC_DESK_ADDRESS` : demo desk creator address
 
 Production URL: https://canarydrop-teamtitanlink.vercel.app
 
@@ -178,14 +178,14 @@ This project’s UI was styled against a provided “Neural Pathway” motion de
 What’s verified on-chain
 ---------------------------------------------
 
-Pending funding — the relay wallet `0xa6Aa6a1409eb54028550466169A29EAfd8f7a442` is not funded with GLM yet (Tiramisu faucet currently dry). End‑to‑end on‑chain tests (desk + canary creation, tip with sealed ownership to `0x…dEaD`, renewals, replies) will be executed as soon as funds land, and the exact tx hashes will be recorded here and in `arkiv/schema.md`. Until then, the app runs end‑to‑end off‑chain with synthetic data only.
+Pending funding: the relay wallet `0xa6Aa6a1409eb54028550466169A29EAfd8f7a442` is not funded with GLM yet (Tiramisu faucet currently dry). End‑to‑end on‑chain tests (desk + canary creation, tip with sealed ownership to `0x…dEaD`, renewals, replies) will be executed as soon as funds land, and the exact tx hashes will be recorded here and in `arkiv/schema.md`. Until then, the app runs end‑to‑end off‑chain with synthetic data only.
 
 Tests
 -----
 
-- Unit: WebCrypto ECIES round trip (vitest) — PASS
-- Read‑only integration: block timing from Arkiv SDK — PASS
-- E2E (desktop and mobile widths): Playwright visits `/, /submit, /desk, /r, /explorer, /docs`, asserts no console errors and saves screenshots — PASS
+- Unit: WebCrypto ECIES round trip (vitest): PASS
+- Read‑only integration: block timing from Arkiv SDK: PASS
+- E2E (desktop and mobile widths): Playwright visits `/, /submit, /desk, /r, /explorer, /docs`, asserts no console errors and saves screenshots: PASS
 - Screenshots: saved in `shots/` (generated via Playwright)
 
 Dry‑run mode

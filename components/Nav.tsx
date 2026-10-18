@@ -46,7 +46,7 @@ export default function Nav() {
         </div>
         <div className="nav-right" style={{ flexWrap: 'nowrap' }}>
           <span className="pill">Tiramisu testnet</span>
-          <button className="btn" onClick={connect}>
+          <button className="btn connect" onClick={connect}>
             {addr ? `Wallet ${addr.slice(0, 6)}…${addr.slice(-4)}` : 'Connect wallet'}
           </button>
           <button

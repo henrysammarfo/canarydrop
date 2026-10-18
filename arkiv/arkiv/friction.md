@@ -1,4 +1,4 @@
-# Friction report — CanaryDrop
+# Friction report: CanaryDrop
 
 Environment: `@arkiv-network/sdk` 0.8.1, viem 2.57.7, Node 20.19.2, Tiramisu (7738577), 18 Oct 2026.
 Repro script: `arkiv/repro/friction-repro.mjs` (read-only, needs no wallet).

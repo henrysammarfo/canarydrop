@@ -13,7 +13,7 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: 'CanaryDrop — Tips that cannot be seized',
+  title: 'CanaryDrop · Tips that cannot be seized',
   description:
     'Anonymous, encrypted tips for small newsrooms. Built on Arkiv (Tiramisu testnet).',
   metadataBase: new URL('https://canarydrop.example.com'),

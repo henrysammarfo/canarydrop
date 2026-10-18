@@ -13,12 +13,15 @@ export default function HomePage() {
     <>
       <video className="art" autoPlay muted loop playsInline preload="auto" aria-hidden="true" poster={POSTER} src={VIDEO} />
       <div className="veil" />
-      <header className="section" style={{ paddingTop: 'var(--space-8)', paddingBottom: 'var(--space-6)' }}>
-        <div className="wrap hero-head" style={{ textAlign: 'center' }}>
+      <header className="section" style={{ paddingTop: 'var(--space-8)', paddingBottom: 'var(--space-6)', position:'relative' }}>
+        <div style={{position:'absolute',inset:0,display:'grid',placeItems:'center',pointerEvents:'none',zIndex:1}}>
+          <div style={{width:'70%',maxWidth:820,height:300,background:'radial-gradient(ellipse at center, rgba(5,8,14,.6), rgba(5,8,14,0) 70%)'}}></div>
+        </div>
+        <div className="wrap hero-head" style={{ textAlign: 'center', position:'relative', zIndex:2 }}>
           <div className="kicker">Anonymous tips, sealed expiry, on chain</div>
           <h1 className="h1" style={{ marginTop: 10 }}>Send news safely. Keep your canary alive.</h1>
           <p className="lead" style={{ marginTop: 12 }}>Your tip is locked on your device before you send it. Only the newsroom can open it.</p>
-          <div className="ctaRow" style={{ marginTop: 18 }}>
+          <div className="ctaRow" style={{ marginTop: 18, justifyContent:'center' }}>
             <Link className="btn primary hero" href="/submit"><span className="dot" /> Submit a tip</Link>
             <Link className="btn hero" href="/desk">Open the desk</Link>
           </div>
@@ -29,9 +32,9 @@ export default function HomePage() {
         <div className="wrap">
           <h2 className="h2">How it works</h2>
           <div className="grid cols-3" style={{ marginTop: 'var(--space-3)' }}>
-            <div className="card"><strong>1) Encrypt</strong><p className="muted">The source’s browser uses P‑256 ECDH → HKDF → AES‑GCM. Plaintext is padded to 2 KiB.</p></div>
-            <div className="card"><strong>2) Relay</strong><p className="muted">A server wallet pays gas to create a <span className="kbd">tip</span> and changes ownership to <span className="kbd">0x…dEaD</span> in the same batch.</p></div>
-            <div className="card"><strong>3) Read</strong><p className="muted">The desk inbox subscribes to live events over WebSocket and decrypts locally. Replies use the same ECDH secret.</p></div>
+            <div className="card"><strong>1) Lock</strong><p className="muted">Your tip is locked on your device. Only the newsroom’s key can open it.</p></div>
+            <div className="card"><strong>2) Send</strong><p className="muted">A sponsor sends it to Arkiv for you. You do not need a wallet or an account.</p></div>
+            <div className="card"><strong>3) Read</strong><p className="muted">The newsroom sees new tips appear and opens them on its own computer.</p></div>
           </div>
         </div>
       </section>

@@ -1,4 +1,4 @@
-# CanaryDrop — Arkiv schema
+# CanaryDrop: Arkiv schema
 
 Network: Tiramisu (chain 7738577) · SDK `@arkiv-network/sdk` 0.8.1 · project attribute `project = "canarydrop-gts26-hm"` on every entity and every query.
 All payloads are synthetic test data. Plaintext never touches Arkiv.
@@ -15,7 +15,7 @@ All payloads are synthetic test data. Plaintext never touches Arkiv.
 |---|---|---|---|---|
 | `desk` | project:str, type:str | JSON `{name, pub}` (P-256 public key, 65 bytes) | `fromDays(30)` lease, renewed by `extendEntity` each desk session | owner = creator = newsroom wallet |
 | `canary` | project, type, desk:key | JSON `{statement}` | `fromHours(26)`, renewed daily; if it lapses the canary is dead | `readonly` (statement frozen, only renewable). Deliberately NOT `permissionlessExtension`: anyone could fake a live canary |
-| `tip` | project, type, desk:key | bytes `[v1 \| ephPub 65 \| iv 12 \| AES-GCM ct]`, plaintext padded to 2 KiB buckets | chosen by source: 1h / 24h / 72h / 7d | `readonly`; ownership moved to `0x…dEaD` in the same batch → nobody can extend, patch or delete; the source's lifetime is final |
+| `tip` | project, type, desk:key | bytes `[v1 \| ephPub 65 \| iv 12 \| AES-GCM ct]`, plaintext padded to 2 KiB buckets | chosen by source: 1h / 24h / 72h / 7d | `readonly`; ownership moved to `0x…dEaD` in the same batch so nobody can extend, patch or delete; the source's lifetime is final |
 | `reply` | project, type, tip:key | bytes `[v1 \| iv 12 \| ct]` (same ECDH secret as the tip) | `fromHours(72)` | owner = desk |
 
 No timestamps, names, emails, IPs or hashes of personal data are stored as attributes. `$createdAt` (a block number) and `$expiresAt` are the only time signals.

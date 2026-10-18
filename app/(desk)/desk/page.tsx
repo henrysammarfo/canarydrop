@@ -345,7 +345,7 @@ export default function DeskPage() {
             <div className="card" style={{ marginBottom: 12 }}>
               <strong>Status</strong>
               <div className="muted" style={{ marginTop: 6 }}>
-                Creator: <code>{creator ?? '—'}</code> · Desk: <code>{deskKey ?? '—'}</code> · Canary: <code>{canaryKey ?? '—'}</code> ·{' '}
+                Creator: <code>{creator ?? 'Not set'}</code> · Desk: <code>{deskKey ?? 'Not set'}</code> · Canary: <code>{canaryKey ?? 'None yet'}</code> ·{' '}
                 Status: {alive === null ? 'unknown' : alive ? <span style={{ color: '#7ae6ff' }}>ALIVE</span> : <span style={{ color: '#ffb048' }}>DEAD</span>}
               </div>
             </div>
