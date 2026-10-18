@@ -31,11 +31,6 @@ type TipView = {
   replyText?: string;
 };
 
-const VIDEO =
-  'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260912_104303_0c6d60b2-9353-408e-944-585108a22fb5.mp4';
-const POSTER =
-  'https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/130837c4-0244-4f37-9c61-8d801d93fd29.jpg';
-
 const CHAIN_ID_HEX = '0x7614d1'; // 7738577
 const DESK_KEY_STORE = 'canarydrop/deskPrivJwk';
 
@@ -290,14 +285,13 @@ export default function DeskPage() {
 
   return (
     <div className="container">
-      <video className="art" autoPlay muted loop playsInline preload="auto" aria-hidden="true" poster={POSTER} src={VIDEO} />
-      <div className="veil" />
-      <header className="header">
-        <Link className="brand" href="/">
-          CANARYDROP
-        </Link>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <label className="badge" title="Server-signed testnet demo — no wallet extension required.">
+      <header className="section" style={{ paddingBottom: 0 }}>
+        <div className="wrap" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <h1 className="h2" style={{ margin: 0 }}>Newsroom desk</h1>
+            <p className="muted" style={{ marginTop: 6 }}>Create your desk, keep the canary alive, and read encrypted tips.</p>
+          </div>
+          <label className="badge" title="Server-signed testnet demo; never enable in production.">
             <input
               type="checkbox"
               checked={demo}
@@ -306,17 +300,41 @@ export default function DeskPage() {
             />
             Demo mode
           </label>
-          {!demo && (
-            <button className="cta secondary" onClick={connect}>
-              {connected ? `Wallet: ${connected.slice(0, 6)}…${connected.slice(-4)}` : 'Connect MetaMask'}
-            </button>
-          )}
         </div>
       </header>
-      <main className="section" style={{ paddingTop: 'var(--space-6)' }}>
+      <main className="section" style={{ paddingTop: 'var(--space-2)' }}>
         <div className="wrap">
-          <h1 className="h2">Desk</h1>
-          <p className="lead">Operate your newsroom desk. Inbox decrypts locally; canary renews daily.</p>
+          <div className="grid cols-3">
+            <div className="card">
+              <strong>Canary</strong>
+              <div className="muted" style={{ marginTop: 6 }}>
+                {alive === null ? 'Unknown' : alive ? 'Alive' : 'Expired'}
+              </div>
+              <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 10 }}>
+                <button className="btn primary" onClick={renewFlow} disabled={!deskKey || !canaryKey || busy}>
+                  Renew canary
+                </button>
+              </div>
+            </div>
+            <div className="card">
+              <strong>Desk</strong>
+              <div className="muted" style={{ marginTop: 6 }}>
+                Creator <code>{creator ?? '—'}</code>
+                <br />
+                Desk key <code>{deskKey ?? '—'}</code>
+              </div>
+            </div>
+            <div className="card">
+              <strong>Next steps</strong>
+              <ol className="muted" style={{ marginTop: 6, paddingLeft: 16 }}>
+                <li>Generate your desk keys</li>
+                <li>Create your desk and first canary</li>
+                <li>Share your public tip link</li>
+              </ol>
+            </div>
+          </div>
+          <hr style={{ opacity: 0.2, margin: '16px 0' }} />
+          <p className="lead">Operate your newsroom desk. The inbox updates in real time and decrypts on this device.</p>
           <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
             {(['inbox','canary','keys','settings'] as const).map(k => (
               <button key={k} className={`btn ${tab===k?'primary':''}`} onClick={()=>setTab(k)}>{k.charAt(0).toUpperCase()+k.slice(1)}</button>

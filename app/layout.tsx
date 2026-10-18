@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Sora } from 'next/font/google';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
+import { ToastProvider } from '@/components/Toast';
 
 const sora = Sora({
   subsets: ['latin'],
@@ -16,17 +17,25 @@ export const metadata: Metadata = {
   description:
     'Anonymous, encrypted tips for small newsrooms. Built on Arkiv (Tiramisu testnet).',
   metadataBase: new URL('https://canarydrop.example.com'),
+  icons: [{ rel: 'icon', url: '/icon.svg' }],
+  openGraph: {
+    title: 'CanaryDrop',
+    description: 'Anonymous, encrypted tips for small newsrooms.',
+    images: ['/og.svg'],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={sora.variable}>
       <body>
-        <div className="container">
-          <Nav />
-          {children}
-          <Footer />
-        </div>
+        <ToastProvider>
+          <div className="container">
+            <Nav />
+            {children}
+            <Footer />
+          </div>
+        </ToastProvider>
       </body>
     </html>
   );

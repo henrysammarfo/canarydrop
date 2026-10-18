@@ -25,8 +25,8 @@ Live pages
 ----------
 
 - `/` — explainer hero and entry points
-- `/desk` — newsroom desk: MetaMask support (Tiramisu testnet) with an explicit Demo Mode toggle that signs on the server using a testnet‑only key, so judges can exercise the flow without an extension; create desk + canary; renew canary; live inbox; reply
-- `/d/[creator]` — source page: canary status, tip textarea with “SYNTHETIC DATA ONLY” banner, lifetime picker, submit; shows tip key, receipt code (JSON) and explorer link
+- `/desk` — newsroom desk dashboard with tabs (Inbox, Canary, Keys, Settings). Single connect button in nav, demo mode toggle in header. Create desk + canary, renew canary, live inbox, reply
+- `/d/[creator]` — public desk page: canary badge, submit form
 - `/r` — read replies with tip key + receipt code
 - `/submit` — submit flow with desk creator picker
 - `/explorer` — live feed of CanaryDrop entities on Tiramisu
@@ -183,10 +183,15 @@ Pending funding — the relay wallet `0xa6Aa6a1409eb54028550466169A29EAfd8f7a442
 Tests
 -----
 
-- Unit: WebCrypto ECIES round‑trip (vitest) — PASS
+- Unit: WebCrypto ECIES round trip (vitest) — PASS
 - Read‑only integration: block timing from Arkiv SDK — PASS
-- E2E: Playwright visits `/, /submit, /desk, /r, /explorer, /docs` at desktop, asserts no console errors — PASS
+- E2E (desktop and mobile widths): Playwright visits `/, /submit, /desk, /r, /explorer, /docs`, asserts no console errors and saves screenshots — PASS
 - Screenshots: saved in `shots/` (generated via Playwright)
+
+Dry‑run mode
+------------
+
+All write APIs support a dry‑run that builds and simulates the transaction without broadcasting. Add `?dryRun=1` or header `x-dry-run: 1`. Returns predicted entity keys and attributes. Used in tests to exercise flows without test tokens.
 
 License
 -------

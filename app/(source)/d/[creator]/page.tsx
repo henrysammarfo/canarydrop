@@ -79,24 +79,12 @@ export default function SourceDeskPage() {
   }
 
   return (
-    <div className="container">
-      <video className="art" autoPlay muted loop playsInline preload="auto" aria-hidden="true" poster={POSTER} src={VIDEO} />
-      <div className="veil" />
-      <header className="header">
-        <Link href="/" className="brand">
-          CANARYDROP
-        </Link>
-        <span className="badge">Source</span>
-      </header>
-      <main className="hero">
-        <div style={{ maxWidth: 760, width: '100%' }}>
-          <h1 className="title" style={{ marginBottom: 8 }}>
-            Send an encrypted tip
-          </h1>
-          <p className="sub">
-            SYNTHETIC DATA ONLY. Do not include personal data. Tips are encrypted in your browser and posted through a relay that
-            pays gas. Your device receives a secret receipt code right after sending — keep it safe to read replies later.
-          </p>
+    <section className="section">
+      <div className="wrap" style={{ maxWidth: 760 }}>
+        <h1 className="h2">Send a tip</h1>
+        <p className="lead">
+          Synthetic data only. Your tip is locked on your device before you send it. Only the newsroom can open it.
+        </p>
 
           <div style={{ marginTop: 18 }}>
             <textarea
@@ -104,19 +92,12 @@ export default function SourceDeskPage() {
               onChange={(e) => setText(e.target.value)}
               placeholder="Write your tip here (synthetic data only)."
               style={{
-                width: '100%',
                 height: 180,
                 resize: 'vertical',
-                background: 'rgba(8,12,18,.45)',
-                border: '1px solid rgba(160,190,210,.35)',
-                color: 'var(--ink)',
-                borderRadius: 12,
-                padding: 14,
-                outline: 'none',
               }}
             />
           </div>
-          <div className="ctaRow" style={{ marginTop: 12 }}>
+          <div className="ctaRow" style={{ marginTop: 12, justifyContent: 'flex-start' }}>
             <label className="badge" style={{ background: 'rgba(10,16,24,.45)' }}>
               Lifetime:&nbsp;
               <select
@@ -130,14 +111,14 @@ export default function SourceDeskPage() {
                 <option value="7d">7 days</option>
               </select>
             </label>
-            <button className="cta" onClick={submit} disabled={!deskKey || !deskPubRaw || sending}>
+            <button className="btn primary" onClick={submit} disabled={!deskKey || !deskPubRaw || sending}>
               <span className="dot" />
               {sending ? 'Sending…' : 'Submit tip'}
             </button>
           </div>
 
           <div style={{ marginTop: 24 }}>
-            <p className="sub">
+            <p className="muted">
               Canary status:{' '}
               {alive === null ? (
                 'unknown'
@@ -151,7 +132,7 @@ export default function SourceDeskPage() {
 
           {ok && (
             <div style={{ marginTop: 20, textAlign: 'left' }}>
-              <p className="sub">Tip created.</p>
+              <p className="lead">Tip created.</p>
               <ul style={{ fontSize: 14, lineHeight: 1.5 }}>
                 <li>
                   Tip key: <code>{ok.tipKey}</code>
@@ -165,14 +146,8 @@ export default function SourceDeskPage() {
                     readOnly
                     value={JSON.stringify(ok.receipt)}
                     style={{
-                      width: '100%',
                       height: 110,
                       marginTop: 8,
-                      background: 'rgba(8,12,18,.45)',
-                      border: '1px solid rgba(160,190,210,.35)',
-                      color: 'var(--ink)',
-                      borderRadius: 12,
-                      padding: 10,
                       fontSize: 12,
                     }}
                   />
@@ -180,7 +155,7 @@ export default function SourceDeskPage() {
                 <li style={{ marginTop: 8 }}>
                   Explorer:{' '}
                   <a
-                    className="cta secondary"
+                    className="btn"
                     href={`https://hub.arkiv.network/tiramisu/entity/${ok.tipKey}`}
                     target="_blank"
                     rel="noreferrer"
@@ -190,7 +165,7 @@ export default function SourceDeskPage() {
                 </li>
                 <li style={{ marginTop: 8 }}>
                   Read replies at{' '}
-                  <Link className="cta secondary" href="/r">
+                  <Link className="btn" href="/r">
                     /r
                   </Link>{' '}
                   using your tip key and receipt code.
@@ -198,15 +173,9 @@ export default function SourceDeskPage() {
               </ul>
             </div>
           )}
-          {err && (
-            <p className="sub" style={{ color: '#ffb048', marginTop: 10 }}>
-              {err}
-            </p>
-          )}
-        </div>
-      </main>
-      <footer className="footer">Creator: {creator}</footer>
-    </div>
+          {err && <p className="muted" style={{ color: '#ffb048', marginTop: 10 }}>{err}</p>}
+      </div>
+    </section>
   );
 }
 

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Hex } from 'viem';
 import { postTip } from '@/lib/relay';
+import { createPublicClient } from '@arkiv-network/sdk';
+import { tiramisu } from '@arkiv-network/sdk/chains';
+import { http } from 'viem';
+import { key } from '@arkiv-network/sdk/attr';
+import { PROJECT, LIFETIMES } from '@/lib/arkiv';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 20; // per-IP per minute, in-memory
@@ -21,6 +26,8 @@ function rateLimit(ip: string | null) {
 
 export async function POST(req: NextRequest) {
   try {
+    const url = new URL(req.url);
+    const dryRun = url.searchParams.get('dryRun') === '1' || req.headers.get('x-dry-run') === '1';
     const ip =
       req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
       req.ip ??
@@ -38,11 +45,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'bad_request' }, { status: 400 });
     }
     const wire = Uint8Array.from(Buffer.from(wireB64, 'base64'));
-    const out = await postTip(deskKey, wire, lifetime);
-    return NextResponse.json({ ok: true, ...out });
+    if (dryRun) {
+      const pub = createPublicClient({ chain: tiramisu, transport: http() });
+      const [pred] = await pub.predictEntityKeys({ owner: (process.env.NEXT_PUBLIC_RELAY_ADDRESS || '0x') as Hex, count: 1 });
+      // Construct the attributes we would write
+      const attributes = { project: PROJECT, type: 'tip', desk: key(deskKey) } as any;
+      return NextResponse.json({
+        ok: true,
+        dryRun: true,
+        predictedTipKey: pred.key,
+        attributes,
+        expires: lifetime in LIFETIMES ? lifetime : 'unknown',
+      });
+    } else {
+      const out = await postTip(deskKey, wire, lifetime);
+      return NextResponse.json({ ok: true, ...out });
+    }
   } catch (e: any) {
     // Do not leak secrets
-    return NextResponse.json({ error: 'server_error', message: String(e?.message ?? e) }, { status: 500 });
+    const msg = String(e?.message ?? e);
+    const friendly =
+      /insufficient funds|fund/.test(msg.toLowerCase())
+        ? "We couldn't send your tip right now because the network sponsor wallet is out of test tokens. Please try again later. Nothing was sent."
+        : msg;
+    return NextResponse.json({ error: 'server_error', message: friendly }, { status: 500 });
   }
 }
 
