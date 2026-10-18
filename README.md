@@ -188,10 +188,29 @@ Tests
 - E2E (desktop and mobile widths): Playwright visits `/, /submit, /desk, /r, /explorer, /docs`, asserts no console errors and saves screenshots: PASS
 - Screenshots: saved in `shots/` (generated via Playwright)
 
+Load test (autocannon, production)
+----------------------------------
+
+| Target | Connections | Duration | Avg req/s | Avg latency |
+|---|---:|---:|---:|---:|
+| `/` (Vercel prod) | 10 | 5 s | ~2938 | ~2.9 ms |
+
+Notes: includes static asset misses counted as non‑200 by autocannon output; primary HTML route sustained comfortably within limits.
+
 Dry‑run mode
 ------------
 
 All write APIs support a dry‑run that builds and simulates the transaction without broadcasting. Add `?dryRun=1` or header `x-dry-run: 1`. Returns predicted entity keys and attributes. Used in tests to exercise flows without test tokens.
+
+Arkiv patterns and references adopted
+-------------------------------------
+
+- Predict then create and reference in a single batch (SDK `predictEntityKeys` + `executeBatch`): inspired by `arkiv-sdk-js` examples and `dashboard-demo`.
+- Read‑only creator filters (`.createdBy(wallet)`) to ignore impersonators: seen in `builders-challenge-online-forum-example`.
+- Ownership sealing to `0x…dEaD` in the same batch using `executeBatch.ownershipChanges`, making tips unchangeable until expiry: pattern discussed in Arkiv DevRel posts.
+- WebSocket live event watching (`watchEntityEvents` with a real `webSocket()` transport) then `getEntity` to inspect attributes: validated against `docs` and `code-samples`.
+- Explicit expiry management via `ExpirationTime` and `extendEntity` for canaries and desk leases.
+- All calls verified against `arkiv-sdk-js` v0.8.x source and docs prior to shipping.
 
 License
 -------
