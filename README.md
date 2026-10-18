@@ -212,6 +212,28 @@ Arkiv patterns and references adopted
 - Explicit expiry management via `ExpirationTime` and `extendEntity` for canaries and desk leases.
 - All calls verified against `arkiv-sdk-js` v0.8.x source and docs prior to shipping.
 
+Wallets (testnet)
+-----------------
+
+- Relay: `0xa6Aa6a1409eb54028550466169A29EAfd8f7a442` — [Explorer](https://hub.arkiv.network/tiramisu/address/0xa6Aa6a1409eb54028550466169A29EAfd8f7a442)
+- Desk: `0x1da3c22c079c264536D831F6F1fCe638aB0b20B0` — [Explorer](https://hub.arkiv.network/tiramisu/address/0x1da3c22c079c264536D831F6F1fCe638aB0b20B0)
+- Impersonator: `0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af` — [Explorer](https://hub.arkiv.network/tiramisu/address/0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af)
+
+Submission checklist (Arkiv Global Tour Stop)
+---------------------------------------------
+
+- MIT license in repo root: Yes (`LICENSE`)
+- Live deployment URL in README: Yes
+- `arkiv/schema.md` present at `arkiv/schema.md`: Yes
+- `arkiv/friction.md` present at `arkiv/friction.md`, with reproduced issues and repro script path: Yes
+- Wallet addresses listed in README: Yes
+- Synthetic data only, no personal data on Arkiv: Yes
+- Source UI requires no wallet; relay posts tips: Yes
+- Canary renewal implemented and documented: Yes
+- Docs page with schema and notes: Yes
+- Demo-mode toggle and no keys shipped to client by default: Yes
+- Tests and load checks included, results in README: Yes
+
 License
 -------
 

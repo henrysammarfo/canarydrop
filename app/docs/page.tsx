@@ -7,8 +7,8 @@ function readFile(p: string) {
 
 export default function DocsPage() {
   const root = process.cwd();
-  const schema = readFile(path.join(root, 'arkiv/arkiv/schema.md'));
-  const friction = readFile(path.join(root, 'arkiv/arkiv/friction.md'));
+  const schema = readFile(path.join(root, 'arkiv/schema.md'));
+  const friction = readFile(path.join(root, 'arkiv/friction.md'));
   return (
     <section className="section">
       <div className="wrap" style={{ maxWidth: 980 }}>

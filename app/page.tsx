@@ -32,9 +32,9 @@ export default function HomePage() {
         <div className="wrap">
           <h2 className="h2">How it works</h2>
           <div className="grid cols-3" style={{ marginTop: 'var(--space-3)' }}>
-            <div className="card"><strong>1) Lock</strong><p className="muted">Your tip is locked on your device. Only the newsroom’s key can open it.</p></div>
-            <div className="card"><strong>2) Send</strong><p className="muted">A sponsor sends it to Arkiv for you. You do not need a wallet or an account.</p></div>
-            <div className="card"><strong>3) Read</strong><p className="muted">The newsroom sees new tips appear and opens them on its own computer.</p></div>
+            <div className="card"><strong>Step 1. Lock</strong><p className="muted">Your tip is locked on your device. Only the newsroom’s key can open it.</p></div>
+            <div className="card"><strong>Step 2. Send</strong><p className="muted">A sponsor sends it to Arkiv for you. You do not need a wallet or an account.</p></div>
+            <div className="card"><strong>Step 3. Read</strong><p className="muted">The newsroom sees new tips appear and opens them on its own computer.</p></div>
           </div>
         </div>
       </section>

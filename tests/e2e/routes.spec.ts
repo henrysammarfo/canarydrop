@@ -28,3 +28,12 @@ test('production home has headline', async ({ page }) => {
   await expect(page.locator('h1')).toContainText(/Send news safely|Tips that can/);
 });
 
+test('production hero CTAs are auto width', async ({ page }) => {
+  test.skip(!process.env.PRODUCTION_URL, 'PRODUCTION_URL not set');
+  await page.goto(process.env.PRODUCTION_URL!);
+  const w1 = await page.locator('a[href="/submit"]').boundingBox();
+  const w2 = await page.locator('a[href="/desk"]').boundingBox();
+  expect(w1!.width).toBeLessThan(340);
+  expect(w2!.width).toBeLessThan(340);
+});
+
