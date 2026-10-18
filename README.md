@@ -3,6 +3,8 @@ CanaryDrop — anonymous encrypted tips on Arkiv (Tiramisu)
 
 Tips that can’t be seized. Canaries that can’t be faked.
 
+Live demo: https://canarydrop-teamtitanlink.vercel.app
+
 What it is
 ----------
 
@@ -140,6 +142,8 @@ Set these Environment Variables (Production + Preview):
 - `NEXT_PUBLIC_RELAY_ADDRESS` — relay wallet address
 - `NEXT_PUBLIC_DESK_ADDRESS` — demo desk creator address
 
+Production URL: https://canarydrop-teamtitanlink.vercel.app
+
 Chain configuration
 -------------------
 
@@ -167,12 +171,10 @@ AI usage
 
 This project’s UI was styled against a provided “Neural Pathway” motion design brief. Code generation assistants were used to scaffold Next.js pages and CSS and to speed up boilerplate, but all Arkiv calls were implemented by hand against the SDK and verified with the docs and the SDK’s source. All cryptography was implemented against WebCrypto and is tested by round‑trip.
 
-What’s verified on-chain (fill while testing)
+What’s verified on-chain
 ---------------------------------------------
 
-- predict‑then‑create‑and‑reference in one tx: …
-- tip create + ownership change to `0x…dEaD` in the same batch: … (tx hash)
-- extend earlier expiry reverts: …
+Pending funding — the relay wallet `0xa6Aa6a1409eb54028550466169A29EAfd8f7a442` is not funded with GLM yet (Tiramisu faucet currently dry). End‑to‑end on‑chain tests (desk + canary creation, tip with sealed ownership to `0x…dEaD`, renewals, replies) will be executed as soon as funds land, and the exact tx hashes will be recorded here and in `arkiv/schema.md`. Until then, the app runs end‑to‑end off‑chain with synthetic data only.
 
 License
 -------
