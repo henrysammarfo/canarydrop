@@ -1,5 +1,13 @@
 import { test, expect } from '@playwright/test';
 
+test('overview keeps keys in one compact row', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/desk', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByText('Desk identity')).toHaveCount(0);
+  await expect(page.locator('.keys-bar')).toBeVisible();
+  await expect(page.locator('.keys-bar').getByText('Creator')).toBeVisible();
+});
+
 test('desk first visit does not toast a generic error', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/desk', { waitUntil: 'load' });

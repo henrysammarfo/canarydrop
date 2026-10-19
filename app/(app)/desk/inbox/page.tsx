@@ -48,7 +48,7 @@ export default function InboxPage() {
               <li key={t.key}>
                 <article className="card tip-card">
                   <header className="tip-head">
-                    <span className="eyebrow">Open tip</span>
+                    <span className="live-pill">Open</span>
                     <code className="key-mono" title={t.key}>
                       {shortHex(t.key, 8, 6)}
                     </code>

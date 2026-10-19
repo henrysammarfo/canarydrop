@@ -67,13 +67,13 @@ export default function DeskCanaryPage() {
             </p>
           )}
         </Card>
-        <Card>
+        <Card className="keys-panel">
           <p className="eyebrow">Keys</p>
           <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
             <CopyField label="Desk" value={d.deskKey ?? (waiting ? 'Loading…' : 'Not set')} />
             <CopyField label="Canary" value={d.canaryKey ?? (waiting ? 'Loading…' : 'None yet')} />
           </div>
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 'auto', paddingTop: 20 }}>
             <RenewAction
               extra={
                 <>

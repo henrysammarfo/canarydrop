@@ -75,7 +75,7 @@ export default function DeskOverviewPage() {
           </div>
         </Card>
         <div className="stat-stack">
-          <Card className="stat-card">
+          <Card className={`stat-card${d.tips.length > 0 ? ' hot' : ''}`}>
             <p className="eyebrow">Tips waiting</p>
             <div className="stat-value">{d.loadingInbox && d.tips.length === 0 ? '…' : d.tips.length}</div>
             <p className="muted stat-meta">
@@ -90,7 +90,7 @@ export default function DeskOverviewPage() {
                       : 'Open tips stay on this device.'}
             </p>
             <div className="ctaRow" style={{ marginTop: 'auto', paddingTop: 12 }}>
-              <Link className="btn" href="/desk/inbox">
+              <Link className={`btn${d.tips.length > 0 ? ' primary' : ''}`} href="/desk/inbox">
                 Open inbox
               </Link>
             </div>
@@ -112,19 +112,21 @@ export default function DeskOverviewPage() {
         </div>
       </div>
       <Card>
-        <p className="eyebrow">Desk identity</p>
-        <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
+        <p className="eyebrow">Keys</p>
+        <div className="keys-bar">
           <CopyField label="Creator" value={d.creator ?? 'Not set'} />
           <CopyField label="Desk" value={d.deskKey ?? (waiting ? 'Loading…' : 'Not set')} />
           <CopyField label="Canary" value={d.canaryKey ?? (waiting ? 'Loading…' : 'None yet')} />
-          {d.tx ? (
-            <a className="btn" href={txUrl(d.tx)} target="_blank" rel="noreferrer">
-              Last tx {shortHex(d.tx, 6, 4)}
-            </a>
-          ) : (
-            <p className="muted">No write in this session yet.</p>
-          )}
         </div>
+        {d.tx ? (
+          <a className="btn" href={txUrl(d.tx)} target="_blank" rel="noreferrer" style={{ marginTop: 12 }}>
+            Last tx {shortHex(d.tx, 6, 4)}
+          </a>
+        ) : (
+          <p className="muted" style={{ marginTop: 12 }}>
+            No write in this session yet.
+          </p>
+        )}
       </Card>
     </>
   );

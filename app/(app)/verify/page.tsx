@@ -17,7 +17,7 @@ export default function VerifyPage() {
           <span className="verify-n">1</span>
           <div>
             <strong>See the canary.</strong>
-            <p className="muted">Open the public canary page. It should say ALIVE if the demo desk has been renewed.</p>
+            <p className="muted">Open the public canary page. It should say Alive if the demo desk has been renewed. The public page shows that as a large status word.</p>
             <Button href={`/canary/${desk}`} variant="primary">
               Open canary
             </Button>

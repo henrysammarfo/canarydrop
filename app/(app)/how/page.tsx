@@ -3,6 +3,7 @@ import { CHAIN_READ_FAILED, DEFAULT_DESK } from '@/lib/constants';
 import PageHeader from '@/components/ui/PageHeader';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
+import CopyField from '@/components/ui/CopyField';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,7 +51,14 @@ export default async function HowPage() {
                 <Badge tone={claim.ok ? 'ok' : 'wait'}>{claim.ok ? 'Live' : 'Check'}</Badge>
               </div>
               <p className="muted" style={{ marginTop: 8 }}>{claim.why}</p>
-              <p style={{ marginTop: 10, overflowWrap: 'anywhere' }}>{claim.detail}</p>
+              <p style={{ marginTop: 10 }}>{claim.detail}</p>
+              {claim.facts && claim.facts.length > 0 ? (
+                <div className="proof-facts">
+                  {claim.facts.map((fact) => (
+                    <CopyField key={`${claim.id}-${fact.label}`} label={fact.label} value={fact.value} />
+                  ))}
+                </div>
+              ) : null}
               <pre className="query-box" tabIndex={0}>{claim.query}</pre>
               {claim.links.length > 0 && (
                 <div className="ctaRow" style={{ marginTop: 12 }}>

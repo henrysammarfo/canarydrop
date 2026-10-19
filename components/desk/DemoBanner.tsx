@@ -16,18 +16,10 @@ export default function DemoBanner() {
         </div>
       )}
       {d.demo && (
-        <div className="page-note compact" style={{ marginBottom: 16 }}>
-          Demo mode is on. This browser loads a shared testnet desk key so a judge can open tips without the original laptop. Do not use this for a real newsroom.
-          {d.createdNotice && (
-            <div style={{ marginTop: 8 }} role="status">
-              {d.createdNotice}
-            </div>
-          )}
-          {d.demoKeyError && (
-            <div style={{ marginTop: 8 }} role="status">
-              {d.demoKeyError}
-            </div>
-          )}
+        <div className="page-note compact" role="status" style={{ marginBottom: 16 }}>
+          Demo mode is on. Shared testnet desk. Do not use this for a real newsroom.
+          {d.createdNotice && <div style={{ marginTop: 8 }}>{d.createdNotice}</div>}
+          {d.demoKeyError && <div style={{ marginTop: 8 }}>{d.demoKeyError}</div>}
           {d.deskKey && d.pubMatch === false && !d.createdNotice && !d.loadingDesk && (
             <div style={{ marginTop: 8 }}>
               The live desk still has an older public key. Open Desk settings and press Create demo desk so new tips match this browser.
@@ -38,7 +30,6 @@ export default function DemoBanner() {
               </div>
             </div>
           )}
-          {d.pubMatch === true && <div style={{ marginTop: 8 }}>The live desk matches the shared demo key. New tips will open here.</div>}
           {showMissingDesk && (
             <div style={{ marginTop: 8 }}>
               No live demo desk yet. Open Desk settings and press Create demo desk. The server wallet publishes the shared public key.

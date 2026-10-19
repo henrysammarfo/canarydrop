@@ -216,10 +216,10 @@ export default function SubmitPage() {
             placeholder="Write your tip here (synthetic data only)."
             style={{ height: 200, resize: 'vertical' }}
           />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 14 }}>
-            <label className="badge">
+          <div className="submit-toolbar">
+            <label className="life-control" htmlFor="tip-life">
               Lifetime
-              <select value={life} onChange={(e) => onLife(e.target.value)} style={{ background: 'transparent', color: 'inherit', border: 'none', outline: 'none', marginLeft: 6 }}>
+              <select id="tip-life" value={life} onChange={(e) => onLife(e.target.value)}>
                 <option value="1h">1 hour</option>
                 <option value="24h">24 hours</option>
                 <option value="72h">72 hours</option>
@@ -231,7 +231,7 @@ export default function SubmitPage() {
                 Dry run
               </button>
               <button
-                className={`btn lg${valid ? ' primary' : ''}`}
+                className="btn lg primary"
                 type="button"
                 onClick={() => setConfirmOpen(true)}
                 disabled={!valid}

@@ -33,6 +33,8 @@ import { sleep, withBackoff } from './retry';
 
 export type ProofLink = { label: string; href: string };
 
+export type ProofFact = { label: string; value: string };
+
 export type ProofClaim = {
   id: string;
   title: string;
@@ -41,6 +43,7 @@ export type ProofClaim = {
   ok: boolean;
   detail: string;
   links: ProofLink[];
+  facts?: ProofFact[];
 };
 
 export type ArkivProofs = {
@@ -119,8 +122,12 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
       query: queryPredicate(q),
       ok: !!desk,
       detail: desk
-        ? `Live desk key ${desk.key}. Creator ${DEFAULT_DESK}.`
+        ? 'This is the live desk for the newsroom wallet.'
         : 'No live desk for the demo wallet.',
+      facts: [
+        ...(desk ? [{ label: 'Desk', value: desk.key }] : []),
+        { label: 'Creator', value: DEFAULT_DESK },
+      ],
       links: desk
         ? [
             { label: 'Desk entity', href: entityUrl(desk.key) },
@@ -146,8 +153,9 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
         query: queryPredicate(cq),
         ok: !!canary,
         detail: canary
-          ? `ALIVE. Expires at block ${canary.expiresAt?.toString() ?? 'n/a'}. ${flagText}`
-          : 'GONE. No live canary for this desk.',
+          ? `Alive. Expires at block ${canary.expiresAt?.toString() ?? 'n/a'}. ${flagText}`
+          : 'Gone. No live canary for this desk.',
+        facts: canary ? [{ label: 'Canary', value: canary.key }] : [],
         links: canary
           ? [
               { label: 'Canary entity', href: entityUrl(canary.key) },
@@ -231,8 +239,12 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
       ),
       ok: fake === undefined || fake.creator.toLowerCase() === DEFAULT_IMPOSTOR.toLowerCase(),
       detail: fake
-        ? `The impostor has a live desk ${fake.key}. The source UI still ignores it because it is not the demo desk wallet.`
+        ? 'The impostor has a live desk. The source UI still ignores it because it is not the demo desk wallet.'
         : 'No live impostor desk at this block.',
+      facts: [
+        ...(fake ? [{ label: 'Impostor desk', value: fake.key }] : []),
+        { label: 'Impostor wallet', value: DEFAULT_IMPOSTOR },
+      ],
       links: [
         { label: 'Impostor wallet', href: addressUrl(DEFAULT_IMPOSTOR) },
         ...(fake ? [{ label: 'Impostor desk', href: entityUrl(fake.key) }] : []),
@@ -351,7 +363,7 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
     why: 'Reads do not go through our server. The browser talks to Arkiv over WebSocket and then decrypts locally.',
     query: 'watchEntityEvents({ onEntityCreated, onExpiryExtended, onOwnershipTransferred, onEntityPatched, onEntityDeleted })',
     ok: true,
-    detail: 'Created tips from the sponsor are fetched and opened. A renew flips ALIVE. A transfer to the burn address marks a seal. Patch and delete events are watched so a change attempt is visible.',
+    detail: 'Created tips from the sponsor are fetched and opened. A renew keeps the public canary Alive. A transfer to the burn address marks a seal. Patch and delete events are watched so a change attempt is visible.',
     links: [{ label: 'Open the desk', href: '/desk' }],
   });
 
