@@ -11,6 +11,9 @@ npm-debug.log*
 .yarn*
 
 # builds
+out
+.static-hold-api
+.static-hold-middleware.ts
 *.log
 test-results
 test-results/.last-run.json

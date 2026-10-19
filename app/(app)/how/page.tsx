@@ -5,8 +5,9 @@ import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import CopyField from '@/components/ui/CopyField';
 import StaleNote from '@/components/ui/StaleNote';
+import HowStatic from '@/components/HowStatic';
 
-export const dynamic = 'force-dynamic';
+export const dynamic = process.env.STATIC_EXPORT === '1' ? 'force-static' : 'force-dynamic';
 
 export default async function HowPage() {
   const proofs = await gatherArkivProofs();
@@ -81,6 +82,8 @@ export default async function HowPage() {
           ))}
         </div>
       </div>
+
+      <HowStatic />
 
       <div className="card" style={{ marginTop: 16 }}>
         <h2 className="proof-title">What stays off Arkiv</h2>

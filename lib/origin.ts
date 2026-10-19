@@ -1,4 +1,4 @@
-import { PRODUCTION_HOST } from './constants';
+import { PAGES_HOST, PRODUCTION_HOST } from './constants';
 
 const PREVIEW_HOST = /^canarydrop[-a-z0-9]*\.vercel\.app$/;
 
@@ -20,6 +20,7 @@ export function isAllowedHostname(hostname: string): boolean {
   const host = hostname.toLowerCase();
   if (host === 'localhost' || host === '127.0.0.1') return true;
   if (host === PRODUCTION_HOST) return true;
+  if (host === PAGES_HOST) return true;
   if (host.endsWith('.vercel.app') && PREVIEW_HOST.test(host)) return true;
   return false;
 }

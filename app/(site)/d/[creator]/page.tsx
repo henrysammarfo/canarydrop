@@ -15,6 +15,8 @@ import StaleNote from '@/components/ui/StaleNote';
 import { useToast } from '@/components/Toast';
 import { entityUrl, txUrl } from '@/lib/chain';
 import CopyField from '@/components/ui/CopyField';
+import VerifiedBadge from '@/components/VerifiedBadge';
+import { fakeDeskSignal, fetchDeskRecord, wellKnownUrl, type DeskListing } from '@/lib/domain-verify';
 
 export default function SourceDeskPage() {
   const push = useToast();
@@ -30,6 +32,7 @@ export default function SourceDeskPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [staleNote, setStaleNote] = useState<string | null>(null);
+  const [listing, setListing] = useState<DeskListing>('unknown');
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +83,16 @@ export default function SourceDeskPage() {
     };
   }, [creator]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void fetchDeskRecord(wellKnownUrl()).then((rec) => {
+      if (!cancelled) setListing(fakeDeskSignal(rec?.desk ?? null, creator));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [creator]);
+
   async function send() {
     if (!deskKey || !deskPubRaw || !text.trim()) return;
     setSending(true);
@@ -111,7 +124,10 @@ export default function SourceDeskPage() {
     <section className="section">
       <div className="wrap" style={{ maxWidth: 760 }}>
         <p className="kicker">Public desk</p>
-        <h1 className="h2">{deskName}</h1>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <h1 className="h2" style={{ margin: 0 }}>{deskName}</h1>
+          <VerifiedBadge signal={listing} />
+        </div>
         <p className="lead" style={{ marginTop: 10 }}>
           Synthetic data only. Your tip is locked on your device before you send it. Only the newsroom can open it.
         </p>

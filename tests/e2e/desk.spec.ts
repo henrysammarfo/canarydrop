@@ -123,6 +123,8 @@ test('desk sidebar marks the active page and opens each section', async ({ page 
   await expect(page.getByRole('heading', { name: 'Inbox' })).toBeVisible();
   await page.locator('aside').getByRole('link', { name: 'Canary', exact: true }).click();
   await expect(page).toHaveURL(/\/desk\/canary/);
+  await page.locator('aside').getByRole('link', { name: 'Dead drop' }).click();
+  await expect(page).toHaveURL(/\/desk\/drop/);
   await page.locator('aside').getByRole('link', { name: 'Replies' }).click();
   await expect(page).toHaveURL(/\/desk\/replies/);
   await page.locator('aside').getByRole('link', { name: 'Desk settings' }).click();

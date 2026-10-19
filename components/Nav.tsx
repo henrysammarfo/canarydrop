@@ -50,6 +50,7 @@ export default function Nav() {
     { href: `/canary/${deskCreator}`, label: 'Canary' },
     { href: '/explorer', label: 'Explorer' },
     { href: '/docs', label: 'Docs' },
+    { href: '/threat', label: 'Limits' },
   ];
 
   const links = (

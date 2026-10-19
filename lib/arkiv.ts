@@ -272,7 +272,6 @@ export async function inboxPage(deskKey: Hex, opts?: PageWalk): Promise<InboxPag
   let q = pub()
     .select(INBOX_SELECT)
     .where(eq('project', PROJECT), eq('type', 'tip'), eq('desk', key(deskKey)))
-    .createdBy(relayAddress())
     .limit(50)
     .atBlock(head);
   if (opts?.cursor) q = q.cursor(opts.cursor);
@@ -353,7 +352,7 @@ export function entityBelongsToDesk(entity: DeskEntityShape | null | undefined, 
   const type = attrStr(entity.attributes, 'type');
   const desk = deskKey.toLowerCase();
   if (type === 'desk') return entity.key.toLowerCase() === desk;
-  if (type === 'tip' || type === 'canary') {
+  if (type === 'tip' || type === 'canary' || type === 'drop' || type === 'release' || type === 'hold') {
     const labeled = attrKey(entity.attributes, 'desk');
     return !!labeled && labeled.toLowerCase() === desk;
   }
@@ -406,7 +405,6 @@ export function watchInbox(deskKey: Hex, onTipOrHandlers: ((k: Hex) => void) | I
     if (stopped) return;
     unwatch = ws().watchEntityEvents({
       onEntityCreated: async (ev: EntityCreatedEvent) => {
-        if (ev.owner.toLowerCase() !== relayAddress().toLowerCase()) return;
         try {
           const e = await pub().getEntity(ev.entityKey);
           if (entityBelongsToDesk(e, deskKey) && attrStr(e.attributes, 'type') === 'tip') {
@@ -512,7 +510,7 @@ export async function explorerPage(opts?: ExplorerWalk) {
   if (opts?.sealed && !opts.kind) filters.push(eq('type', 'tip'));
   else if (opts?.kind) filters.push(eq('type', opts.kind));
   let q = pub().select(EXPLORER_SELECT).where(...filters).limit(20).atBlock(head);
-  if (opts?.sealed) q = q.createdBy(relayAddress()).ownedBy(SEALED_OWNER);
+  if (opts?.sealed) q = q.ownedBy(SEALED_OWNER);
   if (opts?.cursor) q = q.cursor(opts.cursor);
   return q.fetch();
 }

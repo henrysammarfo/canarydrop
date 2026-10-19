@@ -15,6 +15,8 @@ const pages = [
   '/how',
   '/verify',
   '/docs',
+  '/threat',
+  '/desk/drop',
   `/canary/${desk}`,
   `/d/${desk}`,
   '/r',
@@ -24,11 +26,13 @@ const appShell = new Set([
   '/desk',
   '/desk/inbox',
   '/desk/canary',
+  '/desk/drop',
   '/desk/replies',
   '/desk/settings',
   '/explorer',
   '/how',
   '/verify',
+  '/threat',
 ]);
 
 const outDir = '/opt/cursor/artifacts';

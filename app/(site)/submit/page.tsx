@@ -6,8 +6,11 @@ import { bytesToB64 } from '@/lib/bytes';
 import { appFetch } from '@/lib/client-fetch';
 import { CHAIN_READ_FAILED, DEFAULT_DESK, LIFETIME_KEYS, type Lifetime } from '@/lib/constants';
 import { sealTo } from '@/lib/crypto';
+import { newThrowawayKey, postDirectTip } from '@/lib/direct-tip';
+import { fakeDeskSignal, fetchDeskRecord, wellKnownUrl, type DeskListing } from '@/lib/domain-verify';
 import { asAddress } from '@/lib/hex';
 import { fetchDeskLive } from '@/lib/live-client';
+import { sameOriginApi } from '@/lib/runtime';
 import { uiError } from '@/lib/ui-error';
 import Link from 'next/link';
 import Modal from '@/components/Modal';
@@ -15,6 +18,7 @@ import StaleNote from '@/components/ui/StaleNote';
 import { useToast } from '@/components/Toast';
 import { entityUrl, shortHex, txUrl } from '@/lib/chain';
 import CopyField from '@/components/ui/CopyField';
+import VerifiedBadge from '@/components/VerifiedBadge';
 import { IcoVerify } from '@/components/ui/icons';
 
 export default function SubmitPage() {
@@ -33,6 +37,9 @@ export default function SubmitPage() {
   const [looking, setLooking] = useState(true);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [staleNote, setStaleNote] = useState<string | null>(null);
+  const [listing, setListing] = useState<DeskListing>('unknown');
+  const [path, setPath] = useState<'sponsor' | 'direct'>(() => (sameOriginApi() ? 'sponsor' : 'direct'));
+  const [throwaway, setThrowaway] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,6 +94,16 @@ export default function SubmitPage() {
     };
   }, [creator]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void fetchDeskRecord(wellKnownUrl()).then((rec) => {
+      if (!cancelled) setListing(fakeDeskSignal(rec?.desk ?? null, creator));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [creator]);
+
   const valid = !!deskKey && !!deskPubRaw && !!text.trim() && !sending;
   const step1 = deskKey ? 'done' : looking ? 'on' : 'on';
   const step2 = deskKey && text.trim() ? 'done' : deskKey ? 'on' : '';
@@ -98,6 +115,20 @@ export default function SubmitPage() {
     setSending(true);
     try {
       const { wire, receipt } = await sealTo(deskPubRaw, text);
+      if (path === 'direct') {
+        const key = newThrowawayKey();
+        const out = await postDirectTip({ privateKey: key, deskKey, wire, life, dryRun });
+        setThrowaway(out.owner);
+        if (dryRun) {
+          push({ kind: 'info', text: `Dry run ok. Predicted tip key ${shortHex(String(out.tipKey), 6, 4) || 'unknown'}. Nothing was sent.` });
+        } else {
+          if (!out.txHash) throw new Error('The tip was not confirmed.');
+          setOk({ tipKey: out.tipKey, txHash: out.txHash, receipt });
+          setText('');
+          push({ kind: 'success', text: 'Tip sent from a throwaway key. Keep your receipt private.' });
+        }
+        return;
+      }
       const res = await appFetch(`/api/tip${dryRun ? '?dryRun=1' : ''}`, {
         method: 'POST',
         body: JSON.stringify({ deskKey, wireB64: bytesToB64(wire), lifetime: life }),
@@ -156,7 +187,10 @@ export default function SubmitPage() {
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <p className="eyebrow">{looking ? 'Checking Arkiv' : verified ? 'Verified desk' : lookupError || staleNote ? 'Desk lookup' : 'Desk not found'}</p>
-              <h2 className="h3" style={{ marginTop: 4 }}>{deskName}</h2>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
+                <h2 className="h3" style={{ margin: 0 }}>{deskName}</h2>
+                <VerifiedBadge signal={listing} />
+              </div>
               <p className="muted" style={{ marginTop: 6 }} role="status">
                 {looking
                   ? 'Looking up this desk on Arkiv…'
@@ -175,8 +209,27 @@ export default function SubmitPage() {
             </div>
           </div>
           <p className="muted" style={{ marginTop: 14 }}>
-            You do not need a wallet. We pay the fee.
+            {path === 'direct'
+              ? 'This browser makes a throwaway key and pays the fee itself.'
+              : 'You do not need a wallet. We pay the fee.'}
           </p>
+          <fieldset className="send-path">
+            <legend className="small">How to send</legend>
+            <label>
+              <input
+                type="radio"
+                name="send-path"
+                checked={path === 'sponsor'}
+                disabled={!sameOriginApi()}
+                onChange={() => setPath('sponsor')}
+              />
+              Use the sponsor
+            </label>
+            <label>
+              <input type="radio" name="send-path" checked={path === 'direct'} onChange={() => setPath('direct')} />
+              Send without the sponsor
+            </label>
+          </fieldset>
           <details className="advanced">
             <summary>Use a different desk</summary>
             <label className="small" htmlFor="desk-creator">Desk creator address</label>
@@ -234,6 +287,7 @@ export default function SubmitPage() {
               <CopyField label="Tip" value={ok.tipKey} />
               <CopyField label="Tx" value={ok.txHash} />
             </div>
+            {throwaway && <CopyField label="Throwaway creator" value={throwaway} />}
             <div className="muted" style={{ marginTop: 8 }}>Receipt (keep it private):</div>
             <textarea readOnly value={JSON.stringify(ok.receipt)} style={{ height: 120, marginTop: 6 }} />
             <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 12 }}>
@@ -253,7 +307,9 @@ export default function SubmitPage() {
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => send(false)}
       >
-        The tip will be locked on this device and posted by our sponsor. You do not need a wallet. We pay the fee.
+        {path === 'direct'
+          ? 'The tip will be locked on this device and posted by a throwaway key in this browser.'
+          : 'The tip will be locked on this device and posted by our sponsor. You do not need a wallet. We pay the fee.'}
       </Modal>
       <Modal
         open={infoOpen}
@@ -261,7 +317,7 @@ export default function SubmitPage() {
         cancelLabel="Close"
         onClose={() => setInfoOpen(false)}
       >
-        Your device locks the tip. We post it and pay the network fee. You do not need a wallet.
+        Your device locks the tip. You can use the sponsor, or send with a throwaway key from this browser.
       </Modal>
     </section>
   );

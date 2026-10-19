@@ -3,13 +3,20 @@ import Link from 'next/link';
 import { canaryAtBlock, pub } from '@/lib/arkiv';
 import { atBlockAbsenceDetail } from '@/lib/at-block-copy';
 import { loadDeskLive } from '@/lib/live-read';
-import { PROJECT } from '@/lib/constants';
+import { DEFAULT_DESK, DEFAULT_IMPOSTOR, PROJECT } from '@/lib/constants';
 import { addressUrl, entityUrl, TIRAMISU_EXPLORER } from '@/lib/chain';
 import CopyField from '@/components/ui/CopyField';
 import StaleNote from '@/components/ui/StaleNote';
+import VerifiedBadge from '@/components/VerifiedBadge';
+import CanarySig from '@/components/CanarySig';
+import { fakeDeskSignal } from '@/lib/domain-verify';
 import { withReadBackoff } from '@/lib/retry';
 
-export const dynamic = 'force-dynamic';
+export const dynamic = process.env.STATIC_EXPORT === '1' ? 'force-static' : 'force-dynamic';
+
+export function generateStaticParams() {
+  return [{ creator: DEFAULT_DESK }, { creator: DEFAULT_IMPOSTOR }];
+}
 
 function asTime(timing: { currentBlockTime: number; blockDuration: number; currentBlock: bigint }, atBlock: bigint) {
   const duration = timing.blockDuration || 2;
@@ -69,7 +76,10 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
     <section className="section" style={{ paddingBottom: 48 }}>
       <div className="wrap" style={{ maxWidth: 860 }}>
         <p className="kicker">Public warrant canary</p>
-        <h1 className="h2">Canary status</h1>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <h1 className="h2" style={{ margin: 0 }}>Canary status</h1>
+          <VerifiedBadge signal={fakeDeskSignal(DEFAULT_DESK, creator)} />
+        </div>
         <p className="lead" style={{ marginTop: 10 }}>
           If this page says GONE, the newsroom has not renewed its canary. That is the signal.
         </p>
@@ -155,6 +165,8 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
           </p>
           <pre className="query-box">{query}</pre>
         </div>
+
+        <CanarySig desk={creator} />
 
         <div className="ctaRow" style={{ justifyContent: 'flex-start' }}>
           <Link className="btn" href={`/d/${creator}`}>

@@ -1,0 +1,7 @@
+{
+  "source": "arkiv/evidence.json",
+  "deskKey": "0x874e543a36fd673980ca4f2cd992ef9ac1aca38218f1232452bb5d7a7fac6231",
+  "canaryKey": "0x5a9cc9685585f462cc85dfdc2884f06309aa2cda9cc10acfeaa1a260e5a7cc70",
+  "createTx": "0x6558bfd29237fd4b131fbee1d74f13ac3ce1152d88a5ae05d24d5f33a1dc35be",
+  "impersonatorDesk": "0x4d8e321f65850a6ea1d7bfa5bc59a2256e1cf9e09007011f69cb5d61645106ef"
+}

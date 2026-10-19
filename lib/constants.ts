@@ -10,6 +10,7 @@ export const DEFAULT_DESK = '0x1da3c22c079c264536D831F6F1fCe638aB0b20B0' as Hex;
 export const DEFAULT_IMPOSTOR = '0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af' as Hex;
 
 export const PRODUCTION_HOST = 'canarydrop.vercel.app';
+export const PAGES_HOST = 'henrysammarfo.github.io';
 
 /** Ciphertext plus envelope must stay under this. Matches the relay write cap. */
 export const MAX_WIRE_BYTES = 8192;

@@ -22,7 +22,10 @@ export default function HomePage() {
             TIPS THAT CANNOT BE SEIZED.
           </h1>
           <p className="lead">
-            Your tip locks on your device. Only the newsroom can open it.
+            Your tip is locked on your device and only the newsroom can open it.
+          </p>
+          <p className="lead" style={{ marginTop: 8 }}>
+            If the newsroom goes quiet the canary dies on its own.
           </p>
           <div className="ctaRow" style={{ marginTop: 18, justifyContent: 'center' }}>
             <Link className="btn primary pill lg" href="/submit">
@@ -176,7 +179,7 @@ export default function HomePage() {
           <div className="home-faq">
             <details className="card" open>
               <summary>Do sources need a wallet?</summary>
-              <p>No. A sponsor posts the tip for them.</p>
+              <p>No. A sponsor can post the tip for them. They can also send with a throwaway key from this browser.</p>
             </details>
             <details className="card">
               <summary>What data goes on Arkiv?</summary>
@@ -188,7 +191,7 @@ export default function HomePage() {
             </details>
             <details className="card">
               <summary>What happens when the sponsor is down?</summary>
-              <p>Reading still works. Sending new tips needs the sponsor.</p>
+              <p>Reading still works. Sending can use a throwaway key in this browser if you have testnet funds. The sponsor path stays optional.</p>
             </details>
             <details className="card">
               <summary>What stays off Arkiv?</summary>

@@ -50,13 +50,15 @@ function TypeFlags({ item }: { item: Item }) {
     canonicalDemo: item.canonicalDemo,
     olderDemoDesk: item.olderDemo === 'Older demo desk, replaced',
     olderDemoCanary: item.olderDemo === 'Older demo canary, replaced',
+    verifiedDomain: item.verifiedDomain,
+    unlistedDesk: item.unlistedDesk,
   });
   const sealed = isSealedOwner(item.owner);
   return (
     <span className="flag-row">
       <strong style={{ color: 'var(--text)', fontWeight: 600 }}>{item.type}</strong>
       {flags.map((b) => (
-        <Flag key={b.full} short={b.short} full={b.full} tone={b.short === 'Canonical' ? 'gold' : b.short === 'Impostor' ? 'wait' : 'muted'} />
+        <Flag key={b.full} short={b.short} full={b.full} tone={b.short === 'Verified' || b.short === 'Canonical' ? 'gold' : b.short === 'Impostor' ? 'wait' : 'muted'} />
       ))}
       {item.readonly && <Flag short="Readonly" full="Readonly: nobody can change it" />}
       {sealed ? (

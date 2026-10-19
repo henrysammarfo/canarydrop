@@ -33,7 +33,8 @@ The newsroom canary is not `permissionlessExtension`. Only the desk wallet can r
 ## Attacks we do not claim to block
 
 - The relay still sees ciphertext, size, and the chosen lifetime. A seized Vercel account can still post junk tips until spend caps bite.
-- Platform logs may record IPs. We do not write IPs to Arkiv.
+- Platform logs may record IPs. We do not write IPs to Arkiv. Use Tor Browser if your network address must stay off the public RPC and the hosted mirror. The site shows a gentle banner when it does not look like Tor.
+- A throwaway in-browser key hides the sponsor wallet. It does not hide the sender IP.
 - Anonymous Tiramisu RPC can return 429. Reads then fail until the budget recovers.
 - Demo mode trust is weaker than a wallet owned desk. Anyone who can call the demo key route from the live site can open demo tips.
 - `style-src` still allows `unsafe-inline` because React sets element styles. Script eval is the part we tightened.

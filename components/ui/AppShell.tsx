@@ -17,12 +17,14 @@ import {
   IcoReplies,
   IcoSettings,
   IcoVerify,
+  IcoDrop,
 } from './icons';
 
 const DESK = [
   { href: '/desk', label: 'Overview', icon: IcoOverview, exact: true },
   { href: '/desk/inbox', label: 'Inbox', icon: IcoInbox },
   { href: '/desk/canary', label: 'Canary', icon: IcoCanary },
+  { href: '/desk/drop', label: 'Dead drop', icon: IcoDrop },
   { href: '/desk/replies', label: 'Replies', icon: IcoReplies },
   { href: '/desk/settings', label: 'Desk settings', icon: IcoSettings },
 ];
@@ -31,6 +33,7 @@ const WORK = [
   { href: '/explorer', label: 'Explorer', icon: IcoExplorer },
   { href: '/how', label: 'How it uses Arkiv', icon: IcoHow },
   { href: '/verify', label: 'Verify', icon: IcoVerify },
+  { href: '/threat', label: 'Threat model', icon: IcoHow },
 ];
 
 function active(pathname: string, href: string, exact?: boolean) {

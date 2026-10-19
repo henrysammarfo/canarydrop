@@ -1,8 +1,20 @@
 /** @type {import('next').NextConfig} */
-export default {
+const isStatic = process.env.STATIC_EXPORT === '1';
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
+const config = {
   poweredByHeader: false,
   transpilePackages: ['geist'],
+  ...(isStatic
+    ? {
+        output: 'export',
+        trailingSlash: true,
+        images: { unoptimized: true },
+        ...(basePath ? { basePath, assetPrefix: basePath } : {}),
+      }
+    : {}),
   headers: async () => {
+    if (isStatic) return [];
     return [
       {
         source: '/:path*',
@@ -17,3 +29,5 @@ export default {
     ];
   },
 };
+
+export default config;

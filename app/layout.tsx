@@ -18,8 +18,17 @@ export const metadata: Metadata = {
   },
 };
 
+function cspNonce(): string | undefined {
+  if (process.env.STATIC_EXPORT === '1' || process.env.NEXT_PUBLIC_STATIC === '1') return undefined;
+  try {
+    return headers().get('x-nonce') ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export default function RootLayout({ children }: { children: ReactNode }) {
-  const nonce = headers().get('x-nonce') ?? undefined;
+  const nonce = cspNonce();
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body data-nonce={nonce}>

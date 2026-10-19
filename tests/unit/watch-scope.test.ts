@@ -20,6 +20,8 @@ function attrs(type: string, desk = DESK, project = PROJECT): Attributes {
 describe('watch scope for this desk', () => {
   it('accepts a CanaryDrop tip labeled with this desk', () => {
     expect(entityBelongsToDesk({ key: TIP, attributes: attrs('tip') }, DESK)).toBe(true);
+    expect(entityBelongsToDesk({ key: TIP, attributes: attrs('drop') }, DESK)).toBe(true);
+    expect(entityBelongsToDesk({ key: TIP, attributes: attrs('hold') }, DESK)).toBe(true);
   });
 
   it('accepts this desk entity and a canary for it', () => {

@@ -28,7 +28,8 @@ NEXT_PUBLIC_RELAY_ADDRESS=0xa6Aa6a1409eb54028550466169A29EAfd8f7a442 \
 npm run verify
 ```
 
-Threat model: `SECURITY.md`. Friction report: `arkiv/friction.md` (`npm run friction`).
+Threat model: `/threat` and `SECURITY.md`. Friction report: `arkiv/friction.md` (`npm run friction`).
+Static build: `docs/static-build.md` and `/how#static-build`. Ethereum gaps: `docs/friction.md`.
 
 Why the Privacy pillar
 ----------------------
@@ -61,7 +62,7 @@ Why Arkiv (vs Postgres/IPFS/subgraph/own API)
 Live pages
 ----------
 
-- `/` : explainer hero and entry points
+- `/` : explainer hero and entry points. One sentence for tips, one for the canary.
 - `/desk` : newsroom desk dashboard with tabs (Inbox, Canary, Keys, Settings). Single connect button in nav, demo mode toggle in header. Create desk + canary, renew canary, live inbox, reply
 - `/d/[creator]` : public desk page: canary badge, submit form
 - `/r` : read replies with tip key + receipt code
@@ -69,8 +70,10 @@ Live pages
 - `/explorer` : live feed of CanaryDrop entities on Tiramisu
 - `/canary/[creator]` : public canary status page
 - `/docs` : architecture, schema and friction report
-- `/how` : live Tiramisu proofs for every Arkiv feature the product uses
+- `/how` : live Tiramisu proofs for every Arkiv feature the product uses, plus static build verification
 - `/verify` : sixty second judge path, no keys needed
+- `/threat` : what Arkiv hides, what it does not, and why to use Tor Browser
+- `/desk/drop` : demo dead drop on silence (synthetic data only)
 
 Design
 ------
@@ -219,6 +222,38 @@ Chain configuration
 - Native token: GLM (Golem)
 - Explorer: `https://hub.arkiv.network/tiramisu`
 
+Landing copy
+------------
+
+Tips: Your tip is locked on your device and only the newsroom can open it.
+
+Canary: If the newsroom goes quiet the canary dies on its own.
+
+Relay-free tips
+---------------
+
+Sources can send a sealed tip with a throwaway key created in the browser. The tip is still handed to `0x…dEaD` in the same batch. The sponsor path stays optional on the Next server. The static build has no write API of its own.
+
+Verified domain
+---------------
+
+`/.well-known/canarydrop.json` lists the desk address. DNS TXT `canarydrop-desk=0x…` is the same claim. Pages show a Verified domain badge when the record matches. A desk that is not the listed address is flagged for fake desk detection.
+
+Dead drop on silence
+--------------------
+
+A newsroom can pre-seal a statement to chosen recipients. `predictEntityKeys` books drop, release, and hold keys. The drop is sealed with `changeOwnership`. The hold shares the canary expiry. If the canary lapses, the hold is treated as released. The demo desk seeds synthetic data only.
+
+Static build
+------------
+
+```bash
+npm ci
+npm run build:static
+```
+
+`out/build.sha256` is the published SHA256 list. `npm run verify:static -- out/build.sha256` rebuilds and compares. Self host `out/` or optionally `ipfs add -r out`. GitHub Pages workflow: `.github/workflows/pages.yml`. Vercel stays a convenience mirror.
+
 Security notes
 --------------
 
@@ -255,10 +290,12 @@ Tests
 
 Run these locally. Do not wait on hosted workflows.
 
-- Unit: crypto, origin, CSRF, rate limit, Redis store, wallet lock, retry, CSP, schemas, errors, spend caps, chain helpers, proofs text
+- Unit: crypto, origin, CSRF, rate limit, Redis store, wallet lock, retry, CSP, schemas, errors, spend caps, chain helpers, proofs text, EIP-712, SIWE, stealth addresses, dead drop, verified domain, Tor banner, static runtime
 - API: tip and demo routes, missing Origin, CSRF mismatch, size caps, missing desk, demo key
 - Integration: live Tiramisu reads (sealed tips, `ownedBy`, flags, nonce, count), inbox pagination mock, dry run against a live desk
-- E2E: routes including `/how`, mobile overflow, dry run toast, desk Demo mode, real-browser demo key GET, CSP header, verify page, CSRF cookie
+- E2E: routes including `/how`, `/threat`, `/desk/drop`, mobile overflow, dry run toast, desk Demo mode, real-browser demo key GET, CSP header, verify page, CSRF cookie, landing copy, well known record
+
+Current local counts: 382 vitest, 126 Playwright (123 passed, 3 skipped without PRODUCTION_URL).
 
 ```bash
 npm run lint

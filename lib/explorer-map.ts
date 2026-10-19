@@ -21,6 +21,8 @@ export type ExplorerItem = {
   impostor: boolean;
   canonicalDemo: boolean;
   olderDemo: string | null;
+  verifiedDomain: boolean;
+  unlistedDesk: boolean;
   readonly: boolean;
   openExtend: boolean;
 };
@@ -39,6 +41,7 @@ export function mapExplorerEntity(e: ExplorerEntity, canonicalDeskKey?: Hex): Ex
     canonicalDeskKey,
     demoCreator: DEFAULT_DESK,
     impostorCreator: DEFAULT_IMPOSTOR,
+    listedDesk: DEFAULT_DESK,
   });
   return {
     key: e.key,
@@ -49,6 +52,8 @@ export function mapExplorerEntity(e: ExplorerEntity, canonicalDeskKey?: Hex): Ex
     impostor: flags.impostor,
     canonicalDemo: flags.canonicalDemo,
     olderDemo: olderDemoLabel(flags),
+    verifiedDomain: flags.verifiedDomain,
+    unlistedDesk: flags.unlistedDesk,
     readonly: e.creationFlags?.readonly === true,
     openExtend: e.creationFlags?.permissionlessExtension === true,
   };

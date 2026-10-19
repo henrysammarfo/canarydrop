@@ -16,6 +16,8 @@ const routes = [
   '/docs',
   '/how',
   '/verify',
+  '/threat',
+  '/desk/drop',
   `/canary/${desk}`,
   `/d/${desk}`,
   '/__404__',

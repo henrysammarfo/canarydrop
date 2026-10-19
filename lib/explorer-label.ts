@@ -15,6 +15,8 @@ export type ExplorerRowFlags = {
   canonicalDemo: boolean;
   olderDemoDesk: boolean;
   olderDemoCanary: boolean;
+  verifiedDomain: boolean;
+  unlistedDesk: boolean;
 };
 
 function listed(list: readonly string[], value: string): boolean {
@@ -29,6 +31,7 @@ export function explorerRowFlags(input: {
   canonicalDeskKey?: Hex | undefined;
   demoCreator: Hex;
   impostorCreator: Hex;
+  listedDesk?: Hex | undefined;
 }): ExplorerRowFlags {
   const creator = input.creator.toLowerCase();
   const key = input.key.toLowerCase();
@@ -52,7 +55,11 @@ export function explorerRowFlags(input: {
     (listed(REPLACED_DEMO_CANARY_KEYS, key) ||
       (creator === demo && !!canonical && !!deskAttr && deskAttr !== canonical));
 
-  return { impostor, canonicalDemo, olderDemoDesk, olderDemoCanary };
+  const listedAddr = input.listedDesk?.toLowerCase();
+  const verifiedDomain = input.type === 'desk' && !!listedAddr && creator === listedAddr && !impostor;
+  const unlistedDesk = input.type === 'desk' && !!listedAddr && creator !== listedAddr;
+
+  return { impostor, canonicalDemo, olderDemoDesk, olderDemoCanary, verifiedDomain, unlistedDesk };
 }
 
 export function olderDemoLabel(flags: ExplorerRowFlags): string | null {
@@ -71,6 +78,8 @@ export const SEALED_BADGE: ExplorerBadge = {
 export function explorerTypeBadges(flags: ExplorerRowFlags): ExplorerBadge[] {
   const out: ExplorerBadge[] = [];
   if (flags.impostor) out.push({ short: 'Impostor', full: 'Ignored impostor' });
+  if (flags.verifiedDomain) out.push({ short: 'Verified', full: 'Verified domain' });
+  if (flags.unlistedDesk && !flags.impostor) out.push({ short: 'Unlisted', full: 'Not the desk this site lists' });
   if (flags.canonicalDemo) out.push({ short: 'Canonical', full: 'Canonical demo desk' });
   const older = olderDemoLabel(flags);
   if (older) out.push({ short: 'Replaced', full: older });

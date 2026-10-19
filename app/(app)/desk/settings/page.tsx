@@ -5,6 +5,7 @@ import CopyField from '@/components/ui/CopyField';
 import PageHeader from '@/components/ui/PageHeader';
 import DemoBanner, { DemoSwitch } from '@/components/desk/DemoBanner';
 import { useDesk } from '@/components/desk/DeskProvider';
+import SiweCard from '@/components/desk/SiweCard';
 import { shortHex, txUrl } from '@/lib/chain';
 
 export default function SettingsPage() {
@@ -79,6 +80,7 @@ export default function SettingsPage() {
             </div>
           )}
         </Card>
+        <SiweCard />
       </div>
     </>
   );
