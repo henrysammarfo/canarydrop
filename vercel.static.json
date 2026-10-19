@@ -1,0 +1,23 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build:static",
+  "outputDirectory": "out",
+  "installCommand": "npm ci",
+  "framework": null,
+  "trailingSlash": true,
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "script-src 'self'; script-src-elem 'self'; default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://d2ol7oe51mr4n9.cloudfront.net; media-src https://d8j0ntlcm91z4.cloudfront.net https://d2ol7oe51mr4n9.cloudfront.net; font-src 'self' data:; connect-src 'self' https://rpc.tiramisu.db-chain.testnet.arkiv.network wss://rpc.tiramisu.db-chain.testnet.arkiv.network https://cloudflare-dns.com https://dns.google; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'none'; manifest-src 'self'; upgrade-insecure-requests"
+        },
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
+      ]
+    }
+  ]
+}

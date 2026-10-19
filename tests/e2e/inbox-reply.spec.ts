@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
 
+test('replies page labels stealth replies experimental', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/desk/replies', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.page-header .experimental-label')).toHaveText('Experimental');
+});
+
 test('send reply shows inline confirmation and a toast under the topbar', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/desk', { waitUntil: 'load' });
@@ -31,14 +37,17 @@ test('send reply shows inline confirmation and a toast under the topbar', async 
   });
   await replyBox.fill('Synthetic judge reply.');
   await page.getByRole('button', { name: 'Send reply' }).first().click();
+  await expect(page.locator('.stealth-reply-note').first()).toContainText('Experimental');
   const inline = page.locator('.reply-sent').filter({ hasText: /Reply sent/i });
   await expect(inline).toBeVisible({ timeout: 20_000 });
   await expect(inline.getByRole('link', { name: /Open it on Replies/i })).toHaveAttribute(
     'href',
     `/desk/replies#reply-${replyKey}`,
   );
-  const toast = page.locator('.toast-stack .toast').filter({ hasText: /^Reply sent\.$/ });
+  await expect(inline.locator('.experimental-label')).toHaveText('Experimental');
+  const toast = page.locator('.toast-stack .toast').filter({ hasText: /one time address/i });
   await expect(toast).toBeVisible();
+  await expect(toast).toContainText('Experimental');
   const pos = await toast.boundingBox();
   expect(pos, 'toast sits under the topbar').toBeTruthy();
   expect(pos!.y).toBeLessThan(120);

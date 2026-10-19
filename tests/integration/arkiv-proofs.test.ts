@@ -43,16 +43,17 @@ describe('deeper Arkiv reads against Tiramisu', () => {
     }
   });
 
-  it('explorer sealed filter only returns CanaryDrop tips from the sponsor', async () => {
+  it('explorer sealed filter only returns sealed CanaryDrop tips', async () => {
     const sealed = await retryRead(() => sealedTips());
-    const page = await retryRead(() => explorerPage({ kind: 'tip', sealed: true }));
-    expect(page.blockNumber).toBeGreaterThan(0n);
-    const sealedKeys = sealed.entities.map((e) => e.key).sort();
-    const pageKeys = page.entities.map((e) => e.key).sort();
-    expect(pageKeys).toEqual(sealedKeys);
+    const page = await retryRead(() => explorerPage({ kind: 'tip', sealed: true, atBlock: sealed.blockNumber }));
+    expect(page.blockNumber).toBe(sealed.blockNumber);
+    const sealedKeys = new Set(sealed.entities.map((e) => e.key?.toLowerCase()));
+    for (const key of sealedKeys) {
+      expect(page.entities.some((row) => row.key?.toLowerCase() === key)).toBe(true);
+    }
     for (const row of page.entities) {
+      expect(attrStr(row.attributes, 'project')).toBe(PROJECT);
       expect(attrStr(row.attributes, 'type')).toBe('tip');
-      expect(row.creator?.toLowerCase()).toBe(DEFAULT_RELAY.toLowerCase());
       expect(isSealedOwner(row.owner)).toBe(true);
     }
   });

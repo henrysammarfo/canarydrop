@@ -24,9 +24,12 @@ export async function POST(req: NextRequest) {
     if (raw === null) throw new AppError('bad_request');
     const parsed = createDeskBody.safeParse(raw);
     if (!parsed.success) throw new AppError('bad_request');
-    const { name, deskPubRawB64 } = parsed.data;
+    const { name, deskPubRawB64, domain } = parsed.data;
     const pubRaw = b64ToBytes(deskPubRawB64);
     if (pubRaw.byteLength !== 65) throw new AppError('bad_request', 'That desk public key is the wrong size.');
+    if (domain && !/^[a-z0-9.-]{1,80}$/.test(domain.trim().toLowerCase())) {
+      throw new AppError('bad_request', 'That domain is not valid.');
+    }
     if (dryRun) {
       const deskOwner = asAddress(process.env.NEXT_PUBLIC_DESK_ADDRESS ?? '', DEFAULT_DESK);
       const predicted = await pub().predictEntityKeys({ owner: deskOwner, count: 2 });
@@ -35,10 +38,22 @@ export async function POST(req: NextRequest) {
     const account = deskAccount();
     await assertMinBalance(pub(), account.address);
     await assertDeskCreateRoom(account.address);
+    const { DEFAULT_CANARY_STATEMENT, canaryTypedData, issuedAtNow } = await import('@/lib/eip712');
+    const issuedAt = issuedAtNow();
+    const signed = {
+      statement: DEFAULT_CANARY_STATEMENT,
+      issuedAt,
+      signature: await account.signTypedData(
+        canaryTypedData({ desk: account.address, statement: DEFAULT_CANARY_STATEMENT, issuedAt }),
+      ),
+    };
     const out = await withWalletLock('desk', account.address, () =>
       withBackoff(async () => {
         const nonce = await pub().getTransactionCount({ address: account.address, blockTag: 'pending' });
-        return createDesk(deskWallet(), account.address, name, pubRaw, { nonce });
+        return createDesk(deskWallet(), account.address, name, pubRaw, { nonce }, {
+          domain: domain?.trim().toLowerCase(),
+          signed,
+        });
       }),
     );
     return jsonOk({ ok: true, txHash: out.txHash, created: out.createdEntities });

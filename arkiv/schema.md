@@ -1,5 +1,21 @@
 # CanaryDrop: Arkiv schema
 
+## Why each Arkiv feature
+
+| Feature | Why we use it |
+|---|---|
+| `predictEntityKeys` | Know desk, canary, tip, drop, release, and hold keys before the batch so later steps can reference them in the same transaction. |
+| `executeBatch` | Create desk plus canary, or tip plus seal, or drop plus release plus hold, without a gap a seized operator could abuse. |
+| `changeOwnership` / `ownershipChanges` | Hand a tip or drop to `0x…dEaD` in the same batch so nobody can extend, patch, or delete it later. |
+| `ExpirationTime` / `extendEntity` | Canary and hold die if they are not renewed. Desk leases last 30 days. Drops last 90 days. |
+| `createdBy` | Reads of desk, canary, and replies are pinned to the newsroom wallet. A copycat name does not match. |
+| `ownedBy` | Explorer and proofs ask for burn-owned sealed tips, including throwaway creators. |
+| `readonly` | Tips, canaries, and drops cannot be patched. We never set `permissionlessExtension` on a canary. |
+| `atBlock` | Ask whether the same canary was alive about an hour ago. |
+| `watchEntityEvents` | Live inbox over WebSocket. Catch-up is a query because expiry fires no event. |
+| `slot` u64 | Daily spend cap. `$createdAt` has no index. |
+| Public RPC from the browser | Static builds and the desk UI read Tiramisu directly. There is no read API to censor. |
+
 Network: Tiramisu (chain 7738577) · SDK `@arkiv-network/sdk` 0.8.1 · project attribute `project = "canarydrop-gts26-hm"` on every entity and every query.
 All payloads are synthetic test data. Plaintext never touches Arkiv.
 
@@ -17,6 +33,9 @@ All payloads are synthetic test data. Plaintext never touches Arkiv.
 | `canary` | project, type, desk:key | JSON `{statement}` | `fromHours(26)`, renewed daily; if it lapses the canary is dead | `readonly` (statement frozen, only renewable). Deliberately NOT `permissionlessExtension`: anyone could fake a live canary |
 | `tip` | project, type, desk:key, slot:u64 (UTC YYYYMMDD) | bytes `[v1 \| ephPub 65 \| iv 12 \| AES-GCM ct]`, plaintext padded to 2 KiB buckets | chosen by source: 1h / 24h / 72h / 7d | `readonly`; ownership moved to `0x…dEaD` in the same batch so nobody can extend, patch or delete; the source's lifetime is final |
 | `reply` | project, type, tip:key, slot:u64 | bytes `[v1 \| iv 12 \| ct]` (same ECDH secret as the tip) | `fromHours(72)` | owner = desk |
+| `drop` | project, type, desk:key, slot:u64 | sealed statement bytes | `fromDays(90)` | `readonly`; ownership moved to `0x…dEaD` at create |
+| `release` | project, type, desk:key, drop:key, slot:u64 | JSON wraps of the release key to each recipient | `fromDays(90)` | owned by the desk so it outlives the canary |
+| `hold` | project, type, desk:key, drop:key | JSON `{kind, drop}` | `fromHours(26)`, renewed with the canary | if this and the canary lapse, the drop is treated as released |
 
 No timestamps, names, emails, IPs or hashes of personal data are stored as attributes. `$createdAt` (a block number) and `$expiresAt` are the only time signals.
 

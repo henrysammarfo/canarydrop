@@ -1,10 +1,18 @@
 # Friction report: CanaryDrop on Arkiv Tiramisu
 
+## Top 5
+
+1. `$createdAt` has no index. We sort in JS and write `slot` as u64 YYYYMMDD (F1).
+2. Bare numbers become i32 and `$expiresAt` needs `u64(head)` (F2, F3).
+3. `predictEntityKeys` races under concurrent creates from one owner (F9).
+4. Expiry fires no event, so a dead canary is silent unless we poll (F8).
+5. Anonymous RPC is rate limited. We fail fast and serve last-good reads (F10).
+
 Environment: `@arkiv-network/sdk` 0.8.1, viem 2.57.7, Node 20+, Tiramisu chain 7738577.
 Date of this pass: 19 Oct 2026. Head at repro time: block 772182, 2s blocks.
 Repro: `npm run friction` runs `arkiv/repro/run-all.mjs`. Every script is read only and needs no wallet.
 
-This report lists only issues we reproduced in this repo or measured against the live Tiramisu RPC. Severity is from the point of view of an app that posts sealed tips and a warrant canary.
+This report lists only issues we reproduced in this repo or measured against the live Tiramisu RPC. Severity is from the point of view of an app that posts sealed tips and a warrant canary. All sixteen original findings remain below, plus later ones.
 
 ## Summary table
 
@@ -35,6 +43,10 @@ This report lists only issues we reproduced in this repo or measured against the
 | F23 | Empty `toString()` | Low | A query needs at least one filter |
 | F24 | `getEntityCount` is chain wide | Medium | We print it as whole-chain, then query `project` |
 | F25 | `toString()` is predicate only | Low | Judge page shows the predicate, not SELECT/LIMIT |
+| F26 | No stealth address registry | Product | ERC-5564 announcements stay local. See `docs/friction.md` |
+| F27 | No native typed-data entity | Product | EIP-712 canary signatures live in the payload or offline |
+| F28 | Static export cannot run middleware | Product | CSP nonce and Origin checks are the server path. Static talks to Arkiv from the browser |
+| F29 | `str()` is 128 UTF-8 bytes | High | EIP-712 sigs stay in the canary payload. Attributes never call `str(sig)` |
 
 ## Method
 
@@ -202,7 +214,7 @@ Footgun: storing the selection in a `let` widens `true` to `boolean` and you los
 
 Query keywords are case insensitive. Attribute names are case sensitive. `Level` and `level` are different attributes. `NOT` as a name cannot be queried.
 
-We only write `project`, `type`, `desk`, `tip`, `slot`.
+We only write `project`, `type`, `desk`, `tip`, `slot`, and short labels such as `statement` or `path`. The canary signature is not an attribute (F29).
 
 ## F14. Faucet insolvency (ops, previously measured)
 
@@ -222,6 +234,14 @@ If a canary is `permissionlessExtension: true`, anyone can keep it alive. That d
 
 We put ciphertext in the payload, not in attributes. Labels are short. Tips pad plaintext to 2 KiB buckets so length leaks less. The relay still sees ciphertext size.
 
+## F29. `str()` rejects a 132-character EIP-712 signature
+
+An ECDSA signature on secp256k1 is 65 bytes. Written as `0x` plus 130 hex chars it is 132 UTF-8 bytes. SDK `str()` throws `InvalidValueError` at 129 bytes. Putting `sig: str(signature)` on a canary create therefore 500s on renew and on signed create-desk.
+
+Repro: `str('0x' + 'ab'.repeat(65))` throws. `tests/unit/write-strings.test.ts` calls the real SDK helper on every product string attribute and asserts the 132-character sig is absent from `canaryWriteAttrs`.
+
+Workaround we ship: `statement` and `issuedAt` stay queryable attributes. The signature lives only in the JSON payload. `canarySigFromRow` already prefers `payload.sig`.
+
 ## What worked, with evidence
 
 These paths were already on chain from the seed (see `arkiv/evidence.json` and the README explorer links):
@@ -232,6 +252,16 @@ These paths were already on chain from the seed (see `arkiv/evidence.json` and t
 - `createdBy` ignoring an impersonator desk.
 - `getBlockTiming` plus `u64` expiry queries.
 - `QueryResult.cursor` pagination on live `project = canarydrop-gts26-hm` rows (F5, 5 entities at block 772183).
+
+## Checked and found smooth
+
+These paths were used again in v7 without a new failure class:
+
+- Browser `PublicArkivClient` against the public Tiramisu HTTP URL for static reads.
+- `predictEntityKeys` count 3 for drop plus release plus hold, then `ownershipChanges` on the drop only.
+- `ownedBy(burn)` without `createdBy(relay)` so throwaway creators still appear as sealed tips.
+- `verifyTypedData` / `verifyMessage` from viem for EIP-712 and EIP-4361. Arkiv is not in that path.
+- `ExpirationTime.fromHours(26)` on both canary and hold so silence releases the drop by absence.
 
 ## Smooth SDK paths we now lean on
 
@@ -567,7 +597,9 @@ It does not print SELECT, LIMIT, or the projection. The How page shows that stri
 | `arkiv/repro/f24-entity-count.mjs` | chain wide count |
 | `arkiv/repro/f25-query-text.mjs` | predicate `toString()` |
 | `arkiv/repro/run-all.mjs` | runner |
-| `lib/arkiv.ts` | queries, watch, batch helpers |
+| `lib/arkiv.ts` | queries, watch, batch helpers. Canary `sig` is payload-only (F29) |
+| `lib/write-strings.ts` | Every product `str()` value for the unmocked cap test |
+| `tests/unit/write-strings.test.ts` | Real SDK `str()` on each write attribute |
 | `lib/relay.ts` | sealed tip write |
 | `lib/retry.ts` | queue and backoff |
 | `lib/store.ts` | optional Redis REST creds, fallback warning |

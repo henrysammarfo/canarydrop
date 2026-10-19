@@ -1,5 +1,5 @@
 import type { Hex } from 'viem';
-import { deskAndCanary, explorerPage, inboxPage } from './arkiv';
+import { canarySigFromRow, deskAndCanary, explorerPage, inboxPage, tipVisibleInInbox } from './arkiv';
 import { bytesToB64 } from './bytes';
 import { CHAIN_READ_FAILED, DEFAULT_DESK, LIVE_CACHE_MS, LIVE_STALE_MS } from './constants';
 import { rememberRead } from './data-cache';
@@ -41,6 +41,10 @@ function emptyDesk(creator: Hex, note: string): DeskLive {
     createdAt: null,
     currentBlock: null,
     blockDuration: 2,
+    domain: null,
+    canaryStatement: null,
+    canaryIssuedAt: null,
+    canarySig: null,
     ...freshness(),
     note,
   };
@@ -78,6 +82,7 @@ async function fetchDeskFromChain(creator: Hex): Promise<DeskLive> {
     const prefer = preferPubForCreator(creator);
     const bundle = await deskAndCanary(creator, prefer);
     const parsed = bundle.desk?.payload ? parseDeskPayload(bundle.desk.payload) : null;
+    const signed = canarySigFromRow(bundle.canary);
     return {
       ok: true as const,
       creator,
@@ -90,6 +95,10 @@ async function fetchDeskFromChain(creator: Hex): Promise<DeskLive> {
       createdAt: bundle.canary?.createdAt != null ? bundle.canary.createdAt.toString() : null,
       currentBlock: bundle.currentBlock.toString(),
       blockDuration: bundle.blockDuration || 2,
+      domain: parsed?.domain ?? null,
+      canaryStatement: signed.statement,
+      canaryIssuedAt: signed.issuedAt,
+      canarySig: signed.signature,
       ...freshness(),
     };
   });
@@ -145,7 +154,7 @@ async function fetchInboxFromChain(
     return {
       ok: true as const,
       tips: r.entities
-        .filter((row) => row.key)
+        .filter((row) => row.key && tipVisibleInInbox(row.owner))
         .map((row) => ({
           key: row.key as Hex,
           createdAt: (row.createdAt ?? 0n).toString(),

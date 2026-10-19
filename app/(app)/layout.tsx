@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import AppShell from '@/components/ui/AppShell';
 
+/** Server-only. Client chrome lives on desk, explorer, how, and verify layouts. */
 export default function AppLayout({ children }: { children: ReactNode }) {
-  return <AppShell>{children}</AppShell>;
+  return children;
 }

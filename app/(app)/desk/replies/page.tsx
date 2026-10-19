@@ -5,6 +5,7 @@ import type { Hex } from 'viem';
 import Card from '@/components/ui/Card';
 import CopyField from '@/components/ui/CopyField';
 import EmptyState from '@/components/ui/EmptyState';
+import ExperimentalLabel from '@/components/ui/ExperimentalLabel';
 import PageHeader from '@/components/ui/PageHeader';
 import Table from '@/components/ui/Table';
 import DemoBanner, { DemoSwitch } from '@/components/desk/DemoBanner';
@@ -62,7 +63,12 @@ export default function RepliesPage() {
       <PageHeader
         kicker="Newsroom"
         title="Replies"
-        description="Replies you send from the inbox are stored on Arkiv and listed here."
+        description={
+          <>
+            Replies you send from the inbox use a one time address and are stored on Arkiv.{' '}
+            <ExperimentalLabel />
+          </>
+        }
         actions={<DemoSwitch />}
       />
       <DemoBanner />

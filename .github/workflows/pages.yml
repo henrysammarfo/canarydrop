@@ -1,0 +1,57 @@
+# Optional. The primary static mirror is a separate Vercel project using
+# vercel.static.json (https://canarydrop-static.vercel.app). Keep this workflow
+# if GitHub Pages and Actions are available on the account.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      STATIC_EXPORT: '1'
+      NEXT_PUBLIC_STATIC: '1'
+      NEXT_PUBLIC_BASE_PATH: /canarydrop
+      NEXT_PUBLIC_DESK_ADDRESS: '0x1da3c22c079c264536D831F6F1fCe638aB0b20B0'
+      NEXT_PUBLIC_RELAY_ADDRESS: '0xa6Aa6a1409eb54028550466169A29EAfd8f7a442'
+      NEXT_PUBLIC_BUILD_ID: ${{ github.sha }}
+      SOURCE_DATE_EPOCH: '0'
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-node@v4.1.0
+        with:
+          node-version: 20.18.0
+          cache: npm
+      - run: npm ci
+      - run: npm run build:static
+      - uses: actions/upload-pages-artifact@v3.0.1
+        with:
+          path: out
+      - uses: actions/upload-artifact@v4.4.3
+        with:
+          name: static-sha256
+          path: out/build.sha256
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4.0.5

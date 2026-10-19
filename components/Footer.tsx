@@ -8,6 +8,7 @@ export default function Footer() {
         <div>MIT. Built for Arkiv Global Tour on Tiramisu testnet.</div>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <Link href="/how">How we use Arkiv</Link>
+          <Link href="/threat">Threat model</Link>
           <a href="https://github.com/henrysammarfo/canarydrop" target="_blank" rel="noreferrer">
             GitHub
           </a>

@@ -1076,6 +1076,9 @@ label.small {
   padding: 12px;
   overflow: auto;
   max-height: 220px;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -1085,6 +1088,12 @@ label.small {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-2);
+}
+.proof-list,
+.proof-card,
+.proof-facts {
+  min-width: 0;
+  max-width: 100%;
 }
 .verify-steps { margin: 22px 0 0; padding: 0; display: grid; gap: 12px; }
 .verify-steps li {
@@ -1306,13 +1315,59 @@ label.small {
 .reply-row { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .reply-row input { flex: 1 1 auto; height: 36px; }
 .reply-row .btn { height: 36px; }
+.stealth-reply-note { margin: 8px 0 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .reply-sent { margin: 0; }
+.reply-sent .experimental-label { margin-left: 6px; }
 tr[id^="reply-"] { scroll-margin-top: calc(var(--topbar) + 16px); }
 .stale-note { margin: 12px 0; }
 
 .app-top .ctaRow { align-items: center; }
 .app-top .pill { height: 28px; }
 .app-crumb, .brand-row { align-items: center; }
+
+.tor-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--bg-overlay);
+}
+.tor-banner p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-sm);
+  min-width: 0;
+}
+.threat-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--text-2);
+  display: grid;
+  gap: 8px;
+}
+.send-path {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+.send-path legend { padding: 0 4px; }
+.send-path label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text);
+  font-size: 14px;
+}
 
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }

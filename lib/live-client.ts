@@ -5,6 +5,7 @@ import { CHAIN_READ_FAILED } from './constants';
 import type { ExplorerLiveItem } from './explorer-map';
 import { hydrateExplorerItem, type ExplorerItem } from './explorer-map';
 import type { DeskLive, ExplorerFilter, ExplorerLive, InboxLive } from './live-types';
+import { isStaticExport } from './runtime';
 
 export type DeskLiveView = {
   creator: Hex;
@@ -17,6 +18,10 @@ export type DeskLiveView = {
   createdAt: bigint | null;
   currentBlock: bigint | null;
   blockDuration: number;
+  domain: string | null;
+  canaryStatement: string | null;
+  canaryIssuedAt: string | null;
+  canarySig: string | null;
   stale: boolean;
   staleAgeMs: number;
   note: string | null;
@@ -61,6 +66,10 @@ export function hydrateDeskLive(j: DeskLive): DeskLiveView {
     createdAt: asBigint(j.createdAt),
     currentBlock: asBigint(j.currentBlock),
     blockDuration: j.blockDuration || 2,
+    domain: typeof j.domain === 'string' ? j.domain : null,
+    canaryStatement: typeof j.canaryStatement === 'string' ? j.canaryStatement : null,
+    canaryIssuedAt: typeof j.canaryIssuedAt === 'string' ? j.canaryIssuedAt : null,
+    canarySig: typeof j.canarySig === 'string' ? j.canarySig : null,
     stale: j.stale === true,
     staleAgeMs: typeof j.staleAgeMs === 'number' ? j.staleAgeMs : 0,
     note: typeof j.note === 'string' ? j.note : null,
@@ -68,6 +77,10 @@ export function hydrateDeskLive(j: DeskLive): DeskLiveView {
 }
 
 export async function fetchDeskLive(creator: Hex, fresh = false): Promise<DeskLiveView> {
+  if (isStaticExport()) {
+    const { browserDeskLive } = await import('./live-browser');
+    return hydrateDeskLive(await browserDeskLive(creator));
+  }
   const r = await appFetch(`/api/desk/live?creator=${creator}${fresh ? '&fresh=1' : ''}`);
   const j = (await readJson(r)) as DeskLive;
   return hydrateDeskLive(j);
@@ -80,6 +93,22 @@ export async function fetchExplorerLive(
   const q = new URLSearchParams({ filter });
   if (opts && opts.cursor) q.set('cursor', opts.cursor);
   if (opts && opts.atBlock != null) q.set('atBlock', opts.atBlock.toString());
+  if (isStaticExport()) {
+    const { browserExplorerLive } = await import('./live-browser');
+    const live = await browserExplorerLive(filter, opts);
+    return {
+      items: live.items.map(hydrateExplorerItem),
+      cursor: live.cursor ?? undefined,
+      atBlock: BigInt(live.atBlock),
+      hasMore: live.hasMore,
+      currentBlock: asBigint(live.currentBlock),
+      blockDuration: live.blockDuration || 2,
+      canonicalDeskKey: live.canonicalDeskKey,
+      stale: live.stale === true,
+      staleAgeMs: typeof live.staleAgeMs === 'number' ? live.staleAgeMs : 0,
+      note: typeof live.note === 'string' ? live.note : null,
+    };
+  }
   const r = await appFetch(`/api/explorer?${q.toString()}`);
   const j = (await readJson(r)) as ExplorerLive;
   return {
@@ -111,6 +140,24 @@ export async function fetchInboxLive(
   const q = new URLSearchParams({ deskKey });
   if (opts && opts.cursor) q.set('cursor', opts.cursor);
   if (opts && opts.atBlock != null) q.set('atBlock', opts.atBlock.toString());
+  if (isStaticExport()) {
+    const { browserInboxLive } = await import('./live-browser');
+    const j = await browserInboxLive(deskKey, opts);
+    return {
+      tips: j.tips.map((t) => ({
+        key: t.key,
+        createdAt: BigInt(t.createdAt),
+        payload: b64ToBytes(t.payloadB64),
+        owner: t.owner,
+      })),
+      cursor: j.cursor ?? undefined,
+      atBlock: BigInt(j.atBlock),
+      hasMore: j.hasMore,
+      stale: j.stale === true,
+      staleAgeMs: typeof j.staleAgeMs === 'number' ? j.staleAgeMs : 0,
+      note: typeof j.note === 'string' ? j.note : null,
+    };
+  }
   const r = await appFetch(`/api/desk/inbox?${q.toString()}`);
   const j = (await readJson(r)) as InboxLive;
   return {

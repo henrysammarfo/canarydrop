@@ -19,6 +19,9 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
+    "build:static": "node scripts/build-static.mjs",
+    "verify:static": "node scripts/verify-static.mjs",
+    "repro:hash": "node scripts/repro-hash.mjs",
     "start": "next start -p 3000",
     "lint": "node scripts/lint.mjs",
     "typecheck": "tsc --noEmit",
@@ -26,6 +29,7 @@
     "test:e2e": "playwright test --reporter=line",
     "friction": "node arkiv/repro/run-all.mjs",
     "seed:testnet": "tsx scripts/seed-testnet.mjs",
+    "renew": "tsx scripts/renew.mjs",
     "verify": "node scripts/verify.mjs",
     "ci": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
@@ -52,6 +56,6 @@
     "vitest": "^1.6.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": "20.18.0"
   }
 }

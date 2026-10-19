@@ -8,6 +8,17 @@ const config: PlaywrightTestConfig = {
   },
   testDir: 'tests/e2e',
   reporter: 'line',
+  projects: [
+    {
+      name: 'ui',
+      testIgnore: /(?:^|\/)(explorer|how)\.spec\.ts$/,
+    },
+    {
+      name: 'live-reads',
+      testMatch: /(?:^|\/)(explorer|how)\.spec\.ts$/,
+      fullyParallel: false,
+    },
+  ],
 };
 
 if (!process.env.PRODUCTION_URL) {

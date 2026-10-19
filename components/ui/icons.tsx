@@ -56,6 +56,13 @@ export function IcoHow() {
     </svg>
   );
 }
+export function IcoDrop() {
+  return (
+    <svg className="ico" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M4 3.5h8v9.2L8 10.6 4 12.7V3.5Z" stroke="currentColor" />
+    </svg>
+  );
+}
 export function IcoVerify() {
   return (
     <svg className="ico" viewBox="0 0 16 16" fill="none" aria-hidden="true">

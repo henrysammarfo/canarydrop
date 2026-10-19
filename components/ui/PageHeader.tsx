@@ -8,7 +8,7 @@ export default function PageHeader({
 }: {
   kicker?: string;
   title: string;
-  description?: string;
+  description?: ReactNode;
   actions?: ReactNode;
 }) {
   return (

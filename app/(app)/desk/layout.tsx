@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import DeskProvider, { useDesk } from '@/components/desk/DeskProvider';
 import Modal from '@/components/Modal';
+import AppFrame from '@/components/ui/AppFrame';
 
 function DeskModals() {
   const d = useDesk();
@@ -33,9 +34,11 @@ function DeskModals() {
 
 export default function DeskLayout({ children }: { children: ReactNode }) {
   return (
-    <DeskProvider>
-      {children}
-      <DeskModals />
-    </DeskProvider>
+    <AppFrame>
+      <DeskProvider>
+        {children}
+        <DeskModals />
+      </DeskProvider>
+    </AppFrame>
   );
 }

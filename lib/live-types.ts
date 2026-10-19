@@ -20,6 +20,10 @@ export type DeskLive = {
   createdAt: string | null;
   currentBlock: string | null;
   blockDuration: number;
+  domain: string | null;
+  canaryStatement: string | null;
+  canaryIssuedAt: string | null;
+  canarySig: string | null;
 } & LiveFreshness;
 
 export type ExplorerFilter = 'all' | 'tip' | 'desk' | 'canary' | 'reply' | 'sealed';

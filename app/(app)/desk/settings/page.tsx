@@ -5,6 +5,7 @@ import CopyField from '@/components/ui/CopyField';
 import PageHeader from '@/components/ui/PageHeader';
 import DemoBanner, { DemoSwitch } from '@/components/desk/DemoBanner';
 import { useDesk } from '@/components/desk/DeskProvider';
+import SiweCard from '@/components/desk/SiweCard';
 import { shortHex, txUrl } from '@/lib/chain';
 
 export default function SettingsPage() {
@@ -47,6 +48,18 @@ export default function SettingsPage() {
             <label className="small">Desk name</label>
             <input value={d.deskName} onChange={(e) => d.setDeskName(e.target.value)} />
           </div>
+          <div style={{ marginTop: 16 }}>
+            <label className="small" htmlFor="desk-domain">Declared domain</label>
+            <input
+              id="desk-domain"
+              value={d.deskDomain}
+              onChange={(e) => d.setDeskDomain(e.target.value)}
+              placeholder="newsroom.example"
+            />
+            <p className="muted" style={{ marginTop: 8 }}>
+              We fetch that host /.well-known/canarydrop.json and its DNS TXT record.
+            </p>
+          </div>
           <div className="ctaRow" style={{ marginTop: 14 }}>
             <button
               type="button"
@@ -79,6 +92,7 @@ export default function SettingsPage() {
             </div>
           )}
         </Card>
+        <SiweCard />
       </div>
     </>
   );

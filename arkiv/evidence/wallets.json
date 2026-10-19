@@ -1,0 +1,8 @@
+{
+  "network": "Tiramisu",
+  "chainId": 7738577,
+  "note": "Addresses only. Keys are never committed.",
+  "relay": "0xa6Aa6a1409eb54028550466169A29EAfd8f7a442",
+  "desk": "0x1da3c22c079c264536D831F6F1fCe638aB0b20B0",
+  "impersonator": "0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af"
+}

@@ -11,6 +11,9 @@ npm-debug.log*
 .yarn*
 
 # builds
+out
+.static-hold-api
+.static-hold-middleware.ts
 *.log
 test-results
 test-results/.last-run.json
@@ -20,3 +23,6 @@ autocannon_home.json
 
 # uploads (local only)
 /home/ubuntu/.cursor/projects/workspace/uploads/
+
+# local screenshots (never commit)
+shots/

@@ -1,9 +1,18 @@
-import { describe, expect, it } from 'vitest';
-import { POST as createDesk } from '@/app/api/demo/desk/create/route';
-import { POST as renewDesk } from '@/app/api/demo/desk/renew/route';
-import { POST as replyDesk } from '@/app/api/demo/reply/route';
-import { GET as demoKey } from '@/app/api/demo/desk/key/route';
+import { describe, expect, it, vi } from 'vitest';
 import { HEX_KEY, getJson, postJson } from '../helpers/request';
+
+vi.mock('@/lib/demo-desk', () => ({
+  resolveCanonicalDemoDeskKey: vi.fn(async () => HEX_KEY),
+  isCanonicalDemoDeskKey: (deskKey: string, canonical: string | null) =>
+    !!canonical && deskKey.toLowerCase() === canonical.toLowerCase(),
+}));
+
+const { POST: createDesk } = await import('@/app/api/demo/desk/create/route');
+const { POST: renewDesk } = await import('@/app/api/demo/desk/renew/route');
+const { POST: replyDesk } = await import('@/app/api/demo/reply/route');
+const { POST: dropDesk } = await import('@/app/api/demo/drop/route');
+const { GET: demoKey } = await import('@/app/api/demo/desk/key/route');
+const { resolveCanonicalDemoDeskKey } = await import('@/lib/demo-desk');
 
 const pubB64 = Buffer.alloc(65, 4).toString('base64');
 
@@ -26,6 +35,33 @@ describe('demo routes dry-run', () => {
     const r = await renewDesk(postJson('http://localhost:3000/api/demo/desk/renew?dryRun=1', { deskKey: HEX_KEY, canaryKey: HEX_KEY }));
     expect(r.status).toBe(200);
     expect((await r.json()).wouldRenew).toEqual([HEX_KEY, HEX_KEY]);
+  });
+
+  it('acknowledges drop dry-run', async () => {
+    const payload = Buffer.alloc(80, 1).toString('base64');
+    const r = await dropDesk(
+      postJson('http://localhost:3000/api/demo/drop?dryRun=1', {
+        deskKey: HEX_KEY,
+        dropPayloadB64: payload,
+        releasePayloadB64: payload,
+      }),
+    );
+    expect(r.status).toBe(200);
+    expect((await r.json()).wouldSeal).toBe(HEX_KEY);
+  });
+
+  it('rejects a drop for a desk that is not the canonical demo desk', async () => {
+    vi.mocked(resolveCanonicalDemoDeskKey).mockResolvedValueOnce(`0x${'b'.repeat(64)}`);
+    const payload = Buffer.alloc(80, 1).toString('base64');
+    const r = await dropDesk(
+      postJson('http://localhost:3000/api/demo/drop?dryRun=1', {
+        deskKey: HEX_KEY,
+        dropPayloadB64: payload,
+        releasePayloadB64: payload,
+      }),
+    );
+    expect(r.status).toBe(400);
+    expect((await r.json()).error).toBe('no_desk');
   });
 
   it('acknowledges reply dry-run', async () => {

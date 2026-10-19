@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server';
 import type { Hex } from 'viem';
 import { pub, renew } from '@/lib/arkiv';
+import { liveHoldKeys } from '@/lib/dead-drop';
 import { deskAccount, deskWallet, requireDeskEthKey } from '@/lib/demo-wallet';
+import { DEFAULT_CANARY_STATEMENT, canaryTypedData, issuedAtNow } from '@/lib/eip712';
 import { AppError } from '@/lib/errors';
 import { assertMinBalance } from '@/lib/guard';
 import { jsonFail, jsonOk } from '@/lib/http';
@@ -26,10 +28,23 @@ export async function POST(req: NextRequest) {
     if (dryRun) return jsonOk({ ok: true, dryRun: true, wouldRenew: [deskKey, canaryKey] });
     const account = deskAccount();
     await assertMinBalance(pub(), account.address);
+    const holdKeys = await liveHoldKeys(deskKey as Hex);
+    const issuedAt = issuedAtNow();
+    const signed = {
+      statement: DEFAULT_CANARY_STATEMENT,
+      issuedAt,
+      signature: await account.signTypedData(
+        canaryTypedData({ desk: account.address, statement: DEFAULT_CANARY_STATEMENT, issuedAt }),
+      ),
+    };
     const out = await withWalletLock('desk', account.address, () =>
       withBackoff(async () => {
         const nonce = await pub().getTransactionCount({ address: account.address, blockTag: 'pending' });
-        return renew(deskWallet(), deskKey as Hex, canaryKey as Hex, { nonce });
+        return renew(deskWallet(), deskKey as Hex, canaryKey as Hex, { nonce }, {
+          holdKeys,
+          signed,
+          owner: account.address,
+        });
       }),
     );
     return jsonOk({ ok: true, txHash: out.txHash });

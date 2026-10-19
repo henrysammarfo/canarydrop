@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Attributes } from '@arkiv-network/sdk';
 import type { Hex } from 'viem';
-import { entityBelongsToDesk, watchEventForDesk } from '@/lib/arkiv';
+import { entityBelongsToDesk, watchCreatedTipReady, watchEventForDesk } from '@/lib/arkiv';
 import { PROJECT, SEALED_OWNER } from '@/lib/constants';
 
 const DESK = `0x${'ab'.repeat(32)}` as Hex;
@@ -20,6 +20,8 @@ function attrs(type: string, desk = DESK, project = PROJECT): Attributes {
 describe('watch scope for this desk', () => {
   it('accepts a CanaryDrop tip labeled with this desk', () => {
     expect(entityBelongsToDesk({ key: TIP, attributes: attrs('tip') }, DESK)).toBe(true);
+    expect(entityBelongsToDesk({ key: TIP, attributes: attrs('drop') }, DESK)).toBe(true);
+    expect(entityBelongsToDesk({ key: TIP, attributes: attrs('hold') }, DESK)).toBe(true);
   });
 
   it('accepts this desk entity and a canary for it', () => {
@@ -91,6 +93,16 @@ describe('watch scope for this desk', () => {
         knownKeys: new Set([TIP.toLowerCase()]),
       }),
     ).toBe(false);
+  });
+
+  it('requires the burn owner after getEntity before a created tip is ready', () => {
+    expect(
+      watchCreatedTipReady({ key: TIP, attributes: attrs('tip'), owner: SEALED_OWNER }, DESK),
+    ).toBe(true);
+    expect(
+      watchCreatedTipReady({ key: TIP, attributes: attrs('tip'), owner: `0x${'34'.repeat(20)}` as Hex }, DESK),
+    ).toBe(false);
+    expect(watchCreatedTipReady({ key: TIP, attributes: attrs('tip'), owner: null }, DESK)).toBe(false);
   });
 
   it('scopes a patch to a fetched CanaryDrop row for this desk', () => {

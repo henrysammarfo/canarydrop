@@ -1,0 +1,57 @@
+{
+  "ok": true,
+  "items": [
+    {
+      "key": "0x1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "type": "desk",
+      "creator": "0x1da3c22c079c264536D831F6F1fCe638aB0b20B0",
+      "owner": "0x1da3c22c079c264536D831F6F1fCe638aB0b20B0",
+      "expiresAt": "900",
+      "impostor": false,
+      "canonicalDemo": true,
+      "olderDemo": null,
+      "verifiedDomain": true,
+      "unlistedDesk": false,
+      "readonly": false,
+      "openExtend": true
+    },
+    {
+      "key": "0xabababababababababababababababababababababababababababababababab",
+      "type": "tip",
+      "creator": "0xa6Aa6a1409eb54028550466169A29EAfd8f7a442",
+      "owner": "0x000000000000000000000000000000000000dEaD",
+      "expiresAt": "400",
+      "impostor": false,
+      "canonicalDemo": false,
+      "olderDemo": null,
+      "verifiedDomain": false,
+      "unlistedDesk": false,
+      "readonly": true,
+      "openExtend": false
+    },
+    {
+      "key": "0x4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d",
+      "type": "desk",
+      "creator": "0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af",
+      "owner": "0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af",
+      "expiresAt": "300",
+      "impostor": true,
+      "canonicalDemo": false,
+      "olderDemo": null,
+      "verifiedDomain": false,
+      "unlistedDesk": true,
+      "readonly": false,
+      "openExtend": true
+    }
+  ],
+  "cursor": null,
+  "atBlock": "100",
+  "hasMore": false,
+  "currentBlock": "100",
+  "blockDuration": 2,
+  "canonicalDeskKey": "0x1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+  "fetchedAt": 1700000000000,
+  "stale": false,
+  "staleAgeMs": 0,
+  "note": null
+}

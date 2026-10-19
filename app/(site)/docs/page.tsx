@@ -37,6 +37,7 @@ npm run dev`}</pre>
               <Link className="btn" href="/submit">Submit <span className="arrow" aria-hidden="true" /></Link>
               <Link className="btn" href="/desk">Desk <span className="arrow" aria-hidden="true" /></Link>
               <Link className="btn" href="/explorer">Explorer <span className="arrow" aria-hidden="true" /></Link>
+              <Link className="btn" href="/threat">Threat model <span className="arrow" aria-hidden="true" /></Link>
             </div>
           </div>
         </div>
