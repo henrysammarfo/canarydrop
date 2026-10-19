@@ -162,7 +162,7 @@ Explorer links:
 Run locally
 -----------
 
-Prereqs: Node 20+, pnpm or npm.
+Prereqs: Node 24.22.0 (`.nvmrc`), pnpm or npm.
 
 1) Install
 
@@ -252,7 +252,7 @@ npm ci
 npm run build:static
 ```
 
-A judge gets the same file hashes from every checkout path on Node 20.18.0:
+A judge gets the same file hashes from every checkout path on Node 24.22.0:
 
 ```bash
 nvm use
