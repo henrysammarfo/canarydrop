@@ -12,6 +12,9 @@ npm-debug.log*
 
 # builds
 *.log
+test-results
+playwright-report
+playwright/.cache
 
 # uploads (local only)
 /home/ubuntu/.cursor/projects/workspace/uploads/

@@ -1,5 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { Sora } from 'next/font/google';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
@@ -14,8 +15,7 @@ const sora = Sora({
 
 export const metadata: Metadata = {
   title: 'CanaryDrop · Tips that cannot be seized',
-  description:
-    'Anonymous, encrypted tips for small newsrooms. Built on Arkiv (Tiramisu testnet).',
+  description: 'Anonymous, encrypted tips for small newsrooms. Built on Arkiv (Tiramisu testnet).',
   metadataBase: new URL('https://canarydrop.vercel.app'),
   icons: [{ rel: 'icon', url: '/icon.svg' }],
   openGraph: {
@@ -26,9 +26,10 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const nonce = headers().get('x-nonce') ?? undefined;
   return (
     <html lang="en" className={sora.variable}>
-      <body>
+      <body data-nonce={nonce}>
         <ToastProvider>
           <div className="container">
             <Nav />
@@ -40,4 +41,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
-

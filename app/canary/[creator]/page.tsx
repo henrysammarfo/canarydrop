@@ -1,7 +1,10 @@
 import type { Hex } from 'viem';
 import Link from 'next/link';
-import { canaryAlive, getDesk, pub } from '@/lib/arkiv';
+import { canaryAlive, canaryAtBlock, getDesk, pub } from '@/lib/arkiv';
+import type { CanaryRow } from '@/lib/arkiv';
+import { PROJECT } from '@/lib/constants';
 import { addressUrl, entityUrl, shortHex, TIRAMISU_EXPLORER } from '@/lib/chain';
+import { uiError } from '@/lib/ui-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,25 +22,23 @@ function asTime(timing: { currentBlockTime: number; blockDuration: number; curre
 export default async function CanaryStatus({ params }: { params: { creator: string } }) {
   const creator = params.creator as Hex;
   let desk: Awaited<ReturnType<typeof getDesk>> | null = null;
-  let canary: any = null;
+  let canary: CanaryRow | null = null;
+  let pastAlive: boolean | null = null;
   let timing: { currentBlock: bigint; currentBlockTime: number; blockDuration: number } | null = null;
   let loadError: string | null = null;
+  let head = 0n;
 
   try {
-    timing = await pub.getBlockTiming();
-    desk = await getDesk(creator);
+    timing = await pub().getBlockTiming();
+    head = timing.currentBlock;
+    desk = (await getDesk(creator)) ?? null;
     if (desk) {
-      const alive = await canaryAlive(creator, desk.key);
-      if (alive) {
-        try {
-          canary = await pub.getEntity(alive.key);
-        } catch {
-          canary = alive;
-        }
-      }
+      canary = await canaryAlive(creator, desk.key);
+      const hourAgo = head > 1800n ? head - 1800n : 0n;
+      pastAlive = !!(await canaryAtBlock(creator, desk.key, hourAgo));
     }
-  } catch (e: any) {
-    loadError = String(e?.message ?? e);
+  } catch (e: unknown) {
+    loadError = uiError(e);
   }
 
   const alive = !!canary;
@@ -52,6 +53,10 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
   if (lastRenewedBlock && createdAt && lastRenewedBlock < createdAt) lastRenewedBlock = createdAt;
   const lastRenewed =
     lastRenewedBlock && timing ? asTime(timing, lastRenewedBlock) : 'Not renewed yet';
+
+  const query = desk
+    ? `select key, expiresAt where project = "${PROJECT}" and type = "canary" and desk = key(${desk.key}) and $expiresAt > u64(${head.toString()}) createdBy(${creator}) limit 1`
+    : 'Desk not found for this creator.';
 
   return (
     <section className="section" style={{ paddingBottom: 48 }}>
@@ -82,6 +87,11 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
             {lastRenewedBlock && (
               <div className="muted" style={{ marginTop: 6 }}>
                 block {lastRenewedBlock.toString()}
+              </div>
+            )}
+            {pastAlive !== null && (
+              <div className="muted" style={{ marginTop: 8 }}>
+                About one hour ago this canary was {pastAlive ? 'ALIVE' : 'GONE'} at a pinned block.
               </div>
             )}
           </div>
@@ -126,6 +136,14 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
             </div>
           )}
           {loadError && <p className="muted" style={{ color: '#ffb048', marginTop: 10 }}>{loadError}</p>}
+        </div>
+
+        <div className="card" style={{ marginTop: 16 }}>
+          <strong>Verify this yourself</strong>
+          <p className="muted" style={{ marginTop: 8 }}>
+            Reads are pinned to this newsroom wallet. An impostor with the same name does not match.
+          </p>
+          <pre className="query-box">{query}</pre>
         </div>
 
         <div className="ctaRow" style={{ justifyContent: 'flex-start' }}>

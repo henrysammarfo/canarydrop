@@ -100,27 +100,27 @@ export default function HomePage() {
       <section className="section">
         <div className="wrap">
           <div className="home-bento">
-            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts#L20-L31" target="_blank" rel="noreferrer">
+            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts" target="_blank" rel="noreferrer">
               <div className="mono">executeBatch</div>
               <div>Create desk and canary in one transaction.</div>
             </a>
-            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/relay.ts#L1-L80" target="_blank" rel="noreferrer">
+            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/relay.ts" target="_blank" rel="noreferrer">
               <div className="mono">sealed to 0x…dEaD</div>
               <div>Tips are handed to a burn address so nobody can change them.</div>
             </a>
-            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts#L80-L82" target="_blank" rel="noreferrer">
+            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts" target="_blank" rel="noreferrer">
               <div className="mono">Entity Expiration</div>
               <div>Different lifetimes per type: canary hours, desk days.</div>
             </a>
-            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts#L32-L36" target="_blank" rel="noreferrer">
+            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts" target="_blank" rel="noreferrer">
               <div className="mono">extendEntity</div>
               <div>Renew canary and desk leases with one call.</div>
             </a>
-            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts#L40-L46" target="_blank" rel="noreferrer">
+            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts" target="_blank" rel="noreferrer">
               <div className="mono">createdBy</div>
               <div>Read only what the real desk created. Impostors are ignored.</div>
             </a>
-            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts#L73-L81" target="_blank" rel="noreferrer">
+            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts" target="_blank" rel="noreferrer">
               <div className="mono">watchEntityEvents</div>
               <div>Live inbox over WebSocket. No refresh loop.</div>
             </a>
@@ -144,8 +144,8 @@ export default function HomePage() {
               <div>Maybe</div>
             </div>
             <div className="row">
-              <div>Server can be seized</div>
-              <div>No server</div>
+              <div>Plaintext database to seize</div>
+              <div>No</div>
               <div>Yes</div>
               <div>Yes</div>
             </div>
@@ -184,7 +184,7 @@ export default function HomePage() {
             </details>
             <details className="card">
               <summary>How do judges reproduce this?</summary>
-              Open the Explorer from the footer and run the queries listed in our README.
+              Open the Verify page. You can check the canary, send a synthetic tip, and read the explorer in about one minute.
             </details>
             <details className="card">
               <summary>What happens when the sponsor is down?</summary>
@@ -212,6 +212,7 @@ export default function HomePage() {
             </div>
             <div className="links">
               <a href="https://github.com/henrysammarfo/canarydrop" target="_blank" rel="noreferrer">GitHub</a>
+              <a href="/verify">Verify in 60 seconds</a>
               <a href="/docs">Docs</a>
               <a href="https://tiramisu.explorer.arkiv.network" target="_blank" rel="noreferrer">Explorer</a>
               <a href="/LICENSE" target="_blank" rel="noreferrer">MIT</a>

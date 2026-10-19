@@ -1,28 +1,34 @@
-import { pub } from '@/lib/arkiv';
 import { eq } from '@arkiv-network/sdk/query';
-import { PROJECT, canaryAlive, getDesk } from '@/lib/arkiv';
+import { PROJECT, canaryAlive, pub } from '@/lib/arkiv';
+import { DEFAULT_DESK } from '@/lib/constants';
+import { asAddress } from '@/lib/hex';
 
 export default async function NetworkStrip() {
   async function gather() {
     try {
-      const timing = await pub.getBlockTiming();
-      const rawDesk = process.env.NEXT_PUBLIC_DESK_ADDRESS || '';
-      const deskAddr = (/^0x[0-9a-fA-F]{40}$/.test(rawDesk)
-        ? rawDesk
-        : '0x1da3c22c079c264536D831F6F1fCe638aB0b20B0') as `0x${string}`;
-      const relayAddr = (process.env.NEXT_PUBLIC_RELAY_ADDRESS || '0x') as `0x${string}`;
+      const timing = await pub().getBlockTiming();
+      const deskAddr = asAddress(process.env.NEXT_PUBLIC_DESK_ADDRESS || '', DEFAULT_DESK);
+      const relayAddr = asAddress(process.env.NEXT_PUBLIC_RELAY_ADDRESS || '', '0xa6Aa6a1409eb54028550466169A29EAfd8f7a442');
       let lastCanary: string | null = null;
-      let tips = 0, desks = 0, canariesAlive = 0;
+      let tips = 0;
+      let desks = 0;
+      let canariesAlive = 0;
       try {
-        const d = await pub.select({ key: true }).where(eq('project', PROJECT), eq('type','desk')).createdBy(deskAddr).limit(1).fetch();
+        const d = await pub().select({ key: true }).where(eq('project', PROJECT), eq('type', 'desk')).createdBy(deskAddr).limit(1).fetch();
         desks = d.entities.length;
-        if (d.entities[0]) {
-          const c = await canaryAlive(deskAddr as any, d.entities[0].key);
-          if (c) { canariesAlive = 1; lastCanary = c.expiresAt?.toString() ?? null; }
+        const first = d.entities[0];
+        if (first) {
+          const c = await canaryAlive(deskAddr, first.key);
+          if (c) {
+            canariesAlive = 1;
+            lastCanary = c.expiresAt?.toString() ?? null;
+          }
         }
-        const t = await pub.select({ key: true }).where(eq('project', PROJECT), eq('type','tip')).createdBy(relayAddr).limit(50).fetch();
+        const t = await pub().select({ key: true }).where(eq('project', PROJECT), eq('type', 'tip')).createdBy(relayAddr).limit(50).fetch();
         tips = t.entities.length;
-      } catch {}
+      } catch {
+        // Keep the strip visible with zeros if a live query fails.
+      }
       return { block: timing.currentBlock.toString(), tips, desks, canariesAlive, lastCanary };
     } catch {
       return { block: 'n/a', tips: 0, desks: 0, canariesAlive: 0, lastCanary: null };
@@ -44,4 +50,3 @@ export default async function NetworkStrip() {
     </div>
   );
 }
-

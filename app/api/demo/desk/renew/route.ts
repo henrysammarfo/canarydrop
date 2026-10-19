@@ -1,38 +1,39 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createWalletClient } from '@arkiv-network/sdk';
-import { tiramisu } from '@arkiv-network/sdk/chains';
-import { http, type Hex } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
-import { renew } from '@/lib/arkiv';
-import { z } from 'zod';
+import { NextRequest } from 'next/server';
+import type { Hex } from 'viem';
+import { pub, renew } from '@/lib/arkiv';
+import { deskAccount, deskWallet, requireDeskEthKey } from '@/lib/demo-wallet';
+import { AppError } from '@/lib/errors';
+import { assertMinBalance } from '@/lib/guard';
+import { jsonFail, jsonOk } from '@/lib/http';
+import { isDryRun, protectWrite, readJson } from '@/lib/protect';
+import { withBackoff } from '@/lib/retry';
+import { withWalletLock } from '@/lib/wallet-lock';
+import { renewBody } from '@/lib/schemas';
+
+export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
-    const url = new URL(req.url);
-    const dryRun = url.searchParams.get('dryRun') === '1' || req.headers.get('x-dry-run') === '1';
-    const origin = req.headers.get('origin') || '';
-    const host = req.nextUrl.host;
-    if (origin && !origin.includes(host)) return NextResponse.json({ error: 'bad_origin', message: 'Please use the site to operate the demo desk.' }, { status: 400 });
-    const pk = process.env.DESK_PRIVATE_KEY as Hex | undefined;
-    if (!pk && !dryRun) return NextResponse.json({ error: 'demo_disabled' }, { status: 403 });
-    const schema = z.object({
-      deskKey: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
-      canaryKey: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
-    }).strict();
-    const parsed = schema.safeParse(await req.json());
-    if (!parsed.success) return NextResponse.json({ error: 'bad_request', message: parsed.error.issues.map(i=>i.message).join('; ') }, { status: 400 });
+    const blocked = await protectWrite(req, 'desk');
+    if (blocked) return blocked;
+    const dryRun = isDryRun(req);
+    if (!dryRun) requireDeskEthKey();
+    const raw = await readJson(req);
+    if (raw === null) throw new AppError('bad_request');
+    const parsed = renewBody.safeParse(raw);
+    if (!parsed.success) throw new AppError('bad_request');
     const { deskKey, canaryKey } = parsed.data;
-    if (!deskKey || !canaryKey) return NextResponse.json({ error: 'bad_request' }, { status: 400 });
-    if (dryRun) {
-      return NextResponse.json({ ok: true, dryRun: true, wouldRenew: [deskKey, canaryKey] });
-    } else {
-      const account = privateKeyToAccount(pk as Hex);
-      const w = createWalletClient({ chain: tiramisu, transport: http(), account });
-      const out = await renew(w as any, deskKey as any, canaryKey as any);
-      return NextResponse.json({ ok: true, txHash: out.txHash });
-    }
-  } catch (e: any) {
-    return NextResponse.json({ error: 'server_error', message: String(e?.message ?? e) }, { status: 500 });
+    if (dryRun) return jsonOk({ ok: true, dryRun: true, wouldRenew: [deskKey, canaryKey] });
+    const account = deskAccount();
+    await assertMinBalance(pub(), account.address);
+    const out = await withWalletLock('desk', account.address, () =>
+      withBackoff(async () => {
+        const nonce = await pub().getTransactionCount({ address: account.address, blockTag: 'pending' });
+        return renew(deskWallet(), deskKey as Hex, canaryKey as Hex, { nonce });
+      }),
+    );
+    return jsonOk({ ok: true, txHash: out.txHash });
+  } catch (err: unknown) {
+    return jsonFail(err);
   }
 }
-

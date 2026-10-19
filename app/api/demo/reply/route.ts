@@ -1,38 +1,45 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createWalletClient } from '@arkiv-network/sdk';
-import { tiramisu } from '@arkiv-network/sdk/chains';
-import { http, type Hex } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
+import { NextRequest } from 'next/server';
+import type { Hex } from 'viem';
 import { reply } from '@/lib/arkiv';
-import { z } from 'zod';
+import { b64ToBytes } from '@/lib/bytes';
+import { withBackoff } from '@/lib/retry';
+import { withWalletLock } from '@/lib/wallet-lock';
+import { deskAccount, deskWallet, requireDeskEthKey } from '@/lib/demo-wallet';
+import { AppError } from '@/lib/errors';
+import { assertMinBalance, assertDeskSpendRoom } from '@/lib/guard';
+import { jsonFail, jsonOk } from '@/lib/http';
+import { assertWireB64, throwIfOversizedWire } from '@/lib/limits';
+import { isDryRun, protectWrite, readJson } from '@/lib/protect';
+import { pub } from '@/lib/arkiv';
+import { replyBody } from '@/lib/schemas';
+
+export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
-    const url = new URL(req.url);
-    const dryRun = url.searchParams.get('dryRun') === '1' || req.headers.get('x-dry-run') === '1';
-    const origin = req.headers.get('origin') || '';
-    const host = req.nextUrl.host;
-    if (origin && !origin.includes(host)) return NextResponse.json({ error: 'bad_origin', message: 'Please use the site to operate the demo desk.' }, { status: 400 });
-    const pk = process.env.DESK_PRIVATE_KEY as Hex | undefined;
-    if (!pk && !dryRun) return NextResponse.json({ error: 'demo_disabled' }, { status: 403 });
-    const schema = z.object({
-      tipKey: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
-      wireB64: z.string().max(16 * 1024),
-    }).strict();
-    const parsed = schema.safeParse(await req.json());
-    if (!parsed.success) return NextResponse.json({ error: 'bad_request', message: parsed.error.issues.map(i=>i.message).join('; ') }, { status: 400 });
+    const blocked = await protectWrite(req, 'desk');
+    if (blocked) return blocked;
+    const dryRun = isDryRun(req);
+    if (!dryRun) requireDeskEthKey();
+    const raw = await readJson(req);
+    if (raw === null) throw new AppError('bad_request');
+    throwIfOversizedWire(raw);
+    const parsed = replyBody.safeParse(raw);
+    if (!parsed.success) throw new AppError('bad_request');
     const { tipKey, wireB64 } = parsed.data;
-    if (!tipKey || !wireB64) return NextResponse.json({ error: 'bad_request' }, { status: 400 });
-    if (dryRun) {
-      return NextResponse.json({ ok: true, dryRun: true, wouldReplyTo: tipKey });
-    } else {
-      const account = privateKeyToAccount(pk as Hex);
-      const w = createWalletClient({ chain: tiramisu, transport: http(), account });
-      const out = await reply(w as any, tipKey as any, Uint8Array.from(Buffer.from(wireB64, 'base64')));
-      return NextResponse.json({ ok: true, txHash: out.txHash });
-    }
-  } catch (e: any) {
-    return NextResponse.json({ error: 'server_error', message: String(e?.message ?? e) }, { status: 500 });
+    assertWireB64(wireB64);
+    if (dryRun) return jsonOk({ ok: true, dryRun: true, wouldReplyTo: tipKey });
+    const account = deskAccount();
+    await assertMinBalance(pub(), account.address);
+    await assertDeskSpendRoom(account.address);
+    const out = await withWalletLock('desk', account.address, () =>
+      withBackoff(async () => {
+        const nonce = await pub().getTransactionCount({ address: account.address, blockTag: 'pending' });
+        return reply(deskWallet(), tipKey as Hex, b64ToBytes(wireB64), undefined, { nonce });
+      }),
+    );
+    return jsonOk({ ok: true, txHash: out.txHash });
+  } catch (err: unknown) {
+    return jsonFail(err);
   }
 }
-

@@ -12,9 +12,9 @@ const config: PlaywrightTestConfig = {
 
 if (!process.env.PRODUCTION_URL) {
   config.webServer = {
-    command: 'npm run build && npm run start',
+    command: process.env.CI ? 'npm run start' : 'npm run build && npm run start',
     port: 3000,
-    reuseExistingServer: true,
+    reuseExistingServer: !process.env.CI,
     timeout: 180_000,
   };
 }
