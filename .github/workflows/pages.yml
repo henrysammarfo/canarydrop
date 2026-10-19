@@ -1,3 +1,6 @@
+# Optional. The primary static mirror is a separate Vercel project using
+# vercel.static.json (https://canarydrop-static.vercel.app). Keep this workflow
+# if GitHub Pages and Actions are available on the account.
 name: Pages
 
 on:
@@ -25,6 +28,8 @@ jobs:
       NEXT_PUBLIC_BASE_PATH: /canarydrop
       NEXT_PUBLIC_DESK_ADDRESS: '0x1da3c22c079c264536D831F6F1fCe638aB0b20B0'
       NEXT_PUBLIC_RELAY_ADDRESS: '0xa6Aa6a1409eb54028550466169A29EAfd8f7a442'
+      NEXT_PUBLIC_BUILD_ID: ${{ github.sha }}
+      SOURCE_DATE_EPOCH: '0'
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-node@v4.1.0

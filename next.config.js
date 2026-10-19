@@ -5,6 +5,8 @@ const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 const config = {
   poweredByHeader: false,
   transpilePackages: ['geist'],
+  generateBuildId: async () =>
+    process.env.NEXT_PUBLIC_BUILD_ID || process.env.SOURCE_DATE_EPOCH || 'canarydrop-v7',
   ...(isStatic
     ? {
         output: 'export',

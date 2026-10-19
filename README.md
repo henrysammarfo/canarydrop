@@ -252,7 +252,11 @@ npm ci
 npm run build:static
 ```
 
-`out/build.sha256` is the published SHA256 list. `npm run verify:static -- out/build.sha256` rebuilds and compares. Self host `out/` or optionally `ipfs add -r out`. GitHub Pages workflow: `.github/workflows/pages.yml`. Vercel stays a convenience mirror.
+`out/build.sha256` is the published SHA256 list. `expected.sha256` is the checked in copy. `npm run verify:static -- expected.sha256` rebuilds and compares. `npm run repro:hash` shows two identical trees hash the same way.
+
+The primary static mirror is a separate Vercel project that serves only `out/` (no functions, no API). Placeholder: https://canarydrop-static.vercel.app. Config: `vercel.static.json`.
+
+Self host the same `out/` folder with a plain static file server (`npx serve out`), IPFS (`ipfs add -r out`), or the optional GitHub Pages workflow in `.github/workflows/pages.yml`. The convenience Vercel app stays at https://canarydrop.vercel.app with the sponsor path.
 
 Security notes
 --------------

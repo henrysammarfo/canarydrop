@@ -20,6 +20,8 @@ const routes = [
   '/desk/drop',
   `/canary/${desk}`,
   `/d/${desk}`,
+  `/canary?desk=${desk}`,
+  `/d?desk=${desk}`,
   '/__404__',
 ];
 

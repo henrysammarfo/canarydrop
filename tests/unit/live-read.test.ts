@@ -5,6 +5,8 @@ import { hydrateDeskLive } from '@/lib/live-client';
 import { mapExplorerEntity, serializeExplorerItem, hydrateExplorerItem } from '@/lib/explorer-map';
 
 vi.mock('@/lib/arkiv', () => ({
+  canarySigFromRow: () => ({ statement: 'No warrants or gag orders received.', issuedAt: null, signature: null }),
+  tipVisibleInInbox: () => true,
   deskAndCanary: vi.fn(),
   explorerPage: vi.fn(),
   inboxPage: vi.fn(),

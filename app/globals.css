@@ -1076,6 +1076,9 @@ label.small {
   padding: 12px;
   overflow: auto;
   max-height: 220px;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -1085,6 +1088,12 @@ label.small {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-2);
+}
+.proof-list,
+.proof-card,
+.proof-facts {
+  min-width: 0;
+  max-width: 100%;
 }
 .verify-steps { margin: 22px 0 0; padding: 0; display: grid; gap: 12px; }
 .verify-steps li {

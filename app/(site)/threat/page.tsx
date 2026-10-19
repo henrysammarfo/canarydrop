@@ -40,7 +40,7 @@ export default function ThreatPage() {
         <div className="card" style={{ marginTop: 16 }}>
           <strong>Dead drop on silence</strong>
           <p className="muted" style={{ marginTop: 8 }}>
-            The newsroom can pre-seal a statement to chosen recipients. If the canary lapses, the hold is treated as released. Recipients still need their own keys. The demo desk shows synthetic data only.
+            The newsroom can pre-seal a statement to chosen recipients. Recipients can open that packet as soon as they have it. The hold going quiet is a public signal. It is not a lock that waits for a clock.
           </p>
           <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 12 }}>
             <Link className="btn" href="/desk/drop">

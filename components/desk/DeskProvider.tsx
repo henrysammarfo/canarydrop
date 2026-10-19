@@ -24,6 +24,12 @@ import {
   walletFromProvider,
   watchInbox,
 } from '@/lib/arkiv';
+import { canarySignPayload } from '@/lib/canary-sign';
+import { liveHoldKeys, writeDeadDrop } from '@/lib/dead-drop';
+import { DEFAULT_CANARY_STATEMENT, issuedAtNow } from '@/lib/eip712';
+import { deskWriteAllowed, restoreSiweSession, saveSiweSession, type SiweSession } from '@/lib/siwe-session';
+import { announcementForReply, loadOrCreateStealthMeta } from '@/lib/stealth-store';
+import { buildSiweMessage, newsroomSiweFields, verifySiwe } from '@/lib/siwe';
 import { bytesEqual, bytesToB64 } from '@/lib/bytes';
 import { appFetch } from '@/lib/client-fetch';
 import { CHAIN_READ_FAILED, DEFAULT_DESK, ENTITY_KEY_RE } from '@/lib/constants';
@@ -59,6 +65,7 @@ export type TipView = {
   ephPub: CryptoKey;
   replyText?: string;
   sentReplyKey?: Hex | null;
+  sentStealth?: Hex | null;
 };
 
 const DESK_KEY_STORE = 'canarydrop/deskPrivJwk';
@@ -107,6 +114,14 @@ export type DeskContextValue = {
   createDeskFlow: (dryRun?: boolean) => Promise<void>;
   renewFlow: (dryRun?: boolean) => Promise<void>;
   sendReply: (t: TipView) => Promise<void>;
+  sealDropFlow: (title: string, text: string, recipients: { label: string; pub: number[] }[], dryRun?: boolean) => Promise<void>;
+  deskDomain: string;
+  setDeskDomain: (v: string) => void;
+  siweAddress: Hex | null;
+  canDeskWrite: boolean;
+  signSiwe: () => Promise<void>;
+  lastDrop: { dropKey?: Hex | undefined; releaseKey?: Hex | undefined; holdKey?: Hex | undefined; txHash?: Hex | undefined } | null;
+  deskPubRaw: Uint8Array | null;
 };
 
 const DeskContext = createContext<DeskContextValue | null>(null);
@@ -126,6 +141,14 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
   const [creator, setCreator] = useState<Hex | null>(() => asAddress(process.env.NEXT_PUBLIC_DESK_ADDRESS || '', DEFAULT_DESK));
   const [connected, setConnected] = useState<Hex | null>(null);
   const [deskName, setDeskName] = useState('CanaryDrop Demo Desk');
+  const [deskDomain, setDeskDomain] = useState('');
+  const [siweAddress, setSiweAddress] = useState<Hex | null>(null);
+  const [lastDrop, setLastDrop] = useState<{
+    dropKey?: Hex | undefined;
+    releaseKey?: Hex | undefined;
+    holdKey?: Hex | undefined;
+    txHash?: Hex | undefined;
+  } | null>(null);
   const [deskKey, setDeskKey] = useState<Hex | null>(null);
   const [canaryKey, setCanaryKey] = useState<Hex | null>(null);
   const [alive, setAlive] = useState<boolean | null>(null);
@@ -163,6 +186,61 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return;
     localStorage.setItem('canarydrop/demo', demo ? '1' : '0');
   }, [demo]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void restoreSiweSession(window.location.host).then((session) => {
+      if (!cancelled && session) setSiweAddress(session.address);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const canDeskWrite = deskWriteAllowed({ creator, signer: siweAddress, demo });
+
+  function requireWriter() {
+    if (demo) return;
+    if (!deskWriteAllowed({ creator, signer: siweAddress, demo })) {
+      throw new Error('Sign in with the desk wallet first. The signer must be the desk creator.');
+    }
+  }
+
+  async function signSiwe() {
+    const eth = getInjectedProvider();
+    if (!eth) throw new Error('No wallet found. Connect a wallet first.');
+    const address = (connected ?? (await existingAccount())) as Hex | null;
+    if (!address) throw new Error('Connect a wallet first.');
+    const fields = newsroomSiweFields({
+      domain: window.location.host,
+      address,
+      uri: window.location.origin,
+    });
+    const message = buildSiweMessage(fields);
+    const signature = (await eth.request({
+      method: 'personal_sign',
+      params: [message, address],
+    })) as Hex;
+    const checked = await verifySiwe(message, signature);
+    if (!checked.ok) throw new Error('That sign in could not be verified.');
+    const session: SiweSession = { address: checked.address, message, signature };
+    saveSiweSession(session);
+    setSiweAddress(checked.address);
+    push({ kind: 'success', text: 'Signed in with Ethereum.' });
+  }
+
+  async function signCanary(address: Hex) {
+    const issuedAt = issuedAtNow();
+    const input = { desk: address, statement: DEFAULT_CANARY_STATEMENT, issuedAt };
+    const eth = getInjectedProvider();
+    if (!eth) throw new Error('No wallet found. Install MetaMask, or use Demo mode on the desk.');
+    const payload = canarySignPayload(input);
+    const signature = (await eth.request({
+      method: 'eth_signTypedData_v4',
+      params: [address, JSON.stringify(payload)],
+    })) as Hex;
+    return { statement: DEFAULT_CANARY_STATEMENT, issuedAt, signature };
+  }
 
   useEffect(() => {
     async function syncWallet() {
@@ -313,6 +391,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     setBlockDuration(live.blockDuration || 2);
     if (live.name) setChainName(live.name);
     setDeskPubRaw(live.deskPub);
+    if (live.domain) setDeskDomain(live.domain);
     setStaleNote(live.note);
     if (live.deskKey) startWatch(live.deskKey, live.canaryKey);
   }
@@ -451,6 +530,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     setBusy(true);
     setTx(null);
     try {
+      if (!dryRun) requireWriter();
       if (!priv && !dryRun && !demo) throw new Error('Generate or import a desk key first');
       if (demo && !demoKey) throw new Error('Demo mode is still loading the shared desk key.');
       let pubRaw: Uint8Array;
@@ -469,7 +549,11 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
       if (demo || dryRun) {
         const r = await appFetch(`/api/demo/desk/create${dryRun ? '?dryRun=1' : ''}`, {
           method: 'POST',
-          body: JSON.stringify({ name: deskName, deskPubRawB64: bytesToB64(pubRaw) }),
+          body: JSON.stringify({
+            name: deskName,
+            deskPubRawB64: bytesToB64(pubRaw),
+            ...(deskDomain.trim() ? { domain: deskDomain.trim().toLowerCase() } : {}),
+          }),
         });
         const j = (await r.json()) as {
           message?: string;
@@ -514,7 +598,11 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
         const accounts = (await provider.request({ method: 'eth_accounts' })) as unknown;
         const owner = Array.isArray(accounts) && typeof accounts[0] === 'string' ? (accounts[0] as Hex) : null;
         if (!owner) throw new Error('No account returned by the wallet.');
-        const out = await createDesk(w, owner, deskName, pubRaw);
+        const signed = dryRun ? undefined : await signCanary(owner);
+        const out = await createDesk(w, owner, deskName, pubRaw, undefined, {
+          domain: deskDomain.trim() ? deskDomain.trim().toLowerCase() : undefined,
+          signed,
+        });
         setTx(out.txHash);
         const hinted = createdDeskAndCanary(out.createdEntities);
         bumpGeneration(deskLoad.current);
@@ -550,6 +638,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     setBusy(true);
     setTx(null);
     try {
+      if (!dryRun) requireWriter();
       if (demo || dryRun) {
         const r = await appFetch(`/api/demo/desk/renew${dryRun ? '?dryRun=1' : ''}`, {
           method: 'POST',
@@ -568,7 +657,11 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
         const provider = getInjectedProvider();
         if (!provider) throw new Error('No wallet found. Install MetaMask, or use Demo mode on the desk.');
         const w = walletFromProvider(provider);
-        const out = await renew(w, deskKey, canaryKey);
+        const owner = connected;
+        if (!owner) throw new Error('No account returned by the wallet.');
+        const signed = await signCanary(owner);
+        const holdKeys = await liveHoldKeys(deskKey);
+        const out = await renew(w, deskKey, canaryKey, undefined, { holdKeys, signed, owner });
         setTx(out.txHash);
         push({ kind: 'success', text: 'Canary renewed.' });
       }
@@ -601,13 +694,21 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
   async function sendReply(t: TipView) {
     try {
       if (!t.replyText || !deskKey) return;
+      requireWriter();
       if (!priv) throw new Error('Load a desk key first.');
       let replyKey: Hex | null = null;
+      const stealth = announcementForReply(loadOrCreateStealthMeta().meta);
       if (demo) {
         const w = await sealReply(priv, t.ephPub, t.replyText);
         const r = await appFetch('/api/demo/reply', {
           method: 'POST',
-          body: JSON.stringify({ tipKey: t.key, wireB64: bytesToB64(w) }),
+          body: JSON.stringify({
+            tipKey: t.key,
+            wireB64: bytesToB64(w),
+            stealthAddress: stealth.stealthAddress,
+            ephemeralPub: stealth.ephemeralPub,
+            viewTag: stealth.viewTag,
+          }),
         });
         const j = (await r.json()) as { message?: string; error?: string; txHash?: Hex; replyKey?: Hex };
         if (!r.ok) throw new Error(j.message ?? j.error ?? 'failed');
@@ -619,15 +720,82 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
         if (!provider) throw new Error('No wallet found. Install MetaMask, or use Demo mode on the desk.');
         const w = walletFromProvider(provider);
         const wire = await sealReply(priv, t.ephPub, t.replyText);
-        const out = await reply(w, t.key, wire, deskKey);
+        const out = await reply(w, t.key, wire, deskKey, undefined, stealth);
         setTx(out.txHash);
         const created = Array.isArray(out.createdEntities) ? out.createdEntities[0] : undefined;
         if (typeof created === 'string' && ENTITY_KEY_RE.test(created)) replyKey = created;
       }
-      setTips((arr) => arr.map((x) => (x.key === t.key ? { ...x, replyText: '', sentReplyKey: replyKey } : x)));
-      push({ kind: 'success', text: 'Reply sent.' });
+      setTips((arr) =>
+        arr.map((x) =>
+          x.key === t.key ? { ...x, replyText: '', sentReplyKey: replyKey, sentStealth: stealth.stealthAddress } : x,
+        ),
+      );
+      push({ kind: 'success', text: 'Reply sent to a one time address.' });
     } catch (e: unknown) {
       push({ kind: 'error', text: uiError(e) });
+    }
+  }
+
+  async function sealDropFlow(
+    title: string,
+    text: string,
+    recipients: { label: string; pub: number[] }[],
+    dryRun = false,
+  ) {
+    if (!deskKey) return;
+    setBusy(true);
+    setTx(null);
+    try {
+      if (!dryRun) requireWriter();
+      const { sealDropPacket } = await import('@/lib/drop-seal');
+      const packet = await sealDropPacket({ title, text }, recipients);
+      if (demo || dryRun) {
+        const r = await appFetch(`/api/demo/drop${dryRun ? '?dryRun=1' : ''}`, {
+          method: 'POST',
+          body: JSON.stringify({
+            deskKey,
+            dropPayloadB64: bytesToB64(packet.dropPayload),
+            releasePayloadB64: bytesToB64(packet.releasePayload),
+          }),
+        });
+        const j = (await r.json()) as {
+          message?: string;
+          error?: string;
+          txHash?: Hex;
+          dropKey?: Hex;
+          releaseKey?: Hex;
+          holdKey?: Hex;
+        };
+        if (!r.ok) throw new Error(j.message ?? j.error ?? 'failed');
+        if (dryRun) {
+          push({ kind: 'info', text: 'Dry run ok. The dead drop was not written.' });
+          return;
+        }
+        if (j.txHash) setTx(j.txHash);
+        setLastDrop({ dropKey: j.dropKey, releaseKey: j.releaseKey, holdKey: j.holdKey, txHash: j.txHash });
+        push({ kind: 'success', text: 'Dead drop sealed.' });
+        return;
+      }
+      if (!connected) await connect();
+      const provider = getInjectedProvider();
+      if (!provider) throw new Error('No wallet found. Install MetaMask, or use Demo mode on the desk.');
+      const w = walletFromProvider(provider);
+      const owner = connected;
+      if (!owner) throw new Error('No account returned by the wallet.');
+      const out = await writeDeadDrop(w, owner, deskKey, packet.dropPayload, packet.releasePayload);
+      setTx(out.txHash);
+      const created = Array.isArray(out.createdEntities) ? out.createdEntities : [];
+      setLastDrop({
+        dropKey: created[0],
+        releaseKey: created[1],
+        holdKey: created[2],
+        txHash: out.txHash,
+      });
+      push({ kind: 'success', text: 'Dead drop sealed.' });
+    } catch (e: unknown) {
+      push({ kind: 'error', text: uiError(e) });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -673,6 +841,14 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     createDeskFlow,
     renewFlow,
     sendReply,
+    sealDropFlow,
+    deskDomain,
+    setDeskDomain,
+    siweAddress,
+    canDeskWrite,
+    signSiwe,
+    lastDrop,
+    deskPubRaw,
   };
 
   return <DeskContext.Provider value={value}>{children}</DeskContext.Provider>;

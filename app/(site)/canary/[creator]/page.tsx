@@ -7,9 +7,10 @@ import { DEFAULT_DESK, DEFAULT_IMPOSTOR, PROJECT } from '@/lib/constants';
 import { addressUrl, entityUrl, TIRAMISU_EXPLORER } from '@/lib/chain';
 import CopyField from '@/components/ui/CopyField';
 import StaleNote from '@/components/ui/StaleNote';
-import VerifiedBadge from '@/components/VerifiedBadge';
+import CanaryAutoVerify from '@/components/CanaryAutoVerify';
 import CanarySig from '@/components/CanarySig';
-import { fakeDeskSignal } from '@/lib/domain-verify';
+import DeskListingBadge from '@/components/DeskListingBadge';
+import { publicDeskHref } from '@/lib/desk-href';
 import { withReadBackoff } from '@/lib/retry';
 
 export const dynamic = process.env.STATIC_EXPORT === '1' ? 'force-static' : 'force-dynamic';
@@ -78,7 +79,7 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
         <p className="kicker">Public warrant canary</p>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <h1 className="h2" style={{ margin: 0 }}>Canary status</h1>
-          <VerifiedBadge signal={fakeDeskSignal(DEFAULT_DESK, creator)} />
+          <DeskListingBadge creator={creator} domain={live.domain} />
         </div>
         <p className="lead" style={{ marginTop: 10 }}>
           If this page says GONE, the newsroom has not renewed its canary. That is the signal.
@@ -166,10 +167,16 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
           <pre className="query-box">{query}</pre>
         </div>
 
+        <CanaryAutoVerify
+          desk={creator}
+          statement={live.canaryStatement}
+          issuedAt={live.canaryIssuedAt}
+          signature={live.canarySig}
+        />
         <CanarySig desk={creator} />
 
         <div className="ctaRow" style={{ justifyContent: 'flex-start' }}>
-          <Link className="btn" href={`/d/${creator}`}>
+          <Link className="btn" href={publicDeskHref(creator)}>
             Send this desk a tip <span className="arrow" aria-hidden="true" />
           </Link>
           <Link className="btn" href="/desk">

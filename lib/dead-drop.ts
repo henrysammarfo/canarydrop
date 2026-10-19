@@ -1,7 +1,8 @@
-import { ExpirationTime, jsonToPayload } from '@arkiv-network/sdk';
+import { ExpirationTime, jsonToPayload, type TxParams } from '@arkiv-network/sdk';
 import { key, str, u64 } from '@arkiv-network/sdk/attr';
+import { eq, gt } from '@arkiv-network/sdk/query';
 import type { Hex } from 'viem';
-import { PROJECT, SEALED_OWNER, pub } from './arkiv';
+import { PROJECT, SEALED_OWNER, headBlock, pub, type Wallet } from './arkiv';
 import { utcDaySlot } from './day';
 
 export const DROP_TYPE = 'drop';
@@ -141,4 +142,25 @@ export function parseRecipients(value: unknown): DropRecipient[] {
 
 export function encodeDropPlaintext(doc: DropDocument): string {
   return JSON.stringify({ title: doc.title, text: doc.text, v: 1 });
+}
+
+export async function liveHoldKeys(deskKey: Hex): Promise<Hex[]> {
+  const r = await pub()
+    .select({ key: true })
+    .where(eq('project', PROJECT), eq('type', HOLD_TYPE), eq('desk', key(deskKey)), gt('$expiresAt', u64(await headBlock())))
+    .limit(20)
+    .fetch();
+  return r.entities.filter((row) => row.key).map((row) => row.key as Hex);
+}
+
+export async function writeDeadDrop(
+  w: Wallet,
+  owner: Hex,
+  deskKey: Hex,
+  dropPayload: Uint8Array,
+  releasePayload: Uint8Array,
+  txParams?: TxParams,
+) {
+  const keys = await predictDeadDropKeys(owner);
+  return w.executeBatch(deadDropCreates({ keys, deskKey, dropPayload, releasePayload }), txParams);
 }

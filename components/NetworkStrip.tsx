@@ -57,7 +57,7 @@ export default async function NetworkStrip() {
             <strong>{data.canariesAlive}</strong>
           </div>
           <div>
-            <span className="muted">Last canary renewal</span>
+            <span className="muted">Canary expires at block</span>
             <strong>{data.lastCanary ? `Block ${data.lastCanary}` : 'None yet'}</strong>
           </div>
         </div>

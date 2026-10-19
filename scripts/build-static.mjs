@@ -29,17 +29,28 @@ function restore() {
   if (fs.existsSync(middlewareHold) && !fs.existsSync(middleware)) fs.renameSync(middlewareHold, middleware);
 }
 
+function buildId() {
+  if (process.env.NEXT_PUBLIC_BUILD_ID) return process.env.NEXT_PUBLIC_BUILD_ID;
+  if (process.env.VERCEL_GIT_COMMIT_SHA) return process.env.VERCEL_GIT_COMMIT_SHA;
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA;
+  return 'canarydrop-v7';
+}
+
 try {
   stash();
+  const id = buildId();
   run('npx', ['next', 'build'], {
     STATIC_EXPORT: '1',
     NEXT_PUBLIC_STATIC: '1',
     NEXT_TELEMETRY_DISABLED: '1',
+    NEXT_PUBLIC_BUILD_ID: id,
+    SOURCE_DATE_EPOCH: process.env.SOURCE_DATE_EPOCH || '0',
   });
   run('node', ['scripts/hash-static.mjs', 'out']);
   const note = [
     'CanaryDrop static build',
     `node ${process.version}`,
+    `build id ${id}`,
     'SDK @arkiv-network/sdk 0.8.1',
     'chain 7738577 Tiramisu',
     'Verify: npm ci && npm run build:static && diff -u expected.sha256 out/build.sha256',

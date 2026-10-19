@@ -1,13 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import type { Hex } from 'viem';
 import { bytesToB64 } from '@/lib/bytes';
 import { appFetch } from '@/lib/client-fetch';
 import { CHAIN_READ_FAILED, DEFAULT_DESK, LIFETIME_KEYS, type Lifetime } from '@/lib/constants';
 import { sealTo } from '@/lib/crypto';
-import { newThrowawayKey, postDirectTip } from '@/lib/direct-tip';
-import { fakeDeskSignal, fetchDeskRecord, wellKnownUrl, type DeskListing } from '@/lib/domain-verify';
+import { TIRAMISU_HUB } from '@/lib/chain';
+import { canaryHref } from '@/lib/desk-href';
+import { postDirectTip, throwawayAccount, throwawayBalance } from '@/lib/direct-tip';
+import { listingForDesk } from '@/lib/listing-client';
+import {
+  clearThrowawayKey,
+  formatGlm,
+  loadOrCreateThrowawayKey,
+} from '@/lib/throwaway-store';
+import type { DeskListing } from '@/lib/domain-verify';
 import { asAddress } from '@/lib/hex';
 import { fetchDeskLive } from '@/lib/live-client';
 import { sameOriginApi } from '@/lib/runtime';
@@ -22,8 +31,19 @@ import VerifiedBadge from '@/components/VerifiedBadge';
 import { IcoVerify } from '@/components/ui/icons';
 
 export default function SubmitPage() {
+  return (
+    <Suspense fallback={<section className="section"><div className="wrap"><p className="lead">Loading the tip form…</p></div></section>}>
+      <SubmitForm />
+    </Suspense>
+  );
+}
+
+function SubmitForm() {
   const push = useToast();
-  const [creator, setCreator] = useState<Hex>(() => asAddress(process.env.NEXT_PUBLIC_DESK_ADDRESS || '', DEFAULT_DESK));
+  const search = useSearchParams();
+  const [creator, setCreator] = useState<Hex>(() =>
+    asAddress(search.get('desk') || process.env.NEXT_PUBLIC_DESK_ADDRESS || '', DEFAULT_DESK),
+  );
   const [deskName, setDeskName] = useState('CanaryDrop desk');
   const [deskKey, setDeskKey] = useState<Hex | null>(null);
   const [deskPubRaw, setDeskPubRaw] = useState<Uint8Array | null>(null);
@@ -40,6 +60,10 @@ export default function SubmitPage() {
   const [listing, setListing] = useState<DeskListing>('unknown');
   const [path, setPath] = useState<'sponsor' | 'direct'>(() => (sameOriginApi() ? 'sponsor' : 'direct'));
   const [throwaway, setThrowaway] = useState<string | null>(null);
+  const [throwawayKey, setThrowawayKey] = useState<Hex | null>(null);
+  const [throwawayBal, setThrowawayBal] = useState<string | null>(null);
+  const [checkingFunds, setCheckingFunds] = useState(false);
+  const [declaredDomain, setDeclaredDomain] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +83,7 @@ export default function SubmitPage() {
         setDeskName(live.name);
         setDeskKey(live.deskKey);
         setDeskPubRaw(live.deskPub);
+        setDeclaredDomain(live.domain);
         setAlive(live.deskKey ? live.alive : null);
         setLookupError(null);
         setStaleNote(live.note);
@@ -96,13 +121,41 @@ export default function SubmitPage() {
 
   useEffect(() => {
     let cancelled = false;
-    void fetchDeskRecord(wellKnownUrl()).then((rec) => {
-      if (!cancelled) setListing(fakeDeskSignal(rec?.desk ?? null, creator));
+    void listingForDesk(creator, declaredDomain).then((signal) => {
+      if (!cancelled) setListing(signal);
     });
     return () => {
       cancelled = true;
     };
-  }, [creator]);
+  }, [creator, declaredDomain]);
+
+  useEffect(() => {
+    if (path !== 'direct') return;
+    const key = loadOrCreateThrowawayKey();
+    setThrowawayKey(key);
+    setThrowaway(throwawayAccount(key).address);
+  }, [path]);
+
+  async function refreshFunds() {
+    if (!throwawayKey) return;
+    setCheckingFunds(true);
+    try {
+      const bal = await throwawayBalance(throwawayAccount(throwawayKey).address);
+      setThrowawayBal(formatGlm(bal));
+    } catch {
+      setThrowawayBal('Could not read the balance.');
+    } finally {
+      setCheckingFunds(false);
+    }
+  }
+
+  function resetThrowaway() {
+    clearThrowawayKey();
+    const key = loadOrCreateThrowawayKey();
+    setThrowawayKey(key);
+    setThrowaway(throwawayAccount(key).address);
+    setThrowawayBal(null);
+  }
 
   const valid = !!deskKey && !!deskPubRaw && !!text.trim() && !sending;
   const step1 = deskKey ? 'done' : looking ? 'on' : 'on';
@@ -116,7 +169,8 @@ export default function SubmitPage() {
     try {
       const { wire, receipt } = await sealTo(deskPubRaw, text);
       if (path === 'direct') {
-        const key = newThrowawayKey();
+        const key = throwawayKey ?? loadOrCreateThrowawayKey();
+        setThrowawayKey(key);
         const out = await postDirectTip({ privateKey: key, deskKey, wire, life, dryRun });
         setThrowaway(out.owner);
         if (dryRun) {
@@ -161,7 +215,9 @@ export default function SubmitPage() {
         <p className="eyebrow">Anonymous tip</p>
         <h1 className="h2">Submit a tip</h1>
         <p className="lead" style={{ marginTop: 10 }}>
-          Synthetic data only. Your words are locked on this device, then posted by a sponsor wallet.
+          {path === 'direct'
+            ? 'Synthetic data only. Your words are locked on this device, then posted by a throwaway key in this tab.'
+            : 'Synthetic data only. Your words are locked on this device, then posted by a sponsor wallet.'}
         </p>
         <StaleNote text={staleNote} />
 
@@ -199,7 +255,7 @@ export default function SubmitPage() {
                     : lookupError || staleNote || 'No live desk found.'}
               </p>
               <div className="ctaRow" style={{ marginTop: 12 }}>
-                <Link className="btn" href={`/canary/${creator}`}>
+                <Link className="btn" href={canaryHref(creator)}>
                   View canary
                 </Link>
                 <button type="button" className="btn" onClick={() => setInfoOpen(true)}>
@@ -230,6 +286,26 @@ export default function SubmitPage() {
               Send without the sponsor
             </label>
           </fieldset>
+          {path === 'direct' && throwaway && (
+            <div className="throwaway-fund" style={{ marginTop: 14 }}>
+              <p className="small">This tab keeps one throwaway key until you clear it.</p>
+              <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+                <CopyField label="Address" value={throwaway} />
+                <CopyField label="Balance" value={throwawayBal ?? 'Not checked yet'} />
+              </div>
+              <div className="ctaRow" style={{ marginTop: 12, justifyContent: 'flex-start' }}>
+                <button type="button" className="btn" onClick={() => void refreshFunds()} disabled={checkingFunds}>
+                  {checkingFunds ? 'Checking' : 'Check funds'}
+                </button>
+                <a className="btn" href={TIRAMISU_HUB} target="_blank" rel="noreferrer">
+                  Open faucet
+                </a>
+                <button type="button" className="btn" onClick={resetThrowaway}>
+                  Clear key
+                </button>
+              </div>
+            </div>
+          )}
           <details className="advanced">
             <summary>Use a different desk</summary>
             <label className="small" htmlFor="desk-creator">Desk creator address</label>

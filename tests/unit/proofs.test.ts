@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import evidence from '@/arkiv/evidence.json';
-import { queryPredicate, sealedTipsQueryText } from '@/lib/arkiv';
+import { inboxPageQueryText, queryPredicate, sealedTipsQueryText } from '@/lib/arkiv';
 import { isFreshProofCache, seedTxLinks } from '@/lib/proofs';
 import { CHAIN_READ_FAILED, DEFAULT_RELAY, PROJECT, PROOF_CACHE_MS, SEALED_OWNER, SEALED_TIPS_EMPTY } from '@/lib/constants';
 
@@ -23,6 +23,15 @@ describe('judge proofs helpers', () => {
     expect(text).toMatch(/\$creator = addr\(/);
     expect(text).not.toMatch(/SELECT|LIMIT/i);
     expect(queryPredicate({ toString: () => text })).toBe(text);
+  });
+
+  it('prints the inbox predicate with burn ownership', () => {
+    const desk = `0x${'ab'.repeat(32)}` as const;
+    const text = inboxPageQueryText(desk);
+    expect(text).toContain(`project = str('${PROJECT}')`);
+    expect(text).toContain("type = str('tip')");
+    expect(text.toLowerCase()).toContain(SEALED_OWNER.toLowerCase());
+    expect(text).toMatch(/\$owner = addr\(/);
   });
 
   it('treats a 45 second proof cache as fresh, then stale', () => {

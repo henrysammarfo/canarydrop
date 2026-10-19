@@ -76,6 +76,7 @@ export default function InboxPage() {
                       <Link href={t.sentReplyKey ? `/desk/replies#reply-${t.sentReplyKey}` : '/desk/replies'}>
                         Open it on Replies
                       </Link>
+                      {t.sentStealth ? ` One time address ${shortHex(t.sentStealth)}.` : ''}
                     </p>
                   )}
                 </article>

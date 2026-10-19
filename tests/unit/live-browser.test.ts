@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DESK } from '@/lib/constants';
 
 vi.mock('@/lib/arkiv', () => ({
+  canarySigFromRow: () => ({ statement: 'No warrants or gag orders received.', issuedAt: null, signature: null }),
+  tipVisibleInInbox: () => true,
   deskAndCanary: vi.fn(async () => ({
     desk: { key: `0x${'ab'.repeat(32)}`, payload: new TextEncoder().encode(JSON.stringify({ name: 'Demo', pub: Array(65).fill(1) })) },
     canary: { key: `0x${'cd'.repeat(32)}`, expiresAt: 10n, createdAt: 1n },

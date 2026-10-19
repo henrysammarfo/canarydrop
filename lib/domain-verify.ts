@@ -1,9 +1,11 @@
 import type { Hex } from 'viem';
 import { ADDRESS_RE, DEFAULT_DESK, PROJECT } from './constants';
+import { DOH_CLOUDFLARE } from './csp';
 import { isAddress } from './hex';
 
 export const WELL_KNOWN_PATH = '/.well-known/canarydrop.json';
 export const DNS_TXT_PREFIX = 'canarydrop-desk=';
+export const DOH_QUERY = `${DOH_CLOUDFLARE}/dns-query`;
 
 export type DeskRecord = {
   v: 1;
@@ -70,4 +72,75 @@ export async function fetchDeskRecord(url: string): Promise<DeskRecord | null> {
 export function wellKnownUrl(origin = ''): string {
   const base = origin.replace(/\/$/, '');
   return `${base}${WELL_KNOWN_PATH}`;
+}
+
+export function declaredDomainOrigin(domain: string): string {
+  const host = domain.trim().toLowerCase().replace(/\/$/, '');
+  return `https://${host}`;
+}
+
+export function declaredWellKnownUrl(domain: string): string {
+  return wellKnownUrl(declaredDomainOrigin(domain));
+}
+
+export type DohAnswer = { type?: number; data?: string };
+
+export function parseDohTxtAnswers(answers: DohAnswer[] | undefined): string[] {
+  if (!answers?.length) return [];
+  const out: string[] = [];
+  for (const answer of answers) {
+    if (answer.type !== 16 || typeof answer.data !== 'string') continue;
+    const cleaned = answer.data.replace(/^"+|"+$/g, '').trim();
+    if (cleaned) out.push(cleaned);
+  }
+  return out;
+}
+
+export function deskFromTxtRecords(records: string[]): Hex | null {
+  for (const record of records) {
+    const desk = deskFromDnsTxt(record);
+    if (desk) return desk;
+  }
+  return null;
+}
+
+export async function fetchDnsTxt(domain: string): Promise<string[]> {
+  const host = domain.trim().toLowerCase();
+  if (!/^[a-z0-9.-]{1,80}$/.test(host)) return [];
+  try {
+    const url = `${DOH_QUERY}?name=${encodeURIComponent(host)}&type=TXT`;
+    const res = await fetch(url, {
+      credentials: 'omit',
+      headers: { accept: 'application/dns-json' },
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { Answer?: DohAnswer[] };
+    return parseDohTxtAnswers(json.Answer);
+  } catch {
+    return [];
+  }
+}
+
+export type DomainLookup = {
+  record: DeskRecord | null;
+  txtDesk: Hex | null;
+  listedDesk: Hex | null;
+};
+
+export async function lookupDeclaredDomain(domain: string): Promise<DomainLookup> {
+  const [record, txts] = await Promise.all([
+    fetchDeskRecord(declaredWellKnownUrl(domain)),
+    fetchDnsTxt(domain),
+  ]);
+  const txtDesk = deskFromTxtRecords(txts);
+  return {
+    record,
+    txtDesk,
+    listedDesk: record?.desk ?? txtDesk,
+  };
+}
+
+/** Mismatch only when a listing exists and the viewed desk is not that listing. */
+export function listingFromLookup(listedDesk: Hex | null | undefined, viewedCreator: Hex): DeskListing {
+  return fakeDeskSignal(listedDesk ?? null, viewedCreator);
 }

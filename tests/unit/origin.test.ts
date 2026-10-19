@@ -18,8 +18,13 @@ describe('origin allow list', () => {
     expect(originAllowed('https://canarydrop.vercel.app')).toBe(true);
   });
 
-  it('allows the GitHub Pages host', () => {
-    expect(originAllowed('https://henrysammarfo.github.io')).toBe(true);
+  it('rejects a github.io Origin so it never reaches CSRF', () => {
+    expect(originAllowed('https://henrysammarfo.github.io')).toBe(false);
+    expect(isAllowedHostname('henrysammarfo.github.io')).toBe(false);
+  });
+
+  it('does not treat the static mirror as a write Origin', () => {
+    expect(originAllowed('https://canarydrop-static.vercel.app')).toBe(false);
   });
 
   it('allows this project preview host', () => {

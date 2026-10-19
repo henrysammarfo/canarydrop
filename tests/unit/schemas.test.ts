@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createDeskBody, replyBody, renewBody, tipBody } from '@/lib/schemas';
+import { createDeskBody, dropBody, replyBody, renewBody, tipBody } from '@/lib/schemas';
 import { HEX_KEY } from '../helpers/request';
 
 describe('request schemas', () => {
@@ -22,7 +22,19 @@ describe('request schemas', () => {
 
   it('accepts reply and renew bodies', () => {
     expect(replyBody.safeParse({ tipKey: HEX_KEY, wireB64: 'AAECAw==' }).success).toBe(true);
+    expect(
+      replyBody.safeParse({
+        tipKey: HEX_KEY,
+        wireB64: 'AAECAw==',
+        stealthAddress: '0x1111111111111111111111111111111111111111',
+        ephemeralPub: '0x02aa',
+        viewTag: '0xab',
+      }).success,
+    ).toBe(true);
     expect(renewBody.safeParse({ deskKey: HEX_KEY, canaryKey: HEX_KEY }).success).toBe(true);
+    expect(
+      dropBody.safeParse({ deskKey: HEX_KEY, dropPayloadB64: 'AAECAw==', releasePayloadB64: 'AAECAw==' }).success,
+    ).toBe(true);
   });
 
   it('caps desk names', () => {

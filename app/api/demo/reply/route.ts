@@ -26,17 +26,21 @@ export async function POST(req: NextRequest) {
     throwIfOversizedWire(raw);
     const parsed = replyBody.safeParse(raw);
     if (!parsed.success) throw new AppError('bad_request');
-    const { tipKey, wireB64 } = parsed.data;
+    const { tipKey, wireB64, stealthAddress, ephemeralPub, viewTag } = parsed.data;
     assertWireB64(wireB64);
     if (dryRun) return jsonOk({ ok: true, dryRun: true, wouldReplyTo: tipKey });
     const account = deskAccount();
     await assertMinBalance(pub(), account.address);
     await assertDeskSpendRoom(account.address);
     const [pred] = await pub().predictEntityKeys({ owner: account.address, count: 1 });
+    const stealth =
+      stealthAddress && ephemeralPub && viewTag
+        ? { schemeId: 1 as const, stealthAddress: stealthAddress as Hex, ephemeralPub: ephemeralPub as Hex, viewTag: viewTag as Hex }
+        : undefined;
     const out = await withWalletLock('desk', account.address, () =>
       withBackoff(async () => {
         const nonce = await pub().getTransactionCount({ address: account.address, blockTag: 'pending' });
-        return reply(deskWallet(), tipKey as Hex, b64ToBytes(wireB64), undefined, { nonce });
+        return reply(deskWallet(), tipKey as Hex, b64ToBytes(wireB64), undefined, { nonce }, stealth);
       }),
     );
     const created = Array.isArray(out.createdEntities) ? out.createdEntities[0] : undefined;

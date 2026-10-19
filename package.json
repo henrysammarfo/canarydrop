@@ -21,6 +21,7 @@
     "build": "next build",
     "build:static": "node scripts/build-static.mjs",
     "verify:static": "node scripts/verify-static.mjs",
+    "repro:hash": "node scripts/repro-hash.mjs",
     "start": "next start -p 3000",
     "lint": "node scripts/lint.mjs",
     "typecheck": "tsc --noEmit",

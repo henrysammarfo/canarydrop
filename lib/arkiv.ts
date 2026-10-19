@@ -23,7 +23,10 @@ import { tiramisu } from '@arkiv-network/sdk/chains';
 import { eq, gt, gte, lte, or } from '@arkiv-network/sdk/query';
 import type { Hex } from 'viem';
 import { custom } from 'viem';
-import { attrKey, attrStr } from './attr';
+import { attrKey, attrStr, attrU64 } from './attr';
+import { DEFAULT_CANARY_STATEMENT } from './eip712';
+import { isSealedOwner } from './chain';
+import type { StealthAnnouncement } from './stealth';
 import {
   DEFAULT_RELAY,
   DEMO_TIP_LIVE_UNTIL,
@@ -44,7 +47,15 @@ export type Wallet = WalletArkivClient;
 export type PublicClient = PublicArkivClient;
 
 const DESK_SELECT = { key: true, creator: true, expiresAt: true, payload: true, createdAt: true } as const;
-const CANARY_SELECT = { key: true, expiresAt: true, createdAt: true, creationFlags: true, owner: true } as const;
+const CANARY_SELECT = {
+  key: true,
+  expiresAt: true,
+  createdAt: true,
+  creationFlags: true,
+  owner: true,
+  attributes: true,
+  payload: true,
+} as const;
 const INBOX_SELECT = { key: true, createdAt: true, expiresAt: true, payload: true, owner: true } as const;
 const REPLY_SELECT = { key: true, payload: true, createdAt: true } as const;
 const COUNT_SELECT = { key: true } as const;
@@ -81,6 +92,59 @@ export type ExplorerKind = 'tip' | 'desk' | 'canary' | 'reply';
 
 export type DeskRow = ProjectedEntity<typeof DESK_SELECT>;
 export type CanaryRow = ProjectedEntity<typeof CANARY_SELECT>;
+
+export type SignedCanaryWrite = {
+  statement: string;
+  issuedAt: bigint;
+  signature: Hex;
+};
+
+export type CreateDeskOpts = {
+  domain?: string | undefined;
+  signed?: SignedCanaryWrite | undefined;
+};
+
+export type RenewOpts = {
+  holdKeys?: Hex[];
+  signed?: SignedCanaryWrite;
+  owner?: Hex;
+};
+
+export function pickNewestCanary<T extends { createdAt?: bigint | undefined }>(rows: readonly T[]): T | null {
+  if (!rows.length) return null;
+  return rows.reduce((best, row) => {
+    const a = best.createdAt ?? 0n;
+    const b = row.createdAt ?? 0n;
+    return b > a ? row : best;
+  });
+}
+
+export function canarySigFromRow(row: { attributes?: Attributes; payload?: Uint8Array } | null | undefined): {
+  statement: string;
+  issuedAt: string | null;
+  signature: Hex | null;
+} {
+  if (!row) return { statement: DEFAULT_CANARY_STATEMENT, issuedAt: null, signature: null };
+  const issued = attrU64(row.attributes, 'issuedAt');
+  const sig = attrStr(row.attributes, 'sig');
+  let statement = attrStr(row.attributes, 'statement') ?? DEFAULT_CANARY_STATEMENT;
+  let issuedAt = issued != null ? issued.toString() : null;
+  let signature = sig && sig.startsWith('0x') ? (sig as Hex) : null;
+  if (row.payload) {
+    try {
+      const parsed: unknown = JSON.parse(new TextDecoder().decode(row.payload));
+      if (typeof parsed === 'object' && parsed !== null) {
+        const rec = parsed as Record<string, unknown>;
+        if (typeof rec.statement === 'string' && rec.statement.trim()) statement = rec.statement.trim();
+        if (typeof rec.issuedAt === 'string' || typeof rec.issuedAt === 'number') issuedAt = String(rec.issuedAt);
+        if (typeof rec.sig === 'string' && rec.sig.startsWith('0x')) signature = rec.sig as Hex;
+      }
+    } catch {
+      // Keep attribute fields.
+    }
+  }
+  return { statement, issuedAt, signature };
+}
 export type InboxTip = ProjectedEntity<typeof INBOX_SELECT>;
 export type ReplyRow = ProjectedEntity<typeof REPLY_SELECT>;
 export type InboxPage = QueryResult<InboxTip>;
@@ -123,23 +187,55 @@ async function aliveHead() {
   return gt('$expiresAt', u64(await headBlock()));
 }
 
+function canaryWriteAttrs(deskKey: Hex, signed?: SignedCanaryWrite) {
+  const attrs: Record<string, ReturnType<typeof str> | ReturnType<typeof key> | ReturnType<typeof u64>> = {
+    project: str(PROJECT),
+    type: str('canary'),
+    desk: key(deskKey),
+  };
+  if (signed) {
+    attrs.statement = str(signed.statement);
+    attrs.issuedAt = u64(signed.issuedAt);
+    attrs.sig = str(signed.signature);
+  }
+  return attrs;
+}
+
+function canaryWritePayload(signed?: SignedCanaryWrite) {
+  if (!signed) return jsonToPayload({ statement: DEFAULT_CANARY_STATEMENT });
+  return jsonToPayload({
+    statement: signed.statement,
+    issuedAt: signed.issuedAt.toString(),
+    sig: signed.signature,
+  });
+}
+
 /** Desk onboarding: desk + first canary land atomically. Canary points at the predicted desk key. */
-export async function createDesk(w: Wallet, owner: Hex, name: string, deskPubRaw: Uint8Array, txParams?: TxParams) {
+export async function createDesk(
+  w: Wallet,
+  owner: Hex,
+  name: string,
+  deskPubRaw: Uint8Array,
+  txParams?: TxParams,
+  opts?: CreateDeskOpts,
+) {
   const [desk, canary] = await pub().predictEntityKeys({ owner, count: 2 });
+  const deskPayload: Record<string, unknown> = { name, pub: Array.from(deskPubRaw) };
+  if (opts?.domain) deskPayload.domain = opts.domain;
   return w.executeBatch({
     creates: [
       {
         salt: desk.salt,
-        payload: jsonToPayload({ name, pub: Array.from(deskPubRaw) }),
+        payload: jsonToPayload(deskPayload),
         contentType: 'application/json',
         attributes: { project: str(PROJECT), type: str('desk'), slot: u64(utcDaySlot()) },
         expires: ExpirationTime.fromDays(30),
       },
       {
         salt: canary.salt,
-        payload: jsonToPayload({ statement: 'No warrants or gag orders received.' }),
+        payload: canaryWritePayload(opts?.signed),
         contentType: 'application/json',
-        attributes: { project: str(PROJECT), type: str('canary'), desk: key(desk.key) },
+        attributes: canaryWriteAttrs(desk.key, opts?.signed),
         expires: ExpirationTime.fromHours(26),
         flags: { readonly: true },
       },
@@ -148,16 +244,34 @@ export async function createDesk(w: Wallet, owner: Hex, name: string, deskPubRaw
 }
 
 /** extendEntity SETS expiry from now. It does not add to the remaining lifetime. */
-export const renew = (w: Wallet, deskKey: Hex, canaryKey: Hex, txParams?: TxParams) =>
-  w.executeBatch(
+export async function renew(w: Wallet, deskKey: Hex, canaryKey: Hex, txParams?: TxParams, opts?: RenewOpts) {
+  const holdKeys = opts?.holdKeys ?? [];
+  const extensions = [
+    { entityKey: canaryKey, expires: ExpirationTime.fromHours(26) },
+    { entityKey: deskKey, expires: ExpirationTime.fromDays(30) },
+    ...holdKeys.map((entityKey) => ({ entityKey, expires: ExpirationTime.fromHours(26) })),
+  ];
+  if (!opts?.signed || !opts.owner) {
+    return w.executeBatch({ extensions }, txParams);
+  }
+  const [next] = await pub().predictEntityKeys({ owner: opts.owner, count: 1 });
+  return w.executeBatch(
     {
-      extensions: [
-        { entityKey: canaryKey, expires: ExpirationTime.fromHours(26) },
-        { entityKey: deskKey, expires: ExpirationTime.fromDays(30) },
+      creates: [
+        {
+          salt: next.salt,
+          payload: canaryWritePayload(opts.signed),
+          contentType: 'application/json',
+          attributes: canaryWriteAttrs(deskKey, opts.signed),
+          expires: ExpirationTime.fromHours(26),
+          flags: { readonly: true },
+        },
       ],
+      extensions,
     },
     txParams,
   );
+}
 
 export async function getDesk(deskCreator: Hex, preferPub?: Uint8Array, head?: bigint): Promise<DeskRow | undefined> {
   const alive = head != null ? gt('$expiresAt', u64(head)) : await aliveHead();
@@ -203,19 +317,11 @@ export async function deskAndCanary(
   const desk = pickLiveDesk(desks, preferPub);
   const deskKey = desk?.key?.toLowerCase();
   const canaryRow = deskKey
-    ? canaries.find((row) => attrKey(row.attributes, 'desk')?.toLowerCase() === deskKey) ?? null
+    ? pickNewestCanary(canaries.filter((row) => attrKey(row.attributes, 'desk')?.toLowerCase() === deskKey))
     : null;
   return {
     desk: desk as DeskRow | undefined,
-    canary: canaryRow
-      ? {
-          key: canaryRow.key,
-          expiresAt: canaryRow.expiresAt,
-          createdAt: canaryRow.createdAt,
-          owner: canaryRow.owner,
-          creationFlags: canaryRow.creationFlags,
-        }
-      : null,
+    canary: (canaryRow as CanaryRow | null) ?? null,
     currentBlock: r.blockNumber ?? currentBlock,
     blockDuration,
   };
@@ -267,11 +373,24 @@ export type PageWalk = {
   atBlock?: bigint | undefined;
 };
 
+export function tipVisibleInInbox(owner: Hex | null | undefined): boolean {
+  return isSealedOwner(owner);
+}
+
+export function inboxPageQueryText(deskKey: Hex): string {
+  return pub()
+    .select(INBOX_SELECT)
+    .where(eq('project', PROJECT), eq('type', 'tip'), eq('desk', key(deskKey)))
+    .ownedBy(SEALED_OWNER)
+    .toString();
+}
+
 export async function inboxPage(deskKey: Hex, opts?: PageWalk): Promise<InboxPage> {
   const head = opts?.atBlock ?? (await headBlock());
   let q = pub()
     .select(INBOX_SELECT)
     .where(eq('project', PROJECT), eq('type', 'tip'), eq('desk', key(deskKey)))
+    .ownedBy(SEALED_OWNER)
     .limit(50)
     .atBlock(head);
   if (opts?.cursor) q = q.cursor(opts.cursor);
@@ -310,7 +429,14 @@ export async function repliesForCreator(deskCreator: Hex): Promise<readonly Repl
   ).entities;
 }
 
-export const reply = (w: Wallet, tipKey: Hex, wire: Uint8Array, deskKey?: Hex, txParams?: TxParams) =>
+export const reply = (
+  w: Wallet,
+  tipKey: Hex,
+  wire: Uint8Array,
+  deskKey?: Hex,
+  txParams?: TxParams,
+  stealth?: StealthAnnouncement,
+) =>
   w.executeBatch(
     {
       creates: [
@@ -322,6 +448,14 @@ export const reply = (w: Wallet, tipKey: Hex, wire: Uint8Array, deskKey?: Hex, t
             type: str('reply'),
             tip: key(tipKey),
             slot: u64(utcDaySlot()),
+            ...(stealth
+              ? {
+                  scheme: u64(BigInt(stealth.schemeId)),
+                  stealth: str(stealth.stealthAddress),
+                  eph: str(stealth.ephemeralPub),
+                  vtag: str(stealth.viewTag),
+                }
+              : {}),
           },
           expires: ExpirationTime.fromHours(72),
         },
@@ -357,6 +491,19 @@ export function entityBelongsToDesk(entity: DeskEntityShape | null | undefined, 
     return !!labeled && labeled.toLowerCase() === desk;
   }
   return false;
+}
+
+export type WatchEntityOwner = {
+  key?: Hex;
+  attributes?: Attributes;
+  owner?: Hex | null;
+};
+
+/** A live tip is only ready for the inbox after it has been handed to the burn address. */
+export function watchCreatedTipReady(entity: WatchEntityOwner | null | undefined, deskKey: Hex): boolean {
+  if (!entityBelongsToDesk(entity, deskKey)) return false;
+  if (attrStr(entity?.attributes, 'type') !== 'tip') return false;
+  return isSealedOwner(entity?.owner);
 }
 
 export type WatchKind = 'sealed' | 'patched' | 'deleted';
@@ -407,7 +554,7 @@ export function watchInbox(deskKey: Hex, onTipOrHandlers: ((k: Hex) => void) | I
       onEntityCreated: async (ev: EntityCreatedEvent) => {
         try {
           const e = await pub().getEntity(ev.entityKey);
-          if (entityBelongsToDesk(e, deskKey) && attrStr(e.attributes, 'type') === 'tip') {
+          if (watchCreatedTipReady(e, deskKey)) {
             remember(ev.entityKey);
             handlers.onTip(ev.entityKey);
           }

@@ -23,3 +23,6 @@ autocannon_home.json
 
 # uploads (local only)
 /home/ubuntu/.cursor/projects/workspace/uploads/
+
+# local screenshots (never commit)
+shots/

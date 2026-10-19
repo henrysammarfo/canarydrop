@@ -1,5 +1,5 @@
 import type { Hex } from 'viem';
-import { deskAndCanary, explorerPage, inboxPage } from './arkiv';
+import { canarySigFromRow, deskAndCanary, explorerPage, inboxPage, tipVisibleInInbox } from './arkiv';
 import { bytesToB64 } from './bytes';
 import { DEFAULT_DESK } from './constants';
 import { mapExplorerEntity, serializeExplorerItem } from './explorer-map';
@@ -16,6 +16,7 @@ export async function browserDeskLive(creator: Hex): Promise<DeskLive> {
   return withReadBackoff(async () => {
     const bundle = await deskAndCanary(creator);
     const parsed = bundle.desk?.payload ? parseDeskPayload(bundle.desk.payload) : null;
+    const signed = canarySigFromRow(bundle.canary);
     return {
       ok: true as const,
       creator,
@@ -28,6 +29,10 @@ export async function browserDeskLive(creator: Hex): Promise<DeskLive> {
       createdAt: bundle.canary?.createdAt != null ? bundle.canary.createdAt.toString() : null,
       currentBlock: bundle.currentBlock.toString(),
       blockDuration: bundle.blockDuration || 2,
+      domain: parsed?.domain ?? null,
+      canaryStatement: signed.statement,
+      canaryIssuedAt: signed.issuedAt,
+      canarySig: signed.signature,
       ...freshness(),
     };
   });
@@ -80,7 +85,7 @@ export async function browserInboxLive(
     return {
       ok: true as const,
       tips: r.entities
-        .filter((row) => row.key)
+        .filter((row) => row.key && tipVisibleInInbox(row.owner))
         .map((row) => ({
           key: row.key as Hex,
           createdAt: (row.createdAt ?? 0n).toString(),

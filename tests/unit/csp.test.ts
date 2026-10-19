@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCsp, cspAllowsUnsafeEval, cspAllowsUnsafeInlineScript } from '@/lib/csp';
+import { buildCsp, buildStaticCsp, cspAllowsUnsafeEval, cspAllowsUnsafeInlineScript } from '@/lib/csp';
 
 describe('csp', () => {
   const header = buildCsp('abc123');
@@ -47,5 +47,18 @@ describe('csp', () => {
     expect(header).not.toContain('connect-src *');
     expect(header).toContain("worker-src 'none'");
     expect(header).toContain('upgrade-insecure-requests');
+  });
+
+  it('allowlists DNS over HTTPS on connect-src', () => {
+    expect(header).toContain('https://cloudflare-dns.com');
+    expect(header).toContain('https://dns.google');
+  });
+
+  it('builds a nonce free static CSP', () => {
+    const staticHeader = buildStaticCsp();
+    expect(staticHeader).toContain("script-src 'self'");
+    expect(staticHeader).not.toContain('nonce-');
+    expect(staticHeader).toContain('https://cloudflare-dns.com');
+    expect(cspAllowsUnsafeInlineScript(staticHeader)).toBe(false);
   });
 });

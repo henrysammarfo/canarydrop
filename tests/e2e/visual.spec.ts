@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 
 const desk = '0x1da3c22c079c264536D831F6F1fCe638aB0b20B0';
 const pages = [
@@ -19,6 +20,7 @@ const pages = [
   '/desk/drop',
   `/canary/${desk}`,
   `/d/${desk}`,
+  `/canary?desk=${desk}`,
   '/r',
 ];
 
@@ -35,7 +37,7 @@ const appShell = new Set([
   '/threat',
 ]);
 
-const outDir = '/opt/cursor/artifacts';
+const outDir = process.env.VISUAL_SHOT_DIR || path.join(os.tmpdir(), 'canarydrop-visual');
 
 function slug(route: string) {
   return route === '/' ? 'home' : route.replace(/\W+/g, '_').replace(/^_|_$/g, '');

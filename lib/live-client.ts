@@ -18,6 +18,10 @@ export type DeskLiveView = {
   createdAt: bigint | null;
   currentBlock: bigint | null;
   blockDuration: number;
+  domain: string | null;
+  canaryStatement: string | null;
+  canaryIssuedAt: string | null;
+  canarySig: string | null;
   stale: boolean;
   staleAgeMs: number;
   note: string | null;
@@ -62,6 +66,10 @@ export function hydrateDeskLive(j: DeskLive): DeskLiveView {
     createdAt: asBigint(j.createdAt),
     currentBlock: asBigint(j.currentBlock),
     blockDuration: j.blockDuration || 2,
+    domain: typeof j.domain === 'string' ? j.domain : null,
+    canaryStatement: typeof j.canaryStatement === 'string' ? j.canaryStatement : null,
+    canaryIssuedAt: typeof j.canaryIssuedAt === 'string' ? j.canaryIssuedAt : null,
+    canarySig: typeof j.canarySig === 'string' ? j.canarySig : null,
     stale: j.stale === true,
     staleAgeMs: typeof j.staleAgeMs === 'number' ? j.staleAgeMs : 0,
     note: typeof j.note === 'string' ? j.note : null,

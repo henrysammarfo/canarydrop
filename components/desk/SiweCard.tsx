@@ -1,45 +1,21 @@
 'use client';
 
-import { useState } from 'react';
-import type { Hex } from 'viem';
 import Card from '@/components/ui/Card';
 import CopyField from '@/components/ui/CopyField';
+import { useDesk } from '@/components/desk/DeskProvider';
 import { useToast } from '@/components/Toast';
-import { getInjectedProvider } from '@/lib/injected';
-import { buildSiweMessage, newsroomSiweFields, parseSiweMessage, verifySiwe } from '@/lib/siwe';
+import { parseSiweMessage } from '@/lib/siwe';
 import { uiError } from '@/lib/ui-error';
-import { existingAccount } from '@/lib/wallet';
 
 export default function SiweCard() {
+  const d = useDesk();
   const push = useToast();
-  const [session, setSession] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   async function signIn() {
-    setBusy(true);
     try {
-      const eth = getInjectedProvider();
-      if (!eth) throw new Error('No wallet found. Connect a wallet first.');
-      const address = (await existingAccount()) as Hex | null;
-      if (!address) throw new Error('Connect a wallet first.');
-      const fields = newsroomSiweFields({
-        domain: window.location.host,
-        address,
-        uri: window.location.origin,
-      });
-      const message = buildSiweMessage(fields);
-      const signature = (await eth.request({
-        method: 'personal_sign',
-        params: [message, address],
-      })) as Hex;
-      const checked = await verifySiwe(message, signature);
-      if (!checked.ok) throw new Error('That sign in could not be verified.');
-      setSession(checked.address);
-      push({ kind: 'success', text: 'Signed in with Ethereum.' });
+      await d.signSiwe();
     } catch (err: unknown) {
       push({ kind: 'error', text: uiError(err) });
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -47,20 +23,25 @@ export default function SiweCard() {
     <Card>
       <h2 className="h3">Newsroom sign in</h2>
       <p className="muted" style={{ marginTop: 8 }}>
-        Sign a standard Ethereum login message. The site checks it here. You can also check the same message offline.
+        Desk writes need a sign in from the desk creator. Demo mode uses the shared testnet desk instead.
       </p>
       <div className="ctaRow" style={{ marginTop: 14 }}>
-        <button type="button" className="btn primary" onClick={() => void signIn()} disabled={busy}>
-          {busy ? 'Working' : 'Sign in with Ethereum'}
+        <button type="button" className="btn primary" onClick={() => void signIn()} disabled={d.busy}>
+          Sign in with Ethereum
         </button>
       </div>
-      {session ? (
+      {d.siweAddress ? (
         <div style={{ marginTop: 12 }}>
-          <CopyField label="Signed in" value={session} />
+          <CopyField label="Signed in" value={d.siweAddress} />
+          <p className="muted" style={{ marginTop: 8 }}>
+            {d.canDeskWrite
+              ? 'This signer can write for the open desk.'
+              : 'This signer is not the desk creator, so writes stay blocked.'}
+          </p>
         </div>
       ) : (
         <p className="muted" style={{ marginTop: 12 }}>
-          No signed session in this browser yet.
+          {d.demo ? 'Demo mode is on. Server writes do not need this sign in.' : 'No signed session in this browser yet.'}
         </p>
       )}
       <details className="advanced">

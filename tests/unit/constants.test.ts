@@ -21,6 +21,8 @@ import {
   PRIVATE_KEY_RE,
   PAGES_HOST,
   PRODUCTION_HOST,
+  STATIC_MIRROR_HOST,
+  STATIC_MIRROR_URL,
   PROJECT,
   SEALED_OWNER,
 } from '@/lib/constants';
@@ -69,6 +71,8 @@ describe('constants', () => {
     expect(REDIS_LOCK_PREFIX).toBe('cd:lock');
     expect(WALLET_LOCK_TTL_MS).toBe(12_000);
     expect(PRODUCTION_HOST).toBe('canarydrop.vercel.app');
+    expect(STATIC_MIRROR_HOST).toBe('canarydrop-static.vercel.app');
+    expect(STATIC_MIRROR_URL).toBe('https://canarydrop-static.vercel.app');
     expect(PAGES_HOST).toBe('henrysammarfo.github.io');
     expect(MAX_WIRE_BYTES).toBe(8192);
     expect(MAX_PLAINTEXT_CHARS).toBe(4000);
