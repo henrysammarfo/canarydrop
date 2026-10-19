@@ -252,7 +252,16 @@ npm ci
 npm run build:static
 ```
 
-`out/build.sha256` is the published SHA256 list. `expected.sha256` is the checked in copy. `npm run verify:static -- expected.sha256` rebuilds and compares. `npm run repro:hash` shows two identical trees hash the same way.
+A judge gets the same file hashes from every checkout path on Node 20.18.0:
+
+```bash
+nvm use
+npm ci
+npm run build:static
+npm run verify:static -- expected.sha256
+```
+
+`out/build.sha256` is the published SHA256 list. `expected.sha256` is the checked in copy. `npm run repro:hash` builds `out/` twice on one machine and compares the two manifests.
 
 The primary static mirror is a separate Vercel project that serves only `out/` (no functions, no API). Placeholder: https://canarydrop-static.vercel.app. Config: `vercel.static.json`.
 
@@ -299,7 +308,7 @@ Run these locally. Do not wait on hosted workflows.
 - Integration: live Tiramisu reads (sealed tips, `ownedBy`, flags, nonce, count), inbox pagination mock, dry run against a live desk
 - E2E: routes including `/how`, `/threat`, `/desk/drop`, mobile overflow, dry run toast, desk Demo mode, real-browser demo key GET, CSP header, verify page, CSRF cookie, landing copy, well known record
 
-Current local counts: 428 vitest, 137 Playwright (134 passed, 3 skipped without PRODUCTION_URL).
+Current local counts: 429 vitest, 137 Playwright (134 passed, 3 skipped without PRODUCTION_URL).
 
 ```bash
 npm run lint

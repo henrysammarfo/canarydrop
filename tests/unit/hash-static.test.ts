@@ -33,4 +33,15 @@ describe('reproducible static hash', () => {
     expect(fs.readFileSync(path.resolve('.nvmrc'), 'utf8').trim()).toBe('20.18.0');
     expect(fs.readFileSync(path.resolve('next.config.js'), 'utf8')).toContain('generateBuildId');
   });
+
+  it('static export uses a clean env and a fixed home', () => {
+    const src = fs.readFileSync(path.resolve('scripts/build-static.mjs'), 'utf8');
+    expect(src).toContain('staticBuildEnv');
+    expect(src).toContain('/tmp/canarydrop-home');
+    expect(src).toContain("TZ: 'UTC'");
+    expect(src).toContain("LANG: 'C'");
+    expect(src).not.toContain('VERCEL_GIT_COMMIT_SHA');
+    expect(src).toContain('stripCheckoutPaths');
+    expect(src).toContain('sortRuntimeMaps');
+  });
 });

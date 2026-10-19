@@ -25,8 +25,10 @@ describe('static export chunk graph', () => {
   it('pins webpack ids and a stable build id for the static export', () => {
     const src = read('next.config.js');
     expect(src).toContain('generateBuildId');
-    expect(src).toContain("moduleIds = 'deterministic'");
-    expect(src).toContain("chunkIds = 'deterministic'");
+    expect(src).toContain('CanarydropStableIds');
+    expect(src).toContain("[contenthash]");
+    expect(src).toContain('cacheGroups.lib = false');
+    expect(src).toContain('CanarydropRelIdent');
   });
 
   it('pins Node 20.18.0', () => {

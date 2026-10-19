@@ -132,27 +132,18 @@ test('dry run tip submit shows a toast', async ({ page }) => {
   await page.goto(urlFor('/submit'), { waitUntil: 'load' });
   const creator = page.getByLabel('Desk creator address');
   if ((await creator.inputValue()) !== desk) await creator.fill(desk);
-  const status = page.locator('p[role="status"]');
-  try {
-    await expect(status).toContainText(/Canary (alive|gone|unknown)/i, { timeout: 35_000 });
-  } catch {
-    await page.waitForTimeout(8_000);
-    await page.reload({ waitUntil: 'load' });
-    await expect(status).toContainText(/Canary (alive|gone|unknown)/i, { timeout: 45_000 });
-  }
-  await page.locator('textarea').first().fill('Synthetic judge dry run tip.');
+  const canary = page.locator('p[role="status"]').filter({ hasText: /Canary (alive|gone|unknown)/i });
+  await expect(canary).toBeVisible({ timeout: 35_000 });
+  await page.locator('#tip-body').fill('Synthetic judge dry run tip.');
   const dry = page.getByRole('button', { name: 'Dry run' });
-  await expect(dry).toBeEnabled({ timeout: 20_000 });
+  await expect(dry).toBeEnabled();
+  const posted = page.waitForResponse(
+    (res) => res.request().method() === 'POST' && res.url().includes('/api/tip') && res.url().includes('dryRun=1'),
+  );
   await dry.click();
-  const dryToast = page.locator('.toast').filter({ hasText: /dry run/i });
-  try {
-    await expect(dryToast).toBeVisible({ timeout: 20_000 });
-  } catch {
-    await expect(page.locator('.toast').first()).toBeVisible({ timeout: 8_000 });
-    await page.waitForTimeout(16_000);
-    await dry.click();
-    await expect(dryToast).toBeVisible({ timeout: 45_000 });
-  }
+  const res = await posted;
+  expect(res.ok(), `dry run HTTP ${res.status()}`).toBeTruthy();
+  await expect(page.locator('.toast-stack .toast').filter({ hasText: /Dry run ok/i })).toBeVisible();
 });
 
 test('hero CTAs are narrower than 260px', async ({ page }) => {

@@ -11,18 +11,19 @@ export default function HowStatic() {
         The hosted Vercel app is a convenience mirror with the sponsor path. The primary static mirror is a separate Vercel project at {STATIC_MIRROR_URL}. It serves only the files in out/. There are no functions and no write API.
       </p>
       <div className="proof-facts">
-        <CopyField label="Build" value="npm ci && npm run build:static" />
+        <CopyField label="Build" value="nvm use && npm ci && npm run build:static" />
         <CopyField label="Verify" value="npm run verify:static -- expected.sha256" />
         <CopyField label="Self host" value="npx serve out" />
         <CopyField label="Mirror" value={STATIC_MIRROR_URL} />
       </div>
-      <pre className="query-box" tabIndex={0}>{`# pinned tools
-node 20.18.0
+      <pre className="query-box" tabIndex={0}>{`# same hash on every machine
+nvm use
 npm ci
 npm run build:static
+npm run verify:static -- expected.sha256
+# nvm use reads .nvmrc (20.18.0)
 # out/build.sha256 lists
 # sha256 of each file
-# compare: diff -u expected.sha256 out/build.sha256
 # self host: npx serve out
 # or: ipfs add -r out
 # optional workflow: .github/workflows/pages.yml

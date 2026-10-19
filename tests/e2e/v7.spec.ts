@@ -30,6 +30,7 @@ test('threat page states what Arkiv does not hide', async ({ page }) => {
 test('how page documents the static build', async ({ page }) => {
   await page.goto('/how', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#static-build')).toBeVisible();
+  await expect(page.locator('#static-build')).toContainText('nvm use');
   await expect(page.locator('#static-build')).toContainText('npm run build:static');
   await expect(page.locator('#static-build')).toContainText('https://canarydrop-static.vercel.app');
   await expect(page.locator('#static-build')).toContainText('expected.sha256');
