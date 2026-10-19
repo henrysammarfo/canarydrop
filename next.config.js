@@ -7,6 +7,16 @@ const config = {
   transpilePackages: ['geist'],
   generateBuildId: async () =>
     process.env.NEXT_PUBLIC_BUILD_ID || process.env.SOURCE_DATE_EPOCH || 'canarydrop-v7',
+  webpack: (config, { isServer }) => {
+    if (isStatic) {
+      config.optimization.moduleIds = 'deterministic';
+      config.optimization.chunkIds = 'deterministic';
+      if (!isServer && config.optimization.splitChunks && typeof config.optimization.splitChunks === 'object') {
+        config.optimization.splitChunks.automaticNameDelimiter = '-';
+      }
+    }
+    return config;
+  },
   ...(isStatic
     ? {
         output: 'export',

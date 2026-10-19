@@ -299,7 +299,7 @@ Run these locally. Do not wait on hosted workflows.
 - Integration: live Tiramisu reads (sealed tips, `ownedBy`, flags, nonce, count), inbox pagination mock, dry run against a live desk
 - E2E: routes including `/how`, `/threat`, `/desk/drop`, mobile overflow, dry run toast, desk Demo mode, real-browser demo key GET, CSP header, verify page, CSRF cookie, landing copy, well known record
 
-Current local counts: 382 vitest, 126 Playwright (123 passed, 3 skipped without PRODUCTION_URL).
+Current local counts: 428 vitest, 137 Playwright (134 passed, 3 skipped without PRODUCTION_URL).
 
 ```bash
 npm run lint

@@ -48,6 +48,7 @@ try {
     SOURCE_DATE_EPOCH: process.env.SOURCE_DATE_EPOCH || '0',
   });
   run('node', ['scripts/hash-static.mjs', 'out']);
+  run('node', ['scripts/assert-static-chunks.mjs', 'out']);
   const note = [
     'CanaryDrop static build',
     'node 20.18.0 required for expected.sha256',

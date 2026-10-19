@@ -2,6 +2,7 @@
 
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
+import ExperimentalLabel from '@/components/ui/ExperimentalLabel';
 import PageHeader from '@/components/ui/PageHeader';
 import DemoBanner, { DemoSwitch } from '@/components/desk/DemoBanner';
 import { useDesk } from '@/components/desk/DeskProvider';
@@ -70,13 +71,17 @@ export default function InboxPage() {
                       Send reply
                     </button>
                   </div>
+                  <p className="muted stealth-reply-note">
+                    Replies use a one time address. <ExperimentalLabel />
+                  </p>
                   {t.sentReplyKey !== undefined && (
                     <p className="page-note compact reply-sent" role="status">
                       Reply sent.{' '}
                       <Link href={t.sentReplyKey ? `/desk/replies#reply-${t.sentReplyKey}` : '/desk/replies'}>
                         Open it on Replies
                       </Link>
-                      {t.sentStealth ? ` One time address ${shortHex(t.sentStealth)}.` : ''}
+                      {t.sentStealth ? ` One time address ${shortHex(t.sentStealth)}.` : ''}{' '}
+                      <ExperimentalLabel />
                     </p>
                   )}
                 </article>

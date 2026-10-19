@@ -747,7 +747,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
           x.key === t.key ? { ...x, replyText: '', sentReplyKey: replyKey, sentStealth: stealth.stealthAddress } : x,
         ),
       );
-      push({ kind: 'success', text: 'Reply sent to a one time address.' });
+      push({ kind: 'success', text: 'Reply sent to a one time address. Experimental.' });
     } catch (e: unknown) {
       push({ kind: 'error', text: uiError(e) });
     }

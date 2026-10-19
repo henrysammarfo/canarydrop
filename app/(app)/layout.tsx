@@ -1,12 +1,6 @@
 import type { ReactNode } from 'react';
-import AppShell from '@/components/ui/AppShell';
-import TorBanner from '@/components/TorBanner';
 
+/** Server-only. Client chrome lives on desk, explorer, how, and verify layouts. */
 export default function AppLayout({ children }: { children: ReactNode }) {
-  return (
-    <AppShell>
-      <TorBanner />
-      {children}
-    </AppShell>
-  );
+  return children;
 }

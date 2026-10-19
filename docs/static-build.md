@@ -1,6 +1,6 @@
 # Static build and self hosting
 
-Pinned tools: Node 20.18.0 exactly, `npm ci` from `package-lock.json`, `@arkiv-network/sdk` 0.8.1, Tiramisu chain 7738577. The static hash changes if the Node version does not match.
+Pinned tools: Node 20.18.0 exactly (`.nvmrc` and `engines.node`), `npm ci` from `package-lock.json`, `@arkiv-network/sdk` 0.8.1, Tiramisu chain 7738577. The static hash changes if the Node version does not match. The static export uses a fixed `generateBuildId` and deterministic webpack module/chunk ids. App chrome lives on desk, explorer, how, and verify layouts so site pages do not pick up an `(app)/layout-*.js` chunk.
 
 The primary static mirror is a separate Vercel project that serves only `out/`. Placeholder URL: https://canarydrop-static.vercel.app. That project has no functions and no API routes. Config: `vercel.static.json` (`buildCommand` `npm run build:static`, `outputDirectory` `out`, plus CSP and no-referrer headers).
 

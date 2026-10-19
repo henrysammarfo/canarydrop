@@ -1315,7 +1315,9 @@ label.small {
 .reply-row { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .reply-row input { flex: 1 1 auto; height: 36px; }
 .reply-row .btn { height: 36px; }
+.stealth-reply-note { margin: 8px 0 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .reply-sent { margin: 0; }
+.reply-sent .experimental-label { margin-left: 6px; }
 tr[id^="reply-"] { scroll-margin-top: calc(var(--topbar) + 16px); }
 .stale-note { margin: 12px 0; }
 
