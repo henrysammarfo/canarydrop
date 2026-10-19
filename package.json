@@ -29,6 +29,7 @@
     "test:e2e": "playwright test --reporter=line",
     "friction": "node arkiv/repro/run-all.mjs",
     "seed:testnet": "tsx scripts/seed-testnet.mjs",
+    "renew": "tsx scripts/renew.mjs",
     "verify": "node scripts/verify.mjs",
     "ci": "npm run lint && npm run typecheck && npm run test && npm run build"
   },

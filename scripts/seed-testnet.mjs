@@ -82,13 +82,26 @@ async function replyOnce(wDesk, deskPriv, tipKey, sourceReceiptJwk, deskPubRaw) 
   return { replyKey: r.createdEntity, tx: r.txHash };
 }
 
+async function liveHoldKeysForDesk(deskKey) {
+  const { currentBlock } = await pub.getBlockTiming();
+  const r = await pub
+    .select({ key: true })
+    .where(eq('project', PROJECT), eq('type', 'hold'), eq('desk', key(deskKey)), gt('$expiresAt', u64(currentBlock)))
+    .limit(20)
+    .fetch();
+  return r.entities.filter((row) => row.key).map((row) => row.key);
+}
+
 async function renewCanary(wDesk, deskKey, canaryKey) {
-  if (DRY) return { tx: 'dry-run' };
-  const r = await wDesk.executeBatch({ extensions: [
+  const holdKeys = await liveHoldKeysForDesk(deskKey);
+  const extensions = [
     { entityKey: canaryKey, expires: ExpirationTime.fromHours(26) },
     { entityKey: deskKey, expires: ExpirationTime.fromDays(30) },
-  ]});
-  return { tx: r.txHash };
+    ...holdKeys.map((entityKey) => ({ entityKey, expires: ExpirationTime.fromHours(26) })),
+  ];
+  if (DRY) return { tx: 'dry-run', holdKeys };
+  const r = await wDesk.executeBatch({ extensions });
+  return { tx: r.txHash, holdKeys };
 }
 
 async function impersonatorFlow(wImp) {
@@ -144,7 +157,7 @@ async function main() {
 
   // d) Renew canary
   const d = await renewCanary(wDesk, a.created[0], a.created[1]);
-  console.log('Canary renewed, tx %s %s', d.tx, linkTx(d.tx)); evidence.txs.push(d.tx);
+  console.log('Canary renewed with %d hold(s), tx %s %s', d.holdKeys.length, d.tx, linkTx(d.tx)); evidence.txs.push(d.tx);
 
   // e) Impersonator
   const e = await impersonatorFlow(wImp);
