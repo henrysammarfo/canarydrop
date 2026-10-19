@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "dryRun": true,
+  "predictedTipKey": "0xabababababababababababababababababababababababababababababababab",
+  "attributes": {
+    "project": "canarydrop-gts26-hm",
+    "type": "tip",
+    "desk": "0x1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f"
+  },
+  "expires": "24h"
+}

@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "creator": "0x1da3c22c079c264536D831F6F1fCe638aB0b20B0",
+  "deskKey": "0x1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+  "canaryKey": "0x3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c",
+  "alive": true,
+  "name": "CanaryDrop Demo Desk",
+  "deskPubB64": "BOj3V5TE3NFjXbfHrUWqIB4ZUD9VFf7NHmpLzBbloO8WxnotuVmkeG6gZmHkIdRoh4K9F4Q+WiiFIwPCzv1V9s0=",
+  "expiresAt": "200",
+  "createdAt": "50",
+  "currentBlock": "100",
+  "blockDuration": 2,
+  "domain": null,
+  "canaryStatement": "No warrants or gag orders received.",
+  "canaryIssuedAt": null,
+  "canarySig": null,
+  "fetchedAt": 1700000000000,
+  "stale": false,
+  "staleAgeMs": 0,
+  "note": null
+}
