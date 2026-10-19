@@ -37,15 +37,29 @@ export default async function NetworkStrip() {
   }
   const data = await gather();
   return (
-    <div className="wrap" style={{ marginTop: 18 }}>
-      <div className="card" style={{ display: 'flex', gap: 14, justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <div><span className="muted">Latest block</span><div style={{ fontWeight: 600 }}>{data.block}</div></div>
-        <div><span className="muted">Tips sealed</span><div style={{ fontWeight: 600 }}>{data.tips}</div></div>
-        <div><span className="muted">Desks</span><div style={{ fontWeight: 600 }}>{data.desks}</div></div>
-        <div><span className="muted">Canaries alive</span><div style={{ fontWeight: 600 }}>{data.canariesAlive}</div></div>
-        <div>
-          <span className="muted">Last canary renewal</span>
-          <div style={{ fontWeight: 600 }}>{data.lastCanary ? `Expires at block ${data.lastCanary}` : 'None yet'}</div>
+    <div className="wrap">
+      <div className="card" style={{ padding: 0 }}>
+        <div className="metric-row">
+          <div>
+            <span className="muted">Latest block</span>
+            <strong>{data.block}</strong>
+          </div>
+          <div>
+            <span className="muted">Tips sealed</span>
+            <strong>{data.tips}</strong>
+          </div>
+          <div>
+            <span className="muted">Desks</span>
+            <strong>{data.desks}</strong>
+          </div>
+          <div>
+            <span className="muted">Canaries alive</span>
+            <strong>{data.canariesAlive}</strong>
+          </div>
+          <div>
+            <span className="muted">Last canary renewal</span>
+            <strong>{data.lastCanary ? `Block ${data.lastCanary}` : 'None yet'}</strong>
+          </div>
         </div>
       </div>
     </div>

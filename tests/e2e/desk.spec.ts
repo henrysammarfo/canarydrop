@@ -1,5 +1,46 @@
 import { test, expect } from '@playwright/test';
 
+test('overview keeps keys in one compact row', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/desk', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByText('Desk identity')).toHaveCount(0);
+  await expect(page.locator('.keys-bar')).toBeVisible();
+  await expect(page.locator('.keys-bar').getByText('Creator')).toBeVisible();
+});
+
+test('overview canary card fills the lifetime gap when alive', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/desk', { waitUntil: 'load' });
+  await page.getByText('Loading the live desk from Arkiv…').waitFor({ state: 'hidden', timeout: 45_000 }).catch(() => undefined);
+  const alive = page.getByText(/^Alive$/);
+  if ((await alive.count()) === 0) return;
+  await expect(page.getByRole('progressbar', { name: /canary lifetime remaining/i })).toBeVisible();
+  await expect(page.getByText(/of this lifetime is left/i)).toBeVisible();
+  await expect(page.getByText(/Next renewal due|This lifetime has ended/i)).toBeVisible();
+});
+
+test('desk first visit does not toast a generic error', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/desk', { waitUntil: 'load' });
+  await page.getByText('Loading the live desk from Arkiv…').waitFor({ state: 'hidden', timeout: 45_000 }).catch(() => undefined);
+  await expect(page.getByText('Something went wrong. Please try again.')).toHaveCount(0);
+  await expect(page.getByText('Demo mode is off.')).toHaveCount(0);
+});
+
+test('renew canary is hidden until a live canary exists', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/desk', { waitUntil: 'load' });
+  await page.getByText('Loading the live desk from Arkiv…').waitFor({ state: 'hidden', timeout: 45_000 }).catch(() => undefined);
+  const renew = page.getByRole('button', { name: /^Renew canary$/ });
+  if ((await renew.count()) > 0) {
+    await expect(renew.first()).toBeEnabled();
+  } else {
+    await expect(
+      page.getByText(/no live canary to renew|no live canary yet|Checking the live canary|Still reading the live canary/i),
+    ).toBeVisible();
+  }
+});
+
 test('desk page has a single main landmark', async ({ page }) => {
   await page.goto('/desk', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('main')).toHaveCount(1);
@@ -31,7 +72,7 @@ test('create demo desk shows a success notice and drops the stale key warning', 
   const box = demo.locator('input[type="checkbox"]');
   if (!(await box.isChecked())) await box.check();
   await expect(page.getByText(/Demo mode is on/i)).toBeVisible({ timeout: 15_000 });
-  await page.getByRole('button', { name: 'keys' }).click();
+  await page.goto('/desk/settings');
   const createBtn = page.getByRole('button', { name: /Create demo desk/i });
   try {
     await expect(createBtn.first()).toBeEnabled({ timeout: 15_000 });
@@ -68,6 +109,24 @@ test('create demo desk shows a success notice and drops the stale key warning', 
   await expect(page.getByText(/The live desk still has an older public key/i)).toHaveCount(0);
 });
 
+test('desk sidebar marks the active page and opens each section', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/desk', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('aside[aria-label="Desk navigation"] a[aria-current="page"]')).toHaveText(/Overview/);
+  await page.locator('aside').getByRole('link', { name: 'Inbox', exact: true }).click();
+  await expect(page).toHaveURL(/\/desk\/inbox/);
+  await expect(page.getByRole('heading', { name: 'Inbox' })).toBeVisible();
+  await page.locator('aside').getByRole('link', { name: 'Canary', exact: true }).click();
+  await expect(page).toHaveURL(/\/desk\/canary/);
+  await page.locator('aside').getByRole('link', { name: 'Replies' }).click();
+  await expect(page).toHaveURL(/\/desk\/replies/);
+  await page.locator('aside').getByRole('link', { name: 'Desk settings' }).click();
+  await expect(page).toHaveURL(/\/desk\/settings/);
+  await page.locator('aside').getByRole('link', { name: 'Explorer' }).click();
+  await expect(page).toHaveURL(/\/explorer/);
+  await expect(page.locator('aside a[aria-current="page"]')).toHaveText(/Explorer/);
+});
+
 test('desk demo mode toggle is usable without a wallet', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/desk', { waitUntil: 'load' });
@@ -76,8 +135,11 @@ test('desk demo mode toggle is usable without a wallet', async ({ page }) => {
   const box = demo.locator('input[type="checkbox"]');
   if (!(await box.isChecked())) await box.check();
   await expect(page.getByText(/Demo mode is on/i)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Demo mode is off.')).toHaveCount(0);
+  await expect(page.getByText('Something went wrong. Please try again.')).toHaveCount(0);
   await expect(page.getByText(/Please use the site to send this request/i)).toHaveCount(0);
-  await page.getByRole('button', { name: 'inbox' }).click();
+  await page.locator('aside').getByRole('link', { name: 'Inbox', exact: true }).click();
+  await expect(page).toHaveURL(/\/desk\/inbox/);
   await expect(page.getByText(/Older tips load from Arkiv/i)).toBeVisible();
   await expect(page.getByRole('button', { name: /load older tips/i })).toBeVisible();
 });

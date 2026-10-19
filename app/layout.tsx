@@ -1,17 +1,10 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 import { headers } from 'next/headers';
-import { Sora } from 'next/font/google';
-import Nav from '@/components/Nav';
-import Footer from '@/components/Footer';
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
 import { ToastProvider } from '@/components/Toast';
-
-const sora = Sora({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  display: 'swap',
-  variable: '--font-sora',
-});
 
 export const metadata: Metadata = {
   title: 'CanaryDrop · Tips that cannot be seized',
@@ -25,20 +18,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   const nonce = headers().get('x-nonce') ?? undefined;
   return (
-    <html lang="en" className={sora.variable}>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body data-nonce={nonce}>
         <ToastProvider>
           <a className="skip-link" href="#main">
             Skip to content
           </a>
-          <div className="container">
-            <Nav />
-            <main id="main">{children}</main>
-            <Footer />
-          </div>
+          {children}
         </ToastProvider>
       </body>
     </html>

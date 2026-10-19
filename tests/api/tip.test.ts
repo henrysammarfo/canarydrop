@@ -48,7 +48,11 @@ describe('api/tip validation', () => {
 
   it('dry run of a missing desk returns no_desk rather than paying', async () => {
     const wire = Buffer.alloc(80, 1).toString('base64');
-    const r = await POST(postJson('http://localhost:3000/api/tip?dryRun=1', { deskKey: HEX_KEY, wireB64: wire, lifetime: '24h' }));
+    let r = await POST(postJson('http://localhost:3000/api/tip?dryRun=1', { deskKey: HEX_KEY, wireB64: wire, lifetime: '24h' }));
+    for (let i = 0; i < 4 && r.status === 429; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 1200 * (i + 1)));
+      r = await POST(postJson('http://localhost:3000/api/tip?dryRun=1', { deskKey: HEX_KEY, wireB64: wire, lifetime: '24h' }));
+    }
     const j = await r.json();
     expect(r.status).toBe(400);
     expect(j.error).toBe('no_desk');

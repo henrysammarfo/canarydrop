@@ -1,13 +1,16 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { shortHex } from '@/lib/chain';
 import { connectTiramisu, existingAccount } from '@/lib/wallet';
 import { useToast } from './Toast';
+import { IcoMenu } from './ui/icons';
 
 export default function Nav() {
   const push = useToast();
+  const pathname = usePathname();
   const [addr, setAddr] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const deskCreator = /^0x[0-9a-fA-F]{40}$/.test(process.env.NEXT_PUBLIC_DESK_ADDRESS || '')
@@ -34,38 +37,33 @@ export default function Nav() {
 
   useEffect(() => {
     function onResize() {
-      if (window.innerWidth > 900) setOpen(false);
+      if (window.innerWidth > 1100) setOpen(false);
     }
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  const items = [
+    { href: '/#how', label: 'How it works' },
+    { href: '/submit', label: 'Submit' },
+    { href: '/desk', label: 'Desk' },
+    { href: `/canary/${deskCreator}`, label: 'Canary' },
+    { href: '/explorer', label: 'Explorer' },
+    { href: '/docs', label: 'Docs' },
+  ];
+
   const links = (
     <>
-      <a href="/#how" onClick={() => setOpen(false)}>
-        How it works
-      </a>
-      <Link href="/submit" onClick={() => setOpen(false)}>
-        Submit
-      </Link>
-      <Link href="/desk" onClick={() => setOpen(false)}>
-        Desk
-      </Link>
-      <Link href={`/canary/${deskCreator}`} onClick={() => setOpen(false)}>
-        Canary
-      </Link>
-      <Link href="/explorer" onClick={() => setOpen(false)}>
-        Explorer
-      </Link>
-      <Link href="/how" onClick={() => setOpen(false)}>
-        Arkiv
-      </Link>
-      <Link href="/verify" onClick={() => setOpen(false)}>
-        Verify
-      </Link>
-      <Link href="/docs" onClick={() => setOpen(false)}>
-        Docs
-      </Link>
+      {items.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          aria-current={pathname === item.href ? 'page' : undefined}
+          onClick={() => setOpen(false)}
+        >
+          {item.label}
+        </Link>
+      ))}
     </>
   );
 
@@ -74,28 +72,27 @@ export default function Nav() {
       <div className="wrap nav-inner">
         <div className="nav-left">
           <Link href="/" className="logo" aria-label="Home">
-            <span className="logo-mark">[ CANARYDROP ]</span>
+            <span className="logo-mark">CANARYDROP</span>
           </Link>
-          <span className="pill testnet-pill">TESTNET</span>
+          <span className="pill testnet-pill">Testnet</span>
           <nav className="nav-links" aria-label="Primary">
             {links}
           </nav>
         </div>
         <div className="nav-right">
           <span className="pill network-pill">Tiramisu testnet</span>
-          <button type="button" className="btn connect" onClick={connect}>
+          <button type="button" className="btn connect sm" onClick={() => void connect()}>
             {addr ? `Wallet ${shortHex(addr)}` : 'Connect wallet'}
-            <span className="arrow" aria-hidden="true" />
           </button>
           <button
             type="button"
-            className="btn hamburger"
+            className="btn hamburger icon-btn"
             aria-label={open ? 'Close menu' : 'Open menu'}
             aria-expanded={open}
             aria-controls="mobile-menu"
             onClick={() => setOpen((v) => !v)}
           >
-            ☰
+            <IcoMenu />
           </button>
         </div>
       </div>
@@ -103,14 +100,19 @@ export default function Nav() {
         <div className="wrap">
           <div className="card nav-panel-inner">
             {links}
+            <Link href="/verify" onClick={() => setOpen(false)}>
+              Verify
+            </Link>
+            <Link href="/how" onClick={() => setOpen(false)}>
+              How we use Arkiv
+            </Link>
             <a href="https://github.com/henrysammarfo/canarydrop" target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>
               GitHub
             </a>
             <div className="nav-panel-actions">
               <span className="pill">Tiramisu testnet</span>
-              <button type="button" className="btn primary" onClick={connect}>
+              <button type="button" className="btn primary sm" onClick={() => void connect()}>
                 {addr ? `Wallet ${shortHex(addr)}` : 'Connect wallet'}
-                <span className="arrow" aria-hidden="true" />
               </button>
             </div>
           </div>

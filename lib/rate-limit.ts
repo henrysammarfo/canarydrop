@@ -2,6 +2,7 @@ import { Ratelimit } from '@upstash/ratelimit';
 import type { Redis } from '@upstash/redis';
 import {
   IP_RATE_MAX_DESK,
+  IP_RATE_MAX_READ,
   IP_RATE_MAX_RELAY,
   IP_RATE_WINDOW_MS,
   REDIS_RL_PREFIX,
@@ -49,6 +50,8 @@ export class SlidingWindow {
 
 export const relayIpWindow = new SlidingWindow(IP_RATE_WINDOW_MS, IP_RATE_MAX_RELAY);
 export const deskIpWindow = new SlidingWindow(IP_RATE_WINDOW_MS, IP_RATE_MAX_DESK);
+export const relayReadIpWindow = new SlidingWindow(IP_RATE_WINDOW_MS, IP_RATE_MAX_READ);
+export const deskReadIpWindow = new SlidingWindow(IP_RATE_WINDOW_MS, IP_RATE_MAX_READ);
 
 const gateCache = new Map<string, IpLimiter>();
 let injectedLimiter: IpLimiter | null | undefined;
@@ -74,16 +77,21 @@ export function setIpLimiterForTests(limiter: IpLimiter | null | undefined): voi
 export function resetRateLimitForTests(): void {
   relayIpWindow.reset();
   deskIpWindow.reset();
+  relayReadIpWindow.reset();
+  deskReadIpWindow.reset();
   injectedLimiter = undefined;
   gateCache.clear();
 }
 
 function maxFor(bucket: IpBucket): number {
-  return bucket === 'desk' || bucket === 'desk-read' ? IP_RATE_MAX_DESK : IP_RATE_MAX_RELAY;
+  if (bucket === 'desk-read' || bucket === 'relay-read') return IP_RATE_MAX_READ;
+  return bucket === 'desk' ? IP_RATE_MAX_DESK : IP_RATE_MAX_RELAY;
 }
 
 function memoryFor(bucket: IpBucket): SlidingWindow {
-  return bucket === 'desk' || bucket === 'desk-read' ? deskIpWindow : relayIpWindow;
+  if (bucket === 'desk-read') return deskReadIpWindow;
+  if (bucket === 'relay-read') return relayReadIpWindow;
+  return bucket === 'desk' ? deskIpWindow : relayIpWindow;
 }
 
 function cachedGate(bucket: IpBucket, redis: Redis, max: number): IpLimiter {

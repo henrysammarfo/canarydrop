@@ -60,3 +60,19 @@ export function olderDemoLabel(flags: ExplorerRowFlags): string | null {
   if (flags.olderDemoCanary) return 'Older demo canary, replaced';
   return null;
 }
+
+export type ExplorerBadge = { short: string; full: string };
+
+export const SEALED_BADGE: ExplorerBadge = {
+  short: 'Sealed',
+  full: 'Sealed: nobody can change it',
+};
+
+export function explorerTypeBadges(flags: ExplorerRowFlags): ExplorerBadge[] {
+  const out: ExplorerBadge[] = [];
+  if (flags.impostor) out.push({ short: 'Impostor', full: 'Ignored impostor' });
+  if (flags.canonicalDemo) out.push({ short: 'Canonical', full: 'Canonical demo desk' });
+  const older = olderDemoLabel(flags);
+  if (older) out.push({ short: 'Replaced', full: older });
+  return out;
+}

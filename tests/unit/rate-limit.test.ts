@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { SlidingWindow, allowIp } from '@/lib/rate-limit';
+import { afterEach, describe, expect, it } from 'vitest';
+import { SlidingWindow, allowIp, resetRateLimitForTests } from '@/lib/rate-limit';
+import { IP_RATE_MAX_READ } from '@/lib/constants';
 
 describe('sliding window', () => {
   it('allows the first request', () => {
@@ -44,6 +45,10 @@ describe('sliding window', () => {
 });
 
 describe('allowIp memory path', () => {
+  afterEach(() => {
+    resetRateLimitForTests();
+  });
+
   it('allows then fills the process window', async () => {
     const ip = '198.51.100.99';
     for (let i = 0; i < 8; i++) {
@@ -51,5 +56,14 @@ describe('allowIp memory path', () => {
     }
     expect(await allowIp('relay', ip)).toBe(false);
     expect(await allowIp('relay', '198.51.100.100')).toBe(true);
+  });
+
+  it('gives chain snapshot reads a higher window than writes', async () => {
+    const ip = '198.51.100.77';
+    for (let i = 0; i < IP_RATE_MAX_READ; i++) {
+      expect(await allowIp('desk-read', ip)).toBe(true);
+    }
+    expect(await allowIp('desk-read', ip)).toBe(false);
+    expect(await allowIp('desk', ip)).toBe(true);
   });
 });

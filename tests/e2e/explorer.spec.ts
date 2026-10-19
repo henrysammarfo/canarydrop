@@ -44,6 +44,38 @@ test('explorer desks keep canonical and impostor labels and mark replaced demo r
   }
 });
 
+for (const width of [1024, 1280, 1440, 1920] as const) {
+  test(`${width} explorer flags stay inside their cells`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/explorer', { waitUntil: 'domcontentloaded' });
+    await expect.poll(() => explorerTableText(page), { timeout: 45_000 }).toMatch(/tip|desk|canary/i);
+    const clipped = await page.evaluate(() => {
+      const wrap = document.querySelector('.table-wrap');
+      const table = document.querySelector('.data-table');
+      if (!wrap || !table) return [{ text: 'missing table', overflowRight: 1, overflowLeft: 0 }];
+      const wr = wrap.getBoundingClientRect();
+      const nodes = [
+        ...table.querySelectorAll('.flag'),
+        ...table.querySelectorAll('.actions-cell .btn'),
+      ];
+      return nodes.flatMap((el) => {
+        const cell = el.closest('td') ?? el;
+        const r = el.getBoundingClientRect();
+        const cr = cell.getBoundingClientRect();
+        const visibleInWrap = r.right > wr.left + 1 && r.left < wr.right - 1;
+        const cutByWrap = visibleInWrap && (r.right - wr.right > 1 || wr.left - r.left > 1);
+        const overflowRight = r.right - cr.right;
+        const overflowLeft = cr.left - r.left;
+        if (cutByWrap || overflowRight > 1 || overflowLeft > 1) {
+          return [{ text: (el.textContent ?? '').trim(), overflowRight, overflowLeft, cutByWrap }];
+        }
+        return [];
+      });
+    });
+    expect(clipped, `${width}px ${JSON.stringify(clipped)}`).toEqual([]);
+  });
+}
+
 test('explorer canaries mark the replaced demo canary', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/explorer', { waitUntil: 'domcontentloaded' });

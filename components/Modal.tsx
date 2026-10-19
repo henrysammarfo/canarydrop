@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 
 type ModalProps = {
   open: boolean;
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   busy?: boolean;
@@ -84,13 +84,20 @@ export default function Modal({
           {title}
         </h2>
         <div className="modal-body">{children}</div>
-        <div className="ctaRow" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
+        <div className="ctaRow" style={{ justifyContent: 'flex-end', marginTop: 18 }}>
           <button type="button" className="btn" onClick={onClose} disabled={busy}>
             {cancelLabel}
           </button>
           {onConfirm && (
             <button type="button" className="btn primary" onClick={onConfirm} disabled={busy}>
-              {busy ? 'Working' : confirmLabel} <span className="arrow" aria-hidden="true" />
+              {busy ? (
+                <>
+                  <span className="spinner" aria-hidden="true" />
+                  Working
+                </>
+              ) : (
+                confirmLabel
+              )}
             </button>
           )}
         </div>
