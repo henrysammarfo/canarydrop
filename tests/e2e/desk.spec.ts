@@ -102,10 +102,15 @@ test('create demo desk shows a success notice and drops the stale key warning', 
     });
   });
   await createBtn.first().click();
-  await expect(page.getByRole('status').filter({ hasText: /Desk and canary created/i })).toBeVisible({
+  await expect(page.locator('.page-note').filter({ hasText: /Desk and canary created/i })).toBeVisible({
     timeout: 20_000,
   });
-  await expect(page.getByText(/This browser now uses the new live desk/i)).toBeVisible();
+  await expect(page.locator('.page-note').getByText(/This browser now uses the new live desk/i)).toBeVisible();
+  const toast = page.locator('.toast-stack .toast').filter({ hasText: /Desk and canary created/i });
+  await expect(toast).toBeVisible();
+  const toastBox = await toast.boundingBox();
+  expect(toastBox, 'toast sits under the topbar, not the caption bar').toBeTruthy();
+  expect(toastBox!.y).toBeLessThan(120);
   await expect(page.getByText(/The live desk still has an older public key/i)).toHaveCount(0);
 });
 

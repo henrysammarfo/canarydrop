@@ -25,14 +25,14 @@ describe('judge proofs helpers', () => {
     expect(queryPredicate({ toString: () => text })).toBe(text);
   });
 
-  it('treats a 20 second proof cache as fresh, then stale', () => {
+  it('treats a 45 second proof cache as fresh, then stale', () => {
     expect(isFreshProofCache(1_000, 1_000 + PROOF_CACHE_MS - 1)).toBe(true);
     expect(isFreshProofCache(1_000, 1_000 + PROOF_CACHE_MS)).toBe(false);
     expect(isFreshProofCache(1_000, 500)).toBe(false);
   });
 
   it('uses plain English for chain read failures and empty sealed tips', () => {
-    expect(CHAIN_READ_FAILED).toBe('Could not read Tiramisu right now. Please reload in a moment.');
+    expect(CHAIN_READ_FAILED).toBe('Could not read Tiramisu right now. This page will try again on its own.');
     expect(CHAIN_READ_FAILED).not.toMatch(/ECONNRESET|stack|failed to fetch/i);
     expect(SEALED_TIPS_EMPTY).toMatch(/No live sealed tips/);
     expect(SEALED_TIPS_EMPTY).toMatch(/27 Oct 2026/);

@@ -17,6 +17,9 @@ export type DeskLiveView = {
   createdAt: bigint | null;
   currentBlock: bigint | null;
   blockDuration: number;
+  stale: boolean;
+  staleAgeMs: number;
+  note: string | null;
 };
 
 export type ExplorerLiveView = {
@@ -27,6 +30,9 @@ export type ExplorerLiveView = {
   currentBlock: bigint | null;
   blockDuration: number;
   canonicalDeskKey: Hex | null;
+  stale: boolean;
+  staleAgeMs: number;
+  note: string | null;
 };
 
 function asBigint(value: string | null | undefined): bigint | null {
@@ -55,6 +61,9 @@ export function hydrateDeskLive(j: DeskLive): DeskLiveView {
     createdAt: asBigint(j.createdAt),
     currentBlock: asBigint(j.currentBlock),
     blockDuration: j.blockDuration || 2,
+    stale: j.stale === true,
+    staleAgeMs: typeof j.staleAgeMs === 'number' ? j.staleAgeMs : 0,
+    note: typeof j.note === 'string' ? j.note : null,
   };
 }
 
@@ -81,6 +90,9 @@ export async function fetchExplorerLive(
     currentBlock: asBigint(j.currentBlock),
     blockDuration: j.blockDuration || 2,
     canonicalDeskKey: j.canonicalDeskKey,
+    stale: j.stale === true,
+    staleAgeMs: typeof j.staleAgeMs === 'number' ? j.staleAgeMs : 0,
+    note: typeof j.note === 'string' ? j.note : null,
   };
 }
 
@@ -92,6 +104,9 @@ export async function fetchInboxLive(
   cursor: string | undefined;
   atBlock: bigint;
   hasMore: boolean;
+  stale: boolean;
+  staleAgeMs: number;
+  note: string | null;
 }> {
   const q = new URLSearchParams({ deskKey });
   if (opts && opts.cursor) q.set('cursor', opts.cursor);
@@ -108,5 +123,8 @@ export async function fetchInboxLive(
     cursor: j.cursor ?? undefined,
     atBlock: BigInt(j.atBlock),
     hasMore: j.hasMore,
+    stale: j.stale === true,
+    staleAgeMs: typeof j.staleAgeMs === 'number' ? j.staleAgeMs : 0,
+    note: typeof j.note === 'string' ? j.note : null,
   };
 }

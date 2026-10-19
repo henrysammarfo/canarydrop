@@ -1,7 +1,6 @@
 import type { Hex } from 'viem';
 import evidence from '@/arkiv/evidence.json';
 import {
-  canaryAlive,
   canaryAtBlock,
   chainEntityCount,
   countBySlot,
@@ -21,15 +20,19 @@ import {
   DEFAULT_RELAY,
   PROJECT,
   PROOF_CACHE_MS,
+  PROOF_STALE_MS,
   SEALED_TIPS_EMPTY,
 } from './constants';
+import { rememberRead } from './data-cache';
+import { loadDeskLive } from './live-read';
+import { StaleCache } from './read-cache';
+import { withReadBackoff } from './retry';
+import { showingDataFrom } from './stale-copy';
 import { atBlockAbsenceDetail } from './at-block-copy';
 import { addressUrl, entityUrl, isSealedOwner, txUrl } from './chain';
-import { preferPubForCreator } from './demo-pub';
 import { eq, gt, or } from '@arkiv-network/sdk/query';
 import { key, u64 } from '@arkiv-network/sdk/attr';
 import { utcDaySlot } from './day';
-import { sleep, withBackoff } from './retry';
 
 export type ProofLink = { label: string; href: string };
 
@@ -51,6 +54,9 @@ export type ArkivProofs = {
   chainEntities: string;
   claims: ProofClaim[];
   seedTxs: ProofLink[];
+  fetchedAt: number;
+  stale: boolean;
+  note: string | null;
 };
 
 function entityLinks(keys: readonly string[], cap = 6): ProofLink[] {
@@ -77,28 +83,50 @@ function logChainRead(scope: string, err: unknown) {
   console.error(`CanaryDrop proofs ${scope}:`, clipped);
 }
 
-let proofCache: { at: number; value: ArkivProofs } | null = null;
+const proofStore = new StaleCache({ freshMs: PROOF_CACHE_MS, staleMs: PROOF_STALE_MS });
 
 export function clearArkivProofsCache() {
-  proofCache = null;
+  proofStore.clear();
+}
+
+function skeletonProofs(): ArkivProofs {
+  return {
+    head: 'n/a',
+    chainEntities: 'n/a',
+    claims: [],
+    seedTxs: seedTxLinks(),
+    fetchedAt: Date.now(),
+    stale: false,
+    note: CHAIN_READ_FAILED,
+  };
 }
 
 export async function gatherArkivProofs(): Promise<ArkivProofs> {
-  const now = Date.now();
-  if (proofCache && isFreshProofCache(proofCache.at, now)) return proofCache.value;
-  const value = await gatherArkivProofsUncached();
-  proofCache = { at: now, value };
-  return value;
+  const result = await proofStore.get(
+    'proofs',
+    () => rememberRead('proofs', gatherArkivProofsUncached),
+    {
+      fallback: skeletonProofs,
+    },
+  );
+  const age = Math.max(0, Date.now() - result.at);
+  return {
+    ...result.value,
+    fetchedAt: result.at,
+    stale: result.stale,
+    note: result.stale ? showingDataFrom(age) : result.value.note,
+  };
 }
 
 async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
-  const head = await headBlock();
+  const live = await loadDeskLive(DEFAULT_DESK);
+  const head = live.currentBlock ? BigInt(live.currentBlock) : await withReadBackoff(() => headBlock());
   const hourAgo = head > 1800n ? head - 1800n : 0n;
   const claims: ProofClaim[] = [];
 
   let chainEntities = 'n/a';
   try {
-    chainEntities = String(await chainEntityCount());
+    chainEntities = String(await withReadBackoff(() => chainEntityCount()));
   } catch {
     chainEntities = 'n/a';
   }
@@ -106,11 +134,7 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
   const sealedQuery = sealedTipsQueryText();
 
   try {
-    const desk = await withBackoff(
-      () => getDesk(DEFAULT_DESK, preferPubForCreator(DEFAULT_DESK)),
-      8,
-      (ms) => sleep(Math.max(400, ms)),
-    );
+    const deskKey = live.deskKey;
     const q = pub()
       .select({ key: true })
       .where(eq('project', PROJECT), eq('type', 'desk'), gt('$expiresAt', u64(head)))
@@ -120,55 +144,53 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
       title: 'Only the real desk wallet counts',
       why: 'A fake desk with the same name is ignored. Reads are pinned to the newsroom wallet.',
       query: queryPredicate(q),
-      ok: !!desk,
-      detail: desk
+      ok: !!deskKey,
+      detail: deskKey
         ? 'This is the live desk for the newsroom wallet.'
-        : 'No live desk for the demo wallet.',
+        : live.note && !live.stale
+          ? live.note
+          : 'No live desk for the demo wallet.',
       facts: [
-        ...(desk ? [{ label: 'Desk', value: desk.key }] : []),
+        ...(deskKey ? [{ label: 'Desk', value: deskKey }] : []),
         { label: 'Creator', value: DEFAULT_DESK },
       ],
-      links: desk
+      links: deskKey
         ? [
-            { label: 'Desk entity', href: entityUrl(desk.key) },
+            { label: 'Desk entity', href: entityUrl(deskKey) },
             { label: 'Desk wallet', href: addressUrl(DEFAULT_DESK) },
           ]
         : [{ label: 'Desk wallet', href: addressUrl(DEFAULT_DESK) }],
     });
 
-    if (desk) {
-      const canary = await withBackoff(() => canaryAlive(DEFAULT_DESK, desk.key), 4, (ms) => sleep(Math.max(300, ms)));
+    if (deskKey) {
+      const canaryKey = live.canaryKey;
       const cq = pub()
         .select({ key: true, expiresAt: true, creationFlags: true })
-        .where(eq('project', PROJECT), eq('type', 'canary'), eq('desk', key(desk.key)), gt('$expiresAt', u64(head)))
+        .where(eq('project', PROJECT), eq('type', 'canary'), eq('desk', key(deskKey)), gt('$expiresAt', u64(head)))
         .createdBy(DEFAULT_DESK);
-      const flags = canary?.creationFlags;
-      const flagText = flags
-        ? `readonly ${flags.readonly ? 'yes' : 'no'}, anyone can extend ${flags.permissionlessExtension ? 'yes' : 'no'}.`
-        : 'Flags not returned.';
       claims.push({
         id: 'expiry',
         title: 'The canary dies if it is not renewed',
         why: 'Expiry is the signal. There is no off chain flag a seized server can flip.',
         query: queryPredicate(cq),
-        ok: !!canary,
-        detail: canary
-          ? `Alive. Expires at block ${canary.expiresAt?.toString() ?? 'n/a'}. ${flagText}`
+        ok: !!canaryKey,
+        detail: canaryKey
+          ? `Alive. Expires at block ${live.expiresAt ?? 'n/a'}.`
           : 'Gone. No live canary for this desk.',
-        facts: canary ? [{ label: 'Canary', value: canary.key }] : [],
-        links: canary
+        facts: canaryKey ? [{ label: 'Canary', value: canaryKey }] : [],
+        links: canaryKey
           ? [
-              { label: 'Canary entity', href: entityUrl(canary.key) },
+              { label: 'Canary entity', href: entityUrl(canaryKey) },
               { label: 'Public canary page', href: `/canary/${DEFAULT_DESK}` },
             ]
           : [{ label: 'Public canary page', href: `/canary/${DEFAULT_DESK}` }],
       });
 
-      const past = await withBackoff(() => canaryAtBlock(DEFAULT_DESK, desk.key, hourAgo), 4, (ms) => sleep(Math.max(300, ms)));
+      const past = await withReadBackoff(() => canaryAtBlock(DEFAULT_DESK, deskKey, hourAgo));
       const absence = atBlockAbsenceDetail({
         hourAgo,
         pastAlive: past !== null,
-        createdAt: canary?.createdAt,
+        createdAt: live.createdAt ? BigInt(live.createdAt) : null,
       });
       claims.push({
         id: 'atBlock',
@@ -194,7 +216,7 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
   }
 
   try {
-    const page = await withBackoff(() => sealedTips(), 4, (ms) => sleep(Math.max(400, ms)));
+    const page = await withReadBackoff(() => sealedTips());
     const keys = page.entities.map((e) => e.key).filter((k): k is Hex => !!k);
     const allSealed = page.entities.every((e) => isSealedOwner(e.owner));
     const readonly = page.entities.filter((e) => e.creationFlags?.readonly).length;
@@ -229,7 +251,7 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
   }
 
   try {
-    const fake = await getDesk(DEFAULT_IMPOSTOR);
+    const fake = await withReadBackoff(() => getDesk(DEFAULT_IMPOSTOR));
     claims.push({
       id: 'impostor',
       title: 'An impostor desk does not match',
@@ -264,7 +286,7 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
   }
 
   try {
-    const used = await countBySlot('tip', DEFAULT_RELAY, utcDaySlot());
+    const used = await withReadBackoff(() => countBySlot('tip', DEFAULT_RELAY, utcDaySlot()));
     claims.push({
       id: 'slot',
       title: 'Daily spend uses a slot attribute',
@@ -288,7 +310,7 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
   }
 
   try {
-    const nonce = await mintNonce(DEFAULT_RELAY);
+    const nonce = await withReadBackoff(() => mintNonce(DEFAULT_RELAY));
     claims.push({
       id: 'nonce',
       title: 'Entity mint nonce is not the Ethereum nonce',
@@ -312,7 +334,7 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
   }
 
   try {
-    const mixed = await tipsOrCanaries();
+    const mixed = await withReadBackoff(() => tipsOrCanaries());
     claims.push({
       id: 'or',
       title: 'One query can ask for tips or canaries',
@@ -372,5 +394,8 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
     chainEntities,
     claims,
     seedTxs: seedTxLinks(),
+    fetchedAt: Date.now(),
+    stale: false,
+    note: null,
   };
 }

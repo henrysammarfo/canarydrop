@@ -7,13 +7,13 @@ export type AtBlockAbsence = {
 export function atBlockAbsenceDetail(opts: {
   hourAgo: bigint;
   pastAlive: boolean;
-  createdAt?: bigint | undefined;
+  createdAt?: bigint | null | undefined;
 }): AtBlockAbsence {
   const hourAgo = opts.hourAgo.toString();
   if (opts.pastAlive) {
     return { ok: true, detail: `ALIVE at block ${hourAgo}.` };
   }
-  if (opts.createdAt !== undefined && opts.createdAt > opts.hourAgo) {
+  if (opts.createdAt != null && opts.createdAt > opts.hourAgo) {
     return {
       ok: true,
       detail: `This canary did not exist yet about an hour ago. It was created at block ${opts.createdAt.toString()}.`,

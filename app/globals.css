@@ -1005,8 +1005,9 @@ label.small {
 
 .toast-stack {
   position: fixed;
+  top: calc(var(--topbar) + 12px);
   right: 16px;
-  bottom: 16px;
+  bottom: auto;
   z-index: 90;
   display: grid;
   gap: 8px;
@@ -1305,6 +1306,9 @@ label.small {
 .reply-row { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .reply-row input { flex: 1 1 auto; height: 36px; }
 .reply-row .btn { height: 36px; }
+.reply-sent { margin: 0; }
+tr[id^="reply-"] { scroll-margin-top: calc(var(--topbar) + 16px); }
+.stale-note { margin: 12px 0; }
 
 .app-top .ctaRow { align-items: center; }
 .app-top .pill { height: 28px; }

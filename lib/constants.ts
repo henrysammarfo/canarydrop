@@ -31,8 +31,11 @@ export const IP_RATE_MAX_DESK = 8;
 /** Same-origin chain snapshots. Higher than writes so Overview, Explorer, and Inbox can retry. */
 export const IP_RATE_MAX_READ = 40;
 
-/** Coalesce first-visit reads from Overview, Submit, and Explorer. */
-export const LIVE_CACHE_MS = 20_000;
+/** Fresh window for server chain snapshots. Shared by memory and Next data cache. */
+export const LIVE_CACHE_MS = 45_000;
+export const LIVE_CACHE_S = Math.round(LIVE_CACHE_MS / 1000);
+/** Serve the last good snapshot this long when Tiramisu rate limits or fails. */
+export const LIVE_STALE_MS = 15 * 60 * 1000;
 
 /** Shared Redis key prefixes. Rest tokens never go in these names. */
 export const REDIS_RL_PREFIX = 'cd:rl';
@@ -45,6 +48,9 @@ export const WALLET_LOCK_RETRY_MS = 50;
 
 export const CHAIN_RETRY_ATTEMPTS = 4;
 export const CHAIN_RETRY_BASE_MS = 50;
+/** Reads retry once with a slower, jittered pause so 429s are not amplified. */
+export const CHAIN_READ_RETRY_ATTEMPTS = 2;
+export const CHAIN_READ_RETRY_BASE_MS = 700;
 
 export const CSRF_COOKIE = 'cd_csrf';
 export const CSRF_HEADER = 'x-csrf-token';
@@ -58,9 +64,10 @@ export const DEMO_TIP_LIVE_UNTIL = new Date('2026-10-27T23:59:59.000Z');
 export const SEALED_TIPS_EMPTY =
   'No live sealed tips right now. Earlier demo tips have expired. Send a new tip from Submit. New tips last at least until 27 Oct 2026.';
 
-export const CHAIN_READ_FAILED = 'Could not read Tiramisu right now. Please reload in a moment.';
+export const CHAIN_READ_FAILED = 'Could not read Tiramisu right now. This page will try again on its own.';
 
-export const PROOF_CACHE_MS = 20_000;
+export const PROOF_CACHE_MS = LIVE_CACHE_MS;
+export const PROOF_STALE_MS = LIVE_STALE_MS;
 
 export const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 export const ENTITY_KEY_RE = /^0x[0-9a-fA-F]{64}$/;

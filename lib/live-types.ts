@@ -1,6 +1,13 @@
 import type { Hex } from 'viem';
 import type { ExplorerLiveItem } from './explorer-map';
 
+export type LiveFreshness = {
+  fetchedAt: number;
+  stale: boolean;
+  staleAgeMs: number;
+  note: string | null;
+};
+
 export type DeskLive = {
   ok: true;
   creator: Hex;
@@ -13,7 +20,7 @@ export type DeskLive = {
   createdAt: string | null;
   currentBlock: string | null;
   blockDuration: number;
-};
+} & LiveFreshness;
 
 export type ExplorerFilter = 'all' | 'tip' | 'desk' | 'canary' | 'reply' | 'sealed';
 
@@ -26,7 +33,7 @@ export type ExplorerLive = {
   currentBlock: string | null;
   blockDuration: number;
   canonicalDeskKey: Hex | null;
-};
+} & LiveFreshness;
 
 export type InboxLiveTip = {
   key: Hex;
@@ -41,4 +48,4 @@ export type InboxLive = {
   cursor: string | null;
   atBlock: string;
   hasMore: boolean;
-};
+} & LiveFreshness;

@@ -4,17 +4,14 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Hex } from 'viem';
-import { canaryAlive, getDesk } from '@/lib/arkiv';
-import { preferPubForCreatorClient } from '@/lib/demo-pub-client';
 import { bytesToB64 } from '@/lib/bytes';
 import { appFetch } from '@/lib/client-fetch';
 import { CHAIN_READ_FAILED, LIFETIME_KEYS, type Lifetime } from '@/lib/constants';
 import { sealTo } from '@/lib/crypto';
 import { fetchDeskLive } from '@/lib/live-client';
-import { deskPubBytes, parseDeskPayload } from '@/lib/payload';
-import { sleep, withBackoff } from '@/lib/retry';
 import { uiError } from '@/lib/ui-error';
 import Modal from '@/components/Modal';
+import StaleNote from '@/components/ui/StaleNote';
 import { useToast } from '@/components/Toast';
 import { entityUrl, txUrl } from '@/lib/chain';
 import CopyField from '@/components/ui/CopyField';
@@ -32,6 +29,7 @@ export default function SourceDeskPage() {
   const [ok, setOk] = useState<{ tipKey: Hex; txHash: Hex; receipt: JsonWebKey } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
+  const [staleNote, setStaleNote] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,21 +39,7 @@ export default function SourceDeskPage() {
     setDeskPubRaw(null);
     setAlive(null);
     setLookupError(null);
-
-    async function fromChain() {
-      const prefer = await preferPubForCreatorClient(creator);
-      const d = await withBackoff(() => getDesk(creator, prefer), 8, (ms) => sleep(Math.max(400, ms)));
-      if (cancelled) return false;
-      if (d) {
-        setDeskKey(d.key);
-        const parsed = d.payload ? parseDeskPayload(d.payload) : null;
-        if (parsed?.name) setDeskName(parsed.name);
-        setDeskPubRaw(parsed ? deskPubBytes(parsed) : null);
-        const isAlive = await canaryAlive(creator, d.key);
-        if (!cancelled) setAlive(!!isAlive);
-      }
-      return true;
-    }
+    setStaleNote(null);
 
     async function attempt() {
       try {
@@ -66,23 +50,21 @@ export default function SourceDeskPage() {
         setDeskPubRaw(live.deskPub);
         setAlive(live.deskKey ? live.alive : null);
         setLookupError(null);
+        setStaleNote(live.note);
+        if (live.stale || live.note) {
+          timer = window.setTimeout(() => {
+            void attempt();
+          }, 15_000);
+        }
         return;
       } catch {
-        try {
-          const ok = await fromChain();
-          if (ok && !cancelled) {
-            setLookupError(null);
-            return;
-          }
-        } catch {
-          // Keep retrying quietly on a first visit.
-        }
+        // Keep retrying quietly on a first visit.
       }
       if (cancelled) return;
       if (Date.now() < deadline) {
         timer = window.setTimeout(() => {
           void attempt();
-        }, 2500);
+        }, 15_000);
         return;
       }
       setLookupError(CHAIN_READ_FAILED);
@@ -133,12 +115,13 @@ export default function SourceDeskPage() {
         <p className="lead" style={{ marginTop: 10 }}>
           Synthetic data only. Your tip is locked on your device before you send it. Only the newsroom can open it.
         </p>
+        <StaleNote text={staleNote} />
         <div className="page-note" style={{ marginTop: 16 }}>
           You do not need a wallet. We pay the fee.
         </div>
         <p className="muted" style={{ marginTop: 14 }} role="status">
           Canary status:{' '}
-          {lookupError
+          {lookupError && !deskKey
             ? lookupError
             : alive === null
               ? 'unknown'
