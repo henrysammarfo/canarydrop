@@ -9,6 +9,9 @@ import {
   ENTITY_KEY_RE,
   IP_RATE_MAX_DESK,
   IP_RATE_MAX_RELAY,
+  REDIS_LOCK_PREFIX,
+  REDIS_RL_PREFIX,
+  WALLET_LOCK_TTL_MS,
   LIFETIME_KEYS,
   MAX_PLAINTEXT_CHARS,
   MAX_WIRE_BYTES,
@@ -57,6 +60,9 @@ describe('constants', () => {
     expect(CSRF_HEADER).toBe('x-csrf-token');
     expect(IP_RATE_MAX_RELAY).toBe(8);
     expect(IP_RATE_MAX_DESK).toBe(8);
+    expect(REDIS_RL_PREFIX).toBe('cd:rl');
+    expect(REDIS_LOCK_PREFIX).toBe('cd:lock');
+    expect(WALLET_LOCK_TTL_MS).toBe(12_000);
     expect(PRODUCTION_HOST).toBe('canarydrop.vercel.app');
     expect(MAX_WIRE_BYTES).toBe(8192);
     expect(MAX_PLAINTEXT_CHARS).toBe(4000);

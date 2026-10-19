@@ -159,12 +159,14 @@ SDK docs say: a prediction holds only while no other create from this wallet lan
 
 What we do:
 
-- A `SerialQueue` per process for relay writes and desk writes.
+- A Redis lock per paying wallet (`cd:lock:{relay|desk}:{address}`) so two Vercel isolates cannot sign at once.
+- A `SerialQueue` per process inside that lock for relay writes and desk writes.
 - `getTransactionCount({ blockTag: "pending" })` passed into `executeBatch`.
 - Backoff on nonce, 429, timeout, and replacement errors.
 - No retry when `EntityMutationError.txHash` is set. That case means the tx may have landed and a replay would double spend.
+- We do not store the next Ethereum nonce in Redis. A skipped nonce would stall the wallet.
 
-This is still per instance. Two Vercel isolates can race. The Arkiv daily `slot` cap and the GLM floor bound the damage. We do not pretend a process mutex is a global lock.
+If Upstash env vars are missing, this falls back to the process queue and one warning is logged. The Arkiv daily `slot` cap and the GLM floor still bound spend.
 
 ## F10. Anonymous RPC budget
 
@@ -393,7 +395,7 @@ We do not pass `fromBlock` on the first subscribe, because a desk that has been 
 
 1. Demo decrypt on a fresh browser needs a shared P-256 key. Real desks must not use it. We derive it from `DESK_PRIVATE_KEY` at runtime so it is not in git. Production main, until this branch is merged, still only has the key in the creating browser.
 
-2. Per IP rate limits are in memory. That is a Vercel fact. We say so in SECURITY.md instead of calling a Map a durable limiter.
+2. Per IP sliding windows and wallet locks use Upstash Redis when `UPSTASH_REDIS_REST_*` or `KV_REST_API_*` are set. Without those env vars the in process Map and queue remain, and we log one warning. That fallback is honest in SECURITY.md.
 
 3. `style-src 'unsafe-inline'` stays because React sets element styles. Script eval is gone. That is a trade, not a win on every axis.
 
@@ -426,9 +428,9 @@ Cursors are bound to the block they were read at. Mixing a cursor from block N w
 
 `executeBatch(input, { nonce })` is the supported way to pin the Ethereum tx nonce. Reading `getTransactionCount({ blockTag: "pending" })` without passing it in still races because another `eth_sendRawTransaction` can land between the read and the sign.
 
-The SDK wallet client will fill a nonce if you omit it. That is fine for a human MetaMask click. It is not fine for a relay that may have two serverless isolates. We still pass `{ nonce }` so a retry on a 429 does not reuse a consumed prediction by accident: the retry reads pending count again inside the queue.
+The SDK wallet client will fill a nonce if you omit it. That is fine for a human MetaMask click. It is not fine for a relay that may have two serverless isolates. We still pass `{ nonce }` so a retry on a 429 does not reuse a consumed prediction by accident: the retry reads pending count again inside the lock and queue.
 
-`predictEntityKeys` is a separate counter (entity minting nonce). Queueing both reads together is the whole point of `SerialQueue`.
+`predictEntityKeys` is a separate counter (entity minting nonce). The Redis wallet lock plus `SerialQueue` keep both reads together across isolates.
 
 ## F19. JSON helpers are for JSON entities only
 
@@ -455,6 +457,9 @@ The SDK wallet client will fill a nonce if you omit it. That is fine for a human
 | `lib/arkiv.ts` | queries, watch, batch helpers |
 | `lib/relay.ts` | sealed tip write |
 | `lib/retry.ts` | queue and backoff |
+| `lib/store.ts` | Upstash REST creds, fallback warning |
+| `lib/wallet-lock.ts` | distributed lock per relay or desk wallet |
+| `lib/rate-limit.ts` | Upstash sliding window plus in process fallback |
 | `SECURITY.md` | attacks we block and residual risk |
 | `lib/guard.ts` | GLM floor and Arkiv `slot` daily caps |
 

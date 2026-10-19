@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SlidingWindow } from '@/lib/rate-limit';
+import { SlidingWindow, allowIp } from '@/lib/rate-limit';
 
 describe('sliding window', () => {
   it('allows the first request', () => {
@@ -40,5 +40,16 @@ describe('sliding window', () => {
     w.allow('a', 0);
     w.reset();
     expect(w.allow('a', 1)).toBe(true);
+  });
+});
+
+describe('allowIp memory path', () => {
+  it('allows then fills the process window', async () => {
+    const ip = '198.51.100.99';
+    for (let i = 0; i < 8; i++) {
+      expect(await allowIp('relay', ip)).toBe(true);
+    }
+    expect(await allowIp('relay', ip)).toBe(false);
+    expect(await allowIp('relay', '198.51.100.100')).toBe(true);
   });
 });

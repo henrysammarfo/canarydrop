@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import type { Hex } from 'viem';
 import { reply } from '@/lib/arkiv';
 import { b64ToBytes } from '@/lib/bytes';
-import { deskQueue, withBackoff } from '@/lib/retry';
+import { withBackoff } from '@/lib/retry';
+import { withWalletLock } from '@/lib/wallet-lock';
 import { deskAccount, deskWallet, requireDeskEthKey } from '@/lib/demo-wallet';
 import { AppError } from '@/lib/errors';
 import { assertMinBalance, assertDeskSpendRoom } from '@/lib/guard';
@@ -16,7 +17,7 @@ export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
-    const blocked = protectWrite(req, 'desk');
+    const blocked = await protectWrite(req, 'desk');
     if (blocked) return blocked;
     const dryRun = isDryRun(req);
     if (!dryRun) requireDeskEthKey();
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
     const account = deskAccount();
     await assertMinBalance(pub(), account.address);
     await assertDeskSpendRoom(account.address);
-    const out = await deskQueue.enqueue(() =>
+    const out = await withWalletLock('desk', account.address, () =>
       withBackoff(async () => {
         const nonce = await pub().getTransactionCount({ address: account.address, blockTag: 'pending' });
         return reply(deskWallet(), tipKey as Hex, b64ToBytes(wireB64), undefined, { nonce });

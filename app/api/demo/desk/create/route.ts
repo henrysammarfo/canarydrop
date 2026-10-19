@@ -6,7 +6,8 @@ import { AppError } from '@/lib/errors';
 import { assertDeskCreateRoom, assertMinBalance } from '@/lib/guard';
 import { jsonFail, jsonOk } from '@/lib/http';
 import { isDryRun, protectWrite, readJson } from '@/lib/protect';
-import { deskQueue, withBackoff } from '@/lib/retry';
+import { withBackoff } from '@/lib/retry';
+import { withWalletLock } from '@/lib/wallet-lock';
 import { createDeskBody } from '@/lib/schemas';
 import { DEFAULT_DESK } from '@/lib/constants';
 import { asAddress } from '@/lib/hex';
@@ -15,7 +16,7 @@ export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
-    const blocked = protectWrite(req, 'desk');
+    const blocked = await protectWrite(req, 'desk');
     if (blocked) return blocked;
     const dryRun = isDryRun(req);
     if (!dryRun) requireDeskEthKey();
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
     const account = deskAccount();
     await assertMinBalance(pub(), account.address);
     await assertDeskCreateRoom(account.address);
-    const out = await deskQueue.enqueue(() =>
+    const out = await withWalletLock('desk', account.address, () =>
       withBackoff(async () => {
         const nonce = await pub().getTransactionCount({ address: account.address, blockTag: 'pending' });
         return createDesk(deskWallet(), account.address, name, pubRaw, { nonce });

@@ -29,6 +29,15 @@ export const IP_RATE_WINDOW_MS = 60_000;
 export const IP_RATE_MAX_RELAY = 8;
 export const IP_RATE_MAX_DESK = 8;
 
+/** Shared Redis key prefixes. Rest tokens never go in these names. */
+export const REDIS_RL_PREFIX = 'cd:rl';
+export const REDIS_LOCK_PREFIX = 'cd:lock';
+/** Hold a wallet lock long enough for predict, sign, and one backoff. */
+export const WALLET_LOCK_TTL_MS = 12_000;
+/** How long a second isolate waits for the lock before returning try_later. */
+export const WALLET_LOCK_WAIT_MS = 2_000;
+export const WALLET_LOCK_RETRY_MS = 50;
+
 export const CHAIN_RETRY_ATTEMPTS = 4;
 export const CHAIN_RETRY_BASE_MS = 50;
 

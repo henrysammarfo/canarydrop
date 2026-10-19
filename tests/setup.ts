@@ -1,7 +1,8 @@
 import { beforeEach } from 'vitest';
-import { deskIpWindow, relayIpWindow } from '@/lib/rate-limit';
+import { resetRateLimitForTests } from '@/lib/rate-limit';
+import { resetStoreForTests } from '@/lib/store';
 
 beforeEach(() => {
-  relayIpWindow.reset();
-  deskIpWindow.reset();
+  resetStoreForTests();
+  resetRateLimitForTests();
 });

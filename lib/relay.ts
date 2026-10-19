@@ -10,7 +10,8 @@ import { AppError } from './errors';
 import { isPrivateKey } from './hex';
 import { assertWireBytes } from './limits';
 import { assertMinBalance, assertRelaySpendRoom } from './guard';
-import { relayQueue, withBackoff } from './retry';
+import { withBackoff } from './retry';
+import { withWalletLock } from './wallet-lock';
 import { rpcHttp } from './rpc';
 
 function requireRelayKey(): Hex {
@@ -32,7 +33,7 @@ export function relayWallet(): Wallet {
  * it afterwards, so the lifetime the source picked is the lifetime it gets.
  */
 export async function postTip(deskKey: Hex, wire: Uint8Array, life: Lifetime) {
-  return relayQueue.enqueue(() => postTipOnce(deskKey, wire, life));
+  return withWalletLock('relay', relayAccount().address, () => postTipOnce(deskKey, wire, life));
 }
 
 async function postTipOnce(deskKey: Hex, wire: Uint8Array, life: Lifetime) {

@@ -14,7 +14,7 @@ export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
-    const blocked = protectWrite(req, 'relay');
+    const blocked = await protectWrite(req, 'relay');
     if (blocked) return blocked;
     const dryRun = isDryRun(req);
     const raw = await readJson(req);

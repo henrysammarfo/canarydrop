@@ -189,6 +189,26 @@ Set these Environment Variables (Production + Preview):
 
 Production URL: https://canarydrop.vercel.app
 
+Shared store (Upstash Redis)
+----------------------------
+
+Per IP sliding windows and relay or desk wallet locks need a store every Vercel isolate can see. The app reads these env vars, in this order:
+
+1. `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`
+2. or the Vercel Marketplace names `KV_REST_API_URL` and `KV_REST_API_TOKEN`
+
+`KV_URL` (the rediss URL) is never read and never logged. If the REST pair is missing, the app still boots. Limits and locks stay in that process, and one warning is logged.
+
+How to connect Upstash for preview deploys of this branch. This is a Vercel dashboard step. It is not a git change, and this repo does not store the token.
+
+1. Open the CanaryDrop project: https://vercel.com/teamtitanlink/canarydrop
+2. Open Storage (or Marketplace / Integrations) and choose Upstash for Redis.
+3. Create a new Redis database, or connect one you already have.
+4. Enable the integration for the Preview environment so `v2-hardening` preview deploys receive the REST URL and token. Leave Production untouched unless you decide to share the store there too.
+5. Redeploy the `v2-hardening` preview from Vercel Deployments so the new env is present. Do not paste the token into `.env` files that might be committed. Do not put it in git.
+
+Local `npm run dev` without those env vars is expected. You will see the missing store warning once.
+
 Chain configuration
 -------------------
 
@@ -206,8 +226,8 @@ Full threat model: `SECURITY.md`. Short version:
 - Write APIs require an allowed Origin. A missing Origin is 403. Host checks are exact hostname matches, not `includes()`.
 - CSRF cookie `cd_csrf` must match header `x-csrf-token`. `Sec-Fetch-Site: cross-site` and `same-site` are rejected.
 - The relay calls `getEntity` and refuses to pay if the target is not a live CanaryDrop desk.
-- Concurrent tips use a per process queue, a pending nonce, and backoff. A mutation error with a tx hash is not retried.
-- Durable spend caps live on Arkiv: `slot` is the UTC day on new tips, replies, and desks. GLM below 0.02 stops writes. Per IP windows are still in memory; that limit is honest in SECURITY.md.
+- Concurrent tips take a Redis lock per relay or desk wallet, then a per process queue, a pending nonce, and backoff. A mutation error with a tx hash is not retried. Redis is not used as an Ethereum nonce counter.
+- Durable spend caps live on Arkiv: `slot` is the UTC day on new tips, replies, and desks. GLM below 0.02 stops writes. Per IP sliding windows use Upstash Redis when the Marketplace env vars are set. If they are missing, the app still runs with an in process window and logs one warning.
 - Ciphertext cap is 8192 bytes after base64 decode. Zod and the relay share that constant.
 - Route handlers map failures to public codes. RPC text and stacks are not returned.
 - CSP drops `unsafe-eval`, uses a per request script nonce with `strict-dynamic`, and allowlists Tiramisu RPC on `connect-src`. `style-src` still has `unsafe-inline` because React sets element styles.
@@ -233,7 +253,7 @@ Tests
 
 GitHub Actions CI runs lint, typecheck, vitest, production build, and Playwright on every push.
 
-- Unit: crypto, origin, CSRF, rate limit, retry, CSP, schemas, errors, spend caps, chain helpers
+- Unit: crypto, origin, CSRF, rate limit, Redis store, wallet lock, retry, CSP, schemas, errors, spend caps, chain helpers
 - API: tip and demo routes, missing Origin, CSRF mismatch, size caps, missing desk, demo key
 - Integration: live Tiramisu reads, inbox pagination mock, dry run against a live desk
 - E2E: routes, mobile overflow, dry run toast, desk Demo mode, CSP header, verify page, CSRF cookie

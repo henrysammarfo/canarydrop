@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { CSRF_COOKIE, CSRF_HEADER } from './constants';
 import { tokensMatch } from './csrf';
 import { originAllowed } from './origin';
-import { deskIpWindow, relayIpWindow } from './rate-limit';
+import { allowIp, type WriteKind } from './rate-limit';
 
-export type WriteKind = 'relay' | 'desk';
+export type { WriteKind };
 
 export function clientIp(req: NextRequest): string {
   const forwarded = req.headers.get('x-forwarded-for');
@@ -22,7 +22,7 @@ function json(code: string, message: string, status: number): NextResponse {
   return NextResponse.json({ error: code, message }, { status });
 }
 
-export function protectWrite(req: NextRequest, kind: WriteKind): NextResponse | null {
+export async function protectWrite(req: NextRequest, kind: WriteKind): Promise<NextResponse | null> {
   if (!originAllowed(req.headers.get('origin'))) {
     return json('bad_origin', 'Please use the site to send this request.', 403);
   }
@@ -35,19 +35,20 @@ export function protectWrite(req: NextRequest, kind: WriteKind): NextResponse | 
   if (!tokensMatch(cookie, header)) {
     return json('bad_csrf', 'Please reload the page and try again.', 403);
   }
-  const window = kind === 'relay' ? relayIpWindow : deskIpWindow;
-  if (!window.allow(`${kind}:${clientIp(req)}`)) {
+  const ok = await allowIp(kind, clientIp(req));
+  if (!ok) {
     return json('rate_limited', 'Please wait a minute and try again.', 429);
   }
   return null;
 }
 
-export function protectRead(req: NextRequest, kind: WriteKind): NextResponse | null {
+export async function protectRead(req: NextRequest, kind: WriteKind): Promise<NextResponse | null> {
   if (!originAllowed(req.headers.get('origin'))) {
     return json('bad_origin', 'Please use the site to send this request.', 403);
   }
-  const window = kind === 'relay' ? relayIpWindow : deskIpWindow;
-  if (!window.allow(`${kind}-read:${clientIp(req)}`)) {
+  const bucket = kind === 'relay' ? 'relay-read' : 'desk-read';
+  const ok = await allowIp(bucket, clientIp(req));
+  if (!ok) {
     return json('rate_limited', 'Please wait a minute and try again.', 429);
   }
   return null;

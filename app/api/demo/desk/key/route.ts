@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
   try {
-    const blocked = protectRead(req, 'desk');
+    const blocked = await protectRead(req, 'desk');
     if (blocked) return blocked;
     const jwk = deriveDemoDeskJwk(requireDeskEthKey());
     return jsonOk({

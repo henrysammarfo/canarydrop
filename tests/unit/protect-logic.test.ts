@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { NextRequest } from 'next/server';
-import { clientIp, isDryRun } from '@/lib/protect';
+import { clientIp, isDryRun, protectRead, protectWrite } from '@/lib/protect';
 import { isLifetime } from '@/lib/arkiv';
+import { CSRF, postJson } from '../helpers/request';
+import { setIpLimiterForTests } from '@/lib/rate-limit';
 
 function req(url: string, headers: Record<string, string>) {
   return new NextRequest(url, { method: 'POST', headers });
@@ -33,5 +35,26 @@ describe('protect helpers', () => {
     expect(isLifetime('24h')).toBe(true);
     expect(isLifetime('9d')).toBe(false);
     expect(isLifetime('1h')).toBe(true);
+  });
+
+  it('protectWrite is async and returns 429 when the limiter denies', async () => {
+    setIpLimiterForTests({ limit: async () => ({ success: false }) });
+    const blocked = await protectWrite(
+      postJson('http://localhost:3000/api/tip', { deskKey: `0x${'ab'.repeat(32)}` }),
+      'relay',
+    );
+    expect(blocked?.status).toBe(429);
+    expect((await blocked?.json())?.error).toBe('rate_limited');
+  });
+
+  it('protectRead is async and still requires origin', async () => {
+    const blocked = await protectRead(
+      new NextRequest('http://localhost:3000/api/demo/desk/key', {
+        method: 'GET',
+        headers: { cookie: `cd_csrf=${CSRF}` },
+      }),
+      'desk',
+    );
+    expect(blocked?.status).toBe(403);
   });
 });
