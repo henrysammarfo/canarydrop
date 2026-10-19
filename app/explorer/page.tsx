@@ -4,9 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { Hex } from 'viem';
 import { DEFAULT_DESK, DEFAULT_IMPOSTOR, SEALED_TIPS_EMPTY } from '@/lib/constants';
-import { explorerPage, type ExplorerKind } from '@/lib/arkiv';
+import { deskAddress, explorerPage, getDesk, type ExplorerKind } from '@/lib/arkiv';
 import { attrStr } from '@/lib/attr';
 import { addressUrl, entityUrl, isSealedOwner, shortHex } from '@/lib/chain';
+import { fetchSharedDemoPub } from '@/lib/demo-pub-client';
 import { bumpGeneration, isStaleGeneration } from '@/lib/load-gen';
 import { useToast } from '@/components/Toast';
 import { uiError } from '@/lib/ui-error';
@@ -18,6 +19,7 @@ type Item = {
   owner: Hex;
   expires: string;
   impostor: boolean;
+  canonicalDemo: boolean;
   readonly: boolean;
   openExtend: boolean;
 };
@@ -40,7 +42,17 @@ export default function ExplorerPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<(typeof KINDS)[number]['id']>('all');
+  const [canonicalKey, setCanonicalKey] = useState<Hex | undefined>(undefined);
   const gen = useRef({ current: 0 });
+
+  useEffect(() => {
+    void (async () => {
+      const pub = await fetchSharedDemoPub();
+      if (!pub) return;
+      const desk = await getDesk(deskAddress(), pub);
+      if (desk?.key) setCanonicalKey(desk.key);
+    })();
+  }, []);
 
   function mapRow(e: {
     key?: Hex;
@@ -52,15 +64,17 @@ export default function ExplorerPage() {
   }): Item | null {
     if (!e.key) return null;
     const creator = e.creator ?? ('0x' as Hex);
+    const type = attrStr(e.attributes, 'type') ?? 'unknown';
     return {
       key: e.key,
-      type: attrStr(e.attributes, 'type') ?? 'unknown',
+      type,
       creator,
       owner: e.owner ?? creator,
       expires: e.expiresAt != null ? String(e.expiresAt) : 'n/a',
       impostor:
         creator.toLowerCase() === DEFAULT_IMPOSTOR.toLowerCase() ||
-        (creator.toLowerCase() !== DEFAULT_DESK.toLowerCase() && attrStr(e.attributes, 'type') === 'desk'),
+        (creator.toLowerCase() !== DEFAULT_DESK.toLowerCase() && type === 'desk'),
+      canonicalDemo: type === 'desk' && !!canonicalKey && e.key?.toLowerCase() === canonicalKey.toLowerCase(),
       readonly: e.creationFlags?.readonly === true,
       openExtend: e.creationFlags?.permissionlessExtension === true,
     };
@@ -100,7 +114,7 @@ export default function ExplorerPage() {
         if (!isStaleGeneration(started, gen.current.current)) setLoading(false);
       }
     },
-    [filter, push],
+    [filter, push, canonicalKey],
   );
 
   useEffect(() => {
@@ -156,6 +170,11 @@ export default function ExplorerPage() {
                     {it.impostor && (
                       <div>
                         <span className="pill" style={{ marginTop: 6 }}>Ignored impostor</span>
+                      </div>
+                    )}
+                    {it.canonicalDemo && (
+                      <div>
+                        <span className="pill" style={{ marginTop: 6 }}>Canonical demo desk</span>
                       </div>
                     )}
                     {it.readonly && (

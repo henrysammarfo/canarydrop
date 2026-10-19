@@ -32,13 +32,13 @@ test('home sets a csrf cookie', async ({ context }) => {
   expect(cookies.some((c) => c.name === 'cd_csrf' && c.value.length >= 16)).toBeTruthy();
 });
 
-test('demo key route is origin guarded', async ({ request }) => {
+test('demo key API client without browser fetch metadata is 403', async ({ request }) => {
   const res = await request.get('/api/demo/desk/key');
-  expect([200, 403]).toContain(res.status());
   const j = await res.json();
+  // Playwright's request fixture is not a document GET. It must not be treated as the live site.
   if (res.status() === 200) {
-    expect(j.jwk.crv).toBe('P-256');
-  } else {
-    expect(String(j.error)).toMatch(/bad_origin|demo_disabled/);
+    throw new Error('APIRequestContext must not receive the demo key without Origin or Sec-Fetch-Site');
   }
+  expect(res.status()).toBe(403);
+  expect(String(j.error)).toBe('bad_origin');
 });

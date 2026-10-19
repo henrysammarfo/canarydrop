@@ -225,6 +225,7 @@ Security notes
 Full threat model: `SECURITY.md`. Short version:
 
 - Write APIs require an allowed Origin. A missing Origin is 403. Host checks are exact hostname matches, not `includes()`.
+- Same-origin GET reads allow a missing Origin when `Sec-Fetch-Site` is `same-origin` (real browsers omit Origin on those GETs). Writes still require Origin.
 - CSRF cookie `cd_csrf` must match header `x-csrf-token`. `Sec-Fetch-Site: cross-site` and `same-site` are rejected.
 - The relay calls `getEntity` and refuses to pay if the target is not a live CanaryDrop desk.
 - Concurrent tips take a Redis lock per relay or desk wallet when a REST store is configured, then a per process queue, a pending nonce, and backoff. A mutation error with a tx hash is not retried. Redis is not used as an Ethereum nonce counter.
@@ -257,7 +258,7 @@ Run these locally. Do not wait on hosted workflows.
 - Unit: crypto, origin, CSRF, rate limit, Redis store, wallet lock, retry, CSP, schemas, errors, spend caps, chain helpers, proofs text
 - API: tip and demo routes, missing Origin, CSRF mismatch, size caps, missing desk, demo key
 - Integration: live Tiramisu reads (sealed tips, `ownedBy`, flags, nonce, count), inbox pagination mock, dry run against a live desk
-- E2E: routes including `/how`, mobile overflow, dry run toast, desk Demo mode, CSP header, verify page, CSRF cookie
+- E2E: routes including `/how`, mobile overflow, dry run toast, desk Demo mode, real-browser demo key GET, CSP header, verify page, CSRF cookie
 
 ```bash
 npm run lint

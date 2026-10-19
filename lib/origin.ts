@@ -24,7 +24,7 @@ export function isAllowedHostname(hostname: string): boolean {
   return false;
 }
 
-/** Exact hostname allow list. Rejects missing Origin and the old includes() bypass. */
+/** Exact hostname allow list. Rejects missing Origin and the old includes() bypass. Writes use this. Reads may also allow same-origin fetch metadata. */
 export function originAllowed(originHeader: string | null | undefined): boolean {
   const url = parseOrigin(originHeader);
   if (!url) return false;
