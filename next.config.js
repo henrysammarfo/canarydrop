@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 export default {
   poweredByHeader: false,
+  transpilePackages: ['geist'],
   headers: async () => {
     return [
       {

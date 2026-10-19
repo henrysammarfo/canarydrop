@@ -7,6 +7,10 @@ const routes = [
   '/',
   '/submit',
   '/desk',
+  '/desk/inbox',
+  '/desk/canary',
+  '/desk/replies',
+  '/desk/settings',
   '/r',
   '/explorer',
   '/docs',
@@ -128,9 +132,16 @@ test('dry run tip submit shows a toast', async ({ page }) => {
   const dry = page.getByRole('button', { name: 'Dry run' });
   await expect(dry).toBeEnabled({ timeout: 20_000 });
   await dry.click();
-  const toast = page.locator('.toast').first();
-  await expect(toast).toBeVisible({ timeout: 45_000 });
-  await expect(toast).toContainText(/dry run/i);
+  const dryToast = page.locator('.toast').filter({ hasText: /dry run/i });
+  const waitToast = page.locator('.toast').filter({ hasText: /wait a minute/i });
+  try {
+    await expect(dryToast).toBeVisible({ timeout: 20_000 });
+  } catch {
+    await expect(waitToast.first()).toBeVisible({ timeout: 5_000 });
+    await page.waitForTimeout(16_000);
+    await dry.click();
+    await expect(dryToast).toBeVisible({ timeout: 45_000 });
+  }
 });
 
 test('hero CTAs are narrower than 260px', async ({ page }) => {

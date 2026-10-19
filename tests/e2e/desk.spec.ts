@@ -31,7 +31,7 @@ test('create demo desk shows a success notice and drops the stale key warning', 
   const box = demo.locator('input[type="checkbox"]');
   if (!(await box.isChecked())) await box.check();
   await expect(page.getByText(/Demo mode is on/i)).toBeVisible({ timeout: 15_000 });
-  await page.getByRole('button', { name: 'keys' }).click();
+  await page.goto('/desk/settings');
   const createBtn = page.getByRole('button', { name: /Create demo desk/i });
   try {
     await expect(createBtn.first()).toBeEnabled({ timeout: 15_000 });
@@ -68,6 +68,24 @@ test('create demo desk shows a success notice and drops the stale key warning', 
   await expect(page.getByText(/The live desk still has an older public key/i)).toHaveCount(0);
 });
 
+test('desk sidebar marks the active page and opens each section', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/desk', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('aside[aria-label="Desk navigation"] a[aria-current="page"]')).toHaveText(/Overview/);
+  await page.locator('aside').getByRole('link', { name: 'Inbox', exact: true }).click();
+  await expect(page).toHaveURL(/\/desk\/inbox/);
+  await expect(page.getByRole('heading', { name: 'Inbox' })).toBeVisible();
+  await page.locator('aside').getByRole('link', { name: 'Canary', exact: true }).click();
+  await expect(page).toHaveURL(/\/desk\/canary/);
+  await page.locator('aside').getByRole('link', { name: 'Replies' }).click();
+  await expect(page).toHaveURL(/\/desk\/replies/);
+  await page.locator('aside').getByRole('link', { name: 'Desk settings' }).click();
+  await expect(page).toHaveURL(/\/desk\/settings/);
+  await page.locator('aside').getByRole('link', { name: 'Explorer' }).click();
+  await expect(page).toHaveURL(/\/explorer/);
+  await expect(page.locator('aside a[aria-current="page"]')).toHaveText(/Explorer/);
+});
+
 test('desk demo mode toggle is usable without a wallet', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/desk', { waitUntil: 'load' });
@@ -77,7 +95,8 @@ test('desk demo mode toggle is usable without a wallet', async ({ page }) => {
   if (!(await box.isChecked())) await box.check();
   await expect(page.getByText(/Demo mode is on/i)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/Please use the site to send this request/i)).toHaveCount(0);
-  await page.getByRole('button', { name: 'inbox' }).click();
+  await page.locator('aside').getByRole('link', { name: 'Inbox', exact: true }).click();
+  await expect(page).toHaveURL(/\/desk\/inbox/);
   await expect(page.getByText(/Older tips load from Arkiv/i)).toBeVisible();
   await expect(page.getByRole('button', { name: /load older tips/i })).toBeVisible();
 });
