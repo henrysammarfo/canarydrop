@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { gatherArkivProofs } from '@/lib/proofs';
-import { DEFAULT_DESK } from '@/lib/constants';
-import { uiError } from '@/lib/ui-error';
+import { CHAIN_READ_FAILED, DEFAULT_DESK } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +10,9 @@ export default async function HowPage() {
   try {
     proofs = await gatherArkivProofs();
   } catch (err) {
-    loadError = uiError(err);
+    const msg = err instanceof Error ? err.message.replace(/0x[0-9a-fA-F]{64}/g, '0x…').slice(0, 300) : String(err);
+    console.error('CanaryDrop proofs page:', msg);
+    loadError = CHAIN_READ_FAILED;
   }
 
   return (
@@ -76,7 +77,7 @@ export default async function HowPage() {
         <div className="card" style={{ marginTop: 22 }}>
           <h2 className="proof-title">Seed writes that created the first live entities</h2>
           <p className="muted" style={{ marginTop: 8 }}>
-            These transactions are on Tiramisu. The claims above re query the entities those writes left behind.
+            These transactions are on Tiramisu. The claims above query those entities again.
           </p>
           <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 12 }}>
             {(proofs?.seedTxs ?? []).map((link) => (

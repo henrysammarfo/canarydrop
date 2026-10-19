@@ -14,7 +14,15 @@ import {
   sealedTipsQueryText,
   tipsOrCanaries,
 } from './arkiv';
-import { DEFAULT_DESK, DEFAULT_IMPOSTOR, DEFAULT_RELAY, PROJECT } from './constants';
+import {
+  CHAIN_READ_FAILED,
+  DEFAULT_DESK,
+  DEFAULT_IMPOSTOR,
+  DEFAULT_RELAY,
+  PROJECT,
+  PROOF_CACHE_MS,
+  SEALED_TIPS_EMPTY,
+} from './constants';
 import { addressUrl, entityUrl, isSealedOwner, txUrl } from './chain';
 import { eq, gt, or } from '@arkiv-network/sdk/query';
 import { key, u64 } from '@arkiv-network/sdk/attr';
@@ -53,7 +61,31 @@ export function seedTxLinks(): ProofLink[] {
   }));
 }
 
+export function isFreshProofCache(cachedAt: number, now = Date.now(), ttl = PROOF_CACHE_MS): boolean {
+  return now - cachedAt >= 0 && now - cachedAt < ttl;
+}
+
+function logChainRead(scope: string, err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  const clipped = msg.replace(/0x[0-9a-fA-F]{64}/g, '0x…').slice(0, 300);
+  console.error(`CanaryDrop proofs ${scope}:`, clipped);
+}
+
+let proofCache: { at: number; value: ArkivProofs } | null = null;
+
+export function clearArkivProofsCache() {
+  proofCache = null;
+}
+
 export async function gatherArkivProofs(): Promise<ArkivProofs> {
+  const now = Date.now();
+  if (proofCache && isFreshProofCache(proofCache.at, now)) return proofCache.value;
+  const value = await gatherArkivProofsUncached();
+  proofCache = { at: now, value };
+  return value;
+}
+
+async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
   const head = await headBlock();
   const hourAgo = head > 1800n ? head - 1800n : 0n;
   const claims: ProofClaim[] = [];
@@ -120,7 +152,7 @@ export async function gatherArkivProofs(): Promise<ArkivProofs> {
       const past = await canaryAtBlock(DEFAULT_DESK, desk.key, hourAgo);
       claims.push({
         id: 'atBlock',
-        title: 'Was this canary alive about an hour ago',
+        title: 'Was this canary alive about an hour ago?',
         why: 'A pinned block is a small time machine. Absence at that block is still the signal.',
         query: `same canary query, atBlock(${hourAgo.toString()}) and $expiresAt > u64(${hourAgo.toString()})`,
         ok: past !== null,
@@ -131,13 +163,14 @@ export async function gatherArkivProofs(): Promise<ArkivProofs> {
       });
     }
   } catch (err) {
+    logChainRead('createdBy', err);
     claims.push({
       id: 'createdBy',
       title: 'Only the real desk wallet counts',
       why: 'A fake desk with the same name is ignored. Reads are pinned to the newsroom wallet.',
       query: `createdBy(${DEFAULT_DESK})`,
       ok: false,
-      detail: err instanceof Error ? err.message : 'Desk query failed.',
+      detail: CHAIN_READ_FAILED,
       links: [{ label: 'Desk wallet', href: addressUrl(DEFAULT_DESK) }],
     });
   }
@@ -153,8 +186,11 @@ export async function gatherArkivProofs(): Promise<ArkivProofs> {
       title: 'Sealed tips have a burn owner',
       why: 'The sponsor creates the tip, then hands it to a burn address in the same batch. Nobody can extend, patch, or delete it later.',
       query: sealedQuery,
-      ok: keys.length > 0 && allSealed,
-      detail: `${keys.length} live sealed tips. ${readonly} marked readonly. ${noOpenExtend} refuse open extension. Owner is the burn address on every row.`,
+      ok: keys.length === 0 || allSealed,
+      detail:
+        keys.length === 0
+          ? SEALED_TIPS_EMPTY
+          : `${keys.length} live sealed tips. ${readonly} marked readonly. ${noOpenExtend} refuse open extension. Owner is the burn address on every row.`,
       links: [
         ...entityLinks(keys),
         { label: 'Sponsor wallet', href: addressUrl(DEFAULT_RELAY) },
@@ -162,13 +198,14 @@ export async function gatherArkivProofs(): Promise<ArkivProofs> {
       ],
     });
   } catch (err) {
+    logChainRead('ownedBy', err);
     claims.push({
       id: 'ownedBy',
       title: 'Sealed tips have a burn owner',
       why: 'The sponsor creates the tip, then hands it to a burn address in the same batch.',
       query: sealedQuery,
       ok: false,
-      detail: err instanceof Error ? err.message : 'Sealed tip query failed.',
+      detail: CHAIN_READ_FAILED,
       links: [{ label: 'Sponsor wallet', href: addressUrl(DEFAULT_RELAY) }],
     });
   }
@@ -192,13 +229,14 @@ export async function gatherArkivProofs(): Promise<ArkivProofs> {
       ],
     });
   } catch (err) {
+    logChainRead('impostor', err);
     claims.push({
       id: 'impostor',
       title: 'An impostor desk does not match',
       why: 'createdBy is the access control we actually use.',
       query: `createdBy(${DEFAULT_IMPOSTOR})`,
       ok: false,
-      detail: err instanceof Error ? err.message : 'Impostor query failed.',
+      detail: CHAIN_READ_FAILED,
       links: [{ label: 'Impostor wallet', href: addressUrl(DEFAULT_IMPOSTOR) }],
     });
   }
@@ -215,13 +253,14 @@ export async function gatherArkivProofs(): Promise<ArkivProofs> {
       links: [{ label: 'Sponsor wallet', href: addressUrl(DEFAULT_RELAY) }],
     });
   } catch (err) {
+    logChainRead('slot', err);
     claims.push({
       id: 'slot',
       title: 'Daily spend uses a slot attribute',
       why: 'The node will not filter $createdAt.',
       query: `eq("slot", u64(${utcDaySlot().toString()}))`,
       ok: false,
-      detail: err instanceof Error ? err.message : 'Slot query failed.',
+      detail: CHAIN_READ_FAILED,
       links: [],
     });
   }
@@ -238,13 +277,14 @@ export async function gatherArkivProofs(): Promise<ArkivProofs> {
       links: [{ label: 'Sponsor wallet', href: addressUrl(DEFAULT_RELAY) }],
     });
   } catch (err) {
+    logChainRead('nonce', err);
     claims.push({
       id: 'nonce',
       title: 'Entity mint nonce is not the Ethereum nonce',
       why: 'predictEntityKeys reads this counter.',
       query: `getEntityNonce(${DEFAULT_RELAY})`,
       ok: false,
-      detail: err instanceof Error ? err.message : 'Nonce query failed.',
+      detail: CHAIN_READ_FAILED,
       links: [],
     });
   }
@@ -263,13 +303,14 @@ export async function gatherArkivProofs(): Promise<ArkivProofs> {
       links: entityLinks(mixed.entities.map((e) => e.key).filter((k): k is Hex => !!k), 4),
     });
   } catch (err) {
+    logChainRead('or', err);
     claims.push({
       id: 'or',
       title: 'One query can ask for tips or canaries',
       why: 'The explorer can show more than one type without a second round trip.',
       query: 'or(eq("type","tip"), eq("type","canary"))',
       ok: false,
-      detail: err instanceof Error ? err.message : 'Mixed query failed.',
+      detail: CHAIN_READ_FAILED,
       links: [],
     });
   }

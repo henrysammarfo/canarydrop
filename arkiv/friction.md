@@ -262,7 +262,7 @@ npm i
 npm run friction
 ```
 
-Expected: each script prints an `F*` line. `run-all.mjs` exits 0 if every script exits 0. F1–F3 and F20–F23 are successful when they throw the documented SDK error. F3 wrap, F4, F5, F24, and F25 are successful when they return.
+Expected: each script prints an `F*` line. `run-all.mjs` exits 0 if every script exits 0. F1 to F3 and F20 to F23 are successful when they throw the documented SDK error. F3 wrap, F4, F5, F24, and F25 are successful when they return.
 
 ## Notes for SDK authors
 
@@ -279,7 +279,7 @@ Expected: each script prints an `F*` line. `run-all.mjs` exits 0 if every script
 
 ## Honesty
 
-This report is longer because the earlier 47 line file skipped the live error text. Length is not the goal. Reproducible error classes are. If a future SDK release fixes F1–F4 or F20–F22, the scripts here will start exiting 2.
+This report is longer because the earlier 47 line file skipped the live error text. Length is not the goal. Reproducible error classes are. If a future SDK release fixes F1 to F4 or F20 to F22, the scripts here will start exiting 2.
 
 ## Query cookbook we actually run
 

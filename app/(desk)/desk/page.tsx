@@ -179,13 +179,13 @@ export default function DeskPage() {
               if (k === c?.key) setAlive(true);
             },
             onSealed: () => {
-              push({ kind: 'info', text: 'A tip was sealed to the burn address.' });
+              push({ kind: 'info', text: 'A tip for this desk was sealed to the burn address.' });
             },
             onPatched: () => {
-              push({ kind: 'info', text: 'An entity was patched. Sealed tips should never patch.' });
+              push({ kind: 'info', text: 'A tip for this desk was patched. Sealed tips should never patch.' });
             },
             onDeleted: (k) => {
-              push({ kind: 'info', text: `An entity was deleted ${shortHex(k)}.` });
+              push({ kind: 'info', text: `A tip for this desk was deleted ${shortHex(k)}.` });
             },
             onError: () => {
               if (d.key && priv) void loadHistory(d.key, priv);
@@ -404,7 +404,7 @@ export default function DeskPage() {
           </label>
         </div>
       </header>
-      <main className="section" style={{ paddingTop: 'var(--space-2)' }}>
+      <div className="section" style={{ paddingTop: 'var(--space-2)' }}>
         <div className="wrap">
           {demo && (
             <div className="page-note" style={{ marginBottom: 16 }}>
@@ -591,7 +591,7 @@ export default function DeskPage() {
             )}
           </div>
         </div>
-      </main>
+      </div>
 
       <Modal
         open={confirm === 'renew'}

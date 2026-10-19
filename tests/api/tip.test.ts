@@ -9,7 +9,23 @@ describe('api/tip validation', () => {
     const j = await r.json();
     expect(r.status).toBe(400);
     expect(j.error).toBe('bad_request');
+    expect(String(j.message)).toBe('That request was not valid.');
     expect(String(j.message)).not.toMatch(/Ident32|stack|private/i);
+  });
+
+  it('maps a short wire to plain English instead of Zod library text', async () => {
+    const r = await POST(
+      postJson('http://localhost:3000/api/tip?dryRun=1', {
+        deskKey: HEX_KEY,
+        wireB64: 'AA==',
+        lifetime: '24h',
+      }),
+    );
+    const j = await r.json();
+    expect(r.status).toBe(400);
+    expect(j.error).toBe('bad_request');
+    expect(j.message).toBe('That request was not valid.');
+    expect(JSON.stringify(j)).not.toMatch(/Too small|expected string|>=8 characters|Zod/i);
   });
 
   it('rejects invalid json', async () => {

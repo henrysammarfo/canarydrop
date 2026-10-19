@@ -65,7 +65,7 @@ Live pages
 - `/desk` : newsroom desk dashboard with tabs (Inbox, Canary, Keys, Settings). Single connect button in nav, demo mode toggle in header. Create desk + canary, renew canary, live inbox, reply
 - `/d/[creator]` : public desk page: canary badge, submit form
 - `/r` : read replies with tip key + receipt code
-- `/submit` — submit flow with desk creator picker
+- `/submit` : submit flow with desk creator picker
 - `/explorer` : live feed of CanaryDrop entities on Tiramisu
 - `/canary/[creator]` : public canary status page
 - `/docs` : architecture, schema and friction report
@@ -152,9 +152,9 @@ These are used in the demo and on‑chain tests. Keys are never committed; see `
 - Demo desk: `0x1da3c22c079c264536D831F6F1fCe638aB0b20B0`
 - Impersonator: `0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af`
 Explorer links:
-- Relay — https://hub.arkiv.network/tiramisu/address/0xa6Aa6a1409eb54028550466169A29EAfd8f7a442
-- Desk — https://hub.arkiv.network/tiramisu/address/0x1da3c22c079c264536D831F6F1fCe638aB0b20B0
-- Impersonator — https://hub.arkiv.network/tiramisu/address/0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af
+- Relay: https://hub.arkiv.network/tiramisu/address/0xa6Aa6a1409eb54028550466169A29EAfd8f7a442
+- Desk: https://hub.arkiv.network/tiramisu/address/0x1da3c22c079c264536D831F6F1fCe638aB0b20B0
+- Impersonator: https://hub.arkiv.network/tiramisu/address/0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af
 
 Run locally
 -----------
@@ -294,9 +294,9 @@ Arkiv patterns and references adopted
 Wallets (testnet)
 -----------------
 
-- Relay: `0xa6Aa6a1409eb54028550466169A29EAfd8f7a442` — [Explorer](https://hub.arkiv.network/tiramisu/address/0xa6Aa6a1409eb54028550466169A29EAfd8f7a442)
-- Desk: `0x1da3c22c079c264536D831F6F1fCe638aB0b20B0` — [Explorer](https://hub.arkiv.network/tiramisu/address/0x1da3c22c079c264536D831F6F1fCe638aB0b20B0)
-- Impersonator: `0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af` — [Explorer](https://hub.arkiv.network/tiramisu/address/0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af)
+- Relay: `0xa6Aa6a1409eb54028550466169A29EAfd8f7a442` ([Explorer](https://hub.arkiv.network/tiramisu/address/0xa6Aa6a1409eb54028550466169A29EAfd8f7a442))
+- Desk: `0x1da3c22c079c264536D831F6F1fCe638aB0b20B0` ([Explorer](https://hub.arkiv.network/tiramisu/address/0x1da3c22c079c264536D831F6F1fCe638aB0b20B0))
+- Impersonator: `0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af` ([Explorer](https://hub.arkiv.network/tiramisu/address/0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af))
 
 Submission checklist (Arkiv Global Tour Stop)
 ---------------------------------------------
@@ -312,7 +312,7 @@ Submission checklist (Arkiv Global Tour Stop)
 - Docs page with schema and notes: Yes
 - Demo-mode toggle and no keys shipped to client by default: Yes
 - Tests and load checks included, results in README: Yes
-- Pre‑existing work: none, built Oct 9–18, 2026
+- Pre-existing work: none, built Oct 9 to 18, 2026
 - Demo video: https://canarydrop.vercel.app/demo.mp4
 
 How judges can reproduce
@@ -321,17 +321,17 @@ Start at `/verify`. That is the sixty second path. Then use the explorer links i
 
 On‑chain evidence (Tiramisu)
 ----------------------------
-- Desk `0x874e543a36fd673980ca4f2cd992ef9ac1aca38218f1232452bb5d7a7fac6231` and canary `0x5a9cc9685585f462cc85dfdc2884f06309aa2cda9cc10acfeaa1a260e5a7cc70` created atomically — tx https://tiramisu.explorer.arkiv.network/tx/0x6558bfd29237fd4b131fbee1d74f13ac3ce1152d88a5ae05d24d5f33a1dc35be
+- Desk `0x874e543a36fd673980ca4f2cd992ef9ac1aca38218f1232452bb5d7a7fac6231` and canary `0x5a9cc9685585f462cc85dfdc2884f06309aa2cda9cc10acfeaa1a260e5a7cc70` created atomically. Tx https://tiramisu.explorer.arkiv.network/tx/0x6558bfd29237fd4b131fbee1d74f13ac3ce1152d88a5ae05d24d5f33a1dc35be
 - Sealed tips:  
-  `0xd4f74471b97a44751650ccb4fd473a6056715d327497838f2a1c36da13e67f51` — https://tiramisu.explorer.arkiv.network/tx/0xfba666e2ed91c4cd35f0020959cfe48520247f3ab6a96efa1b5e0ed2868744d9  
-  `0xb4301aeffa5a5364d2de46b6485c04cc44fcf2000ebc1194a672769d5014cab8` — https://tiramisu.explorer.arkiv.network/tx/0x2401d9b57ae4545d4f2aee716476db731bcd7cc260c9c1ae42f1ec5e0b6df83c  
-  `0x4e65bf8206c285562c47d5893f15c7f78beb06337e80fe3414b1c196ebfc82b2` — https://tiramisu.explorer.arkiv.network/tx/0x96c37ab0a3592f02abe6ac75565fb5b0c400bb451156d2c156246728f3fc886f
-- Reply — tx https://tiramisu.explorer.arkiv.network/tx/0x3372344033724934a4e5cd09d9512fc1cf5cf221a5e05f11daecd814055227c1
-- Renew canary and desk (lifetime extension) — https://tiramisu.explorer.arkiv.network/tx/0x348fcd830adef7e6cbf5e8201d425e208ef01be8cc6321e41bfa1a6b5f5df466
-- Impersonator fake desk — `0x4d8e321f65850a6ea1d7bfa5bc59a2256e1cf9e09007011f69cb5d61645106ef` — https://tiramisu.explorer.arkiv.network/tx/0x953418573cb61d2e3174f1729162d0ee76e280c43e3633ccba3956b500ff4706
+  `0xd4f74471b97a44751650ccb4fd473a6056715d327497838f2a1c36da13e67f51` : https://tiramisu.explorer.arkiv.network/tx/0xfba666e2ed91c4cd35f0020959cfe48520247f3ab6a96efa1b5e0ed2868744d9  
+  `0xb4301aeffa5a5364d2de46b6485c04cc44fcf2000ebc1194a672769d5014cab8` : https://tiramisu.explorer.arkiv.network/tx/0x2401d9b57ae4545d4f2aee716476db731bcd7cc260c9c1ae42f1ec5e0b6df83c  
+  `0x4e65bf8206c285562c47d5893f15c7f78beb06337e80fe3414b1c196ebfc82b2` : https://tiramisu.explorer.arkiv.network/tx/0x96c37ab0a3592f02abe6ac75565fb5b0c400bb451156d2c156246728f3fc886f
+- Reply: https://tiramisu.explorer.arkiv.network/tx/0x3372344033724934a4e5cd09d9512fc1cf5cf221a5e05f11daecd814055227c1
+- Renew canary and desk (lifetime extension): https://tiramisu.explorer.arkiv.network/tx/0x348fcd830adef7e6cbf5e8201d425e208ef01be8cc6321e41bfa1a6b5f5df466
+- Impersonator fake desk `0x4d8e321f65850a6ea1d7bfa5bc59a2256e1cf9e09007011f69cb5d61645106ef`: https://tiramisu.explorer.arkiv.network/tx/0x953418573cb61d2e3174f1729162d0ee76e280c43e3633ccba3956b500ff4706
 
 License
 -------
 
-MIT — see `LICENSE`.
+MIT. See `LICENSE`.
 

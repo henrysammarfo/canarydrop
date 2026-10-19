@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { DEFAULT_RELAY, PROJECT, SEALED_OWNER } from '@/lib/constants';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { DEFAULT_RELAY, PROJECT, SEALED_TIPS_EMPTY } from '@/lib/constants';
 import {
   chainEntityCount,
   explorerPage,
@@ -7,10 +7,15 @@ import {
   sealedTips,
   tipsOrCanaries,
 } from '@/lib/arkiv';
+import { attrStr } from '@/lib/attr';
 import { isSealedOwner } from '@/lib/chain';
-import { gatherArkivProofs } from '@/lib/proofs';
+import { clearArkivProofsCache, gatherArkivProofs } from '@/lib/proofs';
 
 describe('deeper Arkiv reads against Tiramisu', () => {
+  beforeEach(() => {
+    clearArkivProofsCache();
+  });
+
   it('lists sealed tips owned by the burn address', async () => {
     const page = await sealedTips();
     expect(page.blockNumber).toBeGreaterThan(0n);
@@ -25,10 +30,16 @@ describe('deeper Arkiv reads against Tiramisu', () => {
     }
   });
 
-  it('explorer sealed filter only returns burn owned tips', async () => {
+  it('explorer sealed filter only returns CanaryDrop tips from the sponsor', async () => {
+    const sealed = await sealedTips();
     const page = await explorerPage({ kind: 'tip', sealed: true });
     expect(page.blockNumber).toBeGreaterThan(0n);
+    const sealedKeys = sealed.entities.map((e) => e.key).sort();
+    const pageKeys = page.entities.map((e) => e.key).sort();
+    expect(pageKeys).toEqual(sealedKeys);
     for (const row of page.entities) {
+      expect(attrStr(row.attributes, 'type')).toBe('tip');
+      expect(row.creator?.toLowerCase()).toBe(DEFAULT_RELAY.toLowerCase());
       expect(isSealedOwner(row.owner)).toBe(true);
     }
   });
@@ -61,6 +72,9 @@ describe('deeper Arkiv reads against Tiramisu', () => {
     const owned = proofs.claims.find((c) => c.id === 'ownedBy');
     expect(owned?.query).toContain(PROJECT);
     expect(owned?.query).toMatch(/\$owner = addr\(/);
+    expect(owned?.query).toMatch(/\$creator = addr\(/);
+    expect(owned?.ok).toBe(true);
+    expect(owned?.detail === SEALED_TIPS_EMPTY || /live sealed tips/i.test(owned?.detail ?? '')).toBe(true);
     expect(proofs.seedTxs.length).toBeGreaterThan(0);
     expect(proofs.head).toMatch(/^\d+$/);
   });

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import evidence from '@/arkiv/evidence.json';
 import { queryPredicate, sealedTipsQueryText } from '@/lib/arkiv';
-import { seedTxLinks } from '@/lib/proofs';
-import { DEFAULT_RELAY, PROJECT, SEALED_OWNER } from '@/lib/constants';
+import { isFreshProofCache, seedTxLinks } from '@/lib/proofs';
+import { CHAIN_READ_FAILED, DEFAULT_RELAY, PROJECT, PROOF_CACHE_MS, SEALED_OWNER, SEALED_TIPS_EMPTY } from '@/lib/constants';
 
 describe('judge proofs helpers', () => {
   it('maps seed txs to explorer links', () => {
@@ -23,5 +23,18 @@ describe('judge proofs helpers', () => {
     expect(text).toMatch(/\$creator = addr\(/);
     expect(text).not.toMatch(/SELECT|LIMIT/i);
     expect(queryPredicate({ toString: () => text })).toBe(text);
+  });
+
+  it('treats a 20 second proof cache as fresh, then stale', () => {
+    expect(isFreshProofCache(1_000, 1_000 + PROOF_CACHE_MS - 1)).toBe(true);
+    expect(isFreshProofCache(1_000, 1_000 + PROOF_CACHE_MS)).toBe(false);
+    expect(isFreshProofCache(1_000, 500)).toBe(false);
+  });
+
+  it('uses plain English for chain read failures and empty sealed tips', () => {
+    expect(CHAIN_READ_FAILED).toBe('Could not read Tiramisu right now. Please reload in a moment.');
+    expect(CHAIN_READ_FAILED).not.toMatch(/ECONNRESET|stack|failed to fetch/i);
+    expect(SEALED_TIPS_EMPTY).toMatch(/No live sealed tips/);
+    expect(SEALED_TIPS_EMPTY).toMatch(/27 Oct 2026/);
   });
 });

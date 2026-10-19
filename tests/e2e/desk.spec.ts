@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
 
+test('desk page has a single main landmark', async ({ page }) => {
+  await page.goto('/desk', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('main')).toHaveCount(1);
+  await expect(page.locator('main#main')).toBeVisible();
+});
+
 test('desk demo mode toggle is usable without a wallet', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/desk', { waitUntil: 'load' });

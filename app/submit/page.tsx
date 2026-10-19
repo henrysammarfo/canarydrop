@@ -168,6 +168,9 @@ export default function SubmitPage() {
                 Submit tip <span className="arrow" aria-hidden="true" />
               </button>
             </div>
+            <p className="muted" style={{ marginTop: 8 }}>
+              New tips stay live at least until 27 Oct 2026.
+            </p>
           </div>
         </div>
 

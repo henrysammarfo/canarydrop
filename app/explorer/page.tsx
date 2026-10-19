@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { Hex } from 'viem';
-import { DEFAULT_DESK, DEFAULT_IMPOSTOR } from '@/lib/constants';
+import { DEFAULT_DESK, DEFAULT_IMPOSTOR, SEALED_TIPS_EMPTY } from '@/lib/constants';
 import { explorerPage, type ExplorerKind } from '@/lib/arkiv';
 import { attrStr } from '@/lib/attr';
 import { addressUrl, entityUrl, isSealedOwner, shortHex } from '@/lib/chain';
+import { bumpGeneration, isStaleGeneration } from '@/lib/load-gen';
 import { useToast } from '@/components/Toast';
 import { uiError } from '@/lib/ui-error';
 
@@ -39,6 +40,7 @@ export default function ExplorerPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<(typeof KINDS)[number]['id']>('all');
+  const gen = useRef({ current: 0 });
 
   function mapRow(e: {
     key?: Hex;
@@ -66,6 +68,7 @@ export default function ExplorerPage() {
 
   const load = useCallback(
     async (mode: 'replace' | 'append', nextCursor?: string, nextBlock?: bigint) => {
+      const started = bumpGeneration(gen.current);
       try {
         setLoading(true);
         setErr(null);
@@ -77,6 +80,7 @@ export default function ExplorerPage() {
         if (nextCursor) opts.cursor = nextCursor;
         if (nextBlock !== undefined) opts.atBlock = nextBlock;
         const r = await explorerPage(opts);
+        if (isStaleGeneration(started, gen.current.current)) return;
         const rows: Item[] = [];
         for (const entity of r.entities) {
           const mapped = mapRow(entity);
@@ -88,11 +92,12 @@ export default function ExplorerPage() {
         setHasMore(r.hasNextPage());
         if (mode === 'append') push({ kind: 'info', text: `Loaded ${rows.length} more rows.` });
       } catch (e: unknown) {
+        if (isStaleGeneration(started, gen.current.current)) return;
         const msg = uiError(e);
         setErr(msg);
         push({ kind: 'error', text: msg });
       } finally {
-        setLoading(false);
+        if (!isStaleGeneration(started, gen.current.current)) setLoading(false);
       }
     },
     [filter, push],
@@ -188,7 +193,13 @@ export default function ExplorerPage() {
               {items.length === 0 && (
                 <tr>
                   <td colSpan={5} className="muted">
-                    <span role="status">{loading ? 'Loading live rows…' : 'No rows for this filter.'}</span>
+                    <span role="status">
+                      {loading
+                        ? 'Loading live rows…'
+                        : filter === 'sealed'
+                          ? SEALED_TIPS_EMPTY
+                          : 'No rows for this filter.'}
+                    </span>
                   </td>
                 </tr>
               )}
