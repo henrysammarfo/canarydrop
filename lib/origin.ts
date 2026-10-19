@@ -1,6 +1,6 @@
 import { PRODUCTION_HOST, STATIC_MIRROR_HOST } from './constants';
 
-const PREVIEW_HOST = /^canarydrop[-a-z0-9]*\.vercel\.app$/;
+const PREVIEW_HOST = /^[a-z0-9-]+-teamtitanlink\.vercel\.app$/;
 
 export function parseOrigin(originHeader: string | null | undefined): URL | null {
   if (!originHeader) return null;

@@ -17,7 +17,7 @@ export default function HowStatic() {
         <CopyField label="Mirror" value={STATIC_MIRROR_URL} />
       </div>
       <pre className="query-box" tabIndex={0}>{`# pinned tools
-node 20.18.x
+node 20.18.0
 npm ci
 npm run build:static
 # out/build.sha256 lists

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Hex } from 'viem';
 import { DEFAULT_CANARY_STATEMENT, issuedAtNow, verifyCanarySignature } from '@/lib/eip712';
 import { isAddress } from '@/lib/hex';
@@ -9,10 +9,14 @@ import { useToast } from '@/components/Toast';
 export default function CanarySig({ desk }: { desk: string }) {
   const push = useToast();
   const [statement, setStatement] = useState(DEFAULT_CANARY_STATEMENT);
-  const [issuedAt, setIssuedAt] = useState(() => issuedAtNow().toString());
+  const [issuedAt, setIssuedAt] = useState('');
   const [signature, setSignature] = useState('');
   const [address, setAddress] = useState(desk);
   const [result, setResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIssuedAt(issuedAtNow().toString());
+  }, []);
 
   async function check() {
     if (!isAddress(address)) {

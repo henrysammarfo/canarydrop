@@ -32,11 +32,19 @@ export function deadDropStatus(canaryAlive: boolean, holdAlive: boolean): DeadDr
   return canaryAlive && holdAlive ? 'held' : 'released';
 }
 
+export type DeadDropBadge = DeadDropStatus | 'checking';
+
+/** Held only when a live hold entity exists. Unknown hold state stays on checking. */
+export function deadDropBadge(canaryAlive: boolean | null, holdAlive: boolean | null): DeadDropBadge {
+  if (holdAlive === null) return 'checking';
+  return deadDropStatus(canaryAlive === true, holdAlive);
+}
+
 export function deadDropCopy(status: DeadDropStatus): string {
   if (status === 'held') {
     return 'The newsroom is still signing the canary, so this hold stays closed.';
   }
-  return 'The canary is gone, so the hold is treated as released.';
+  return 'The hold is quiet. Recipients treat the drop as released.';
 }
 
 export async function predictDeadDropKeys(owner: Hex): Promise<PredictedDropKeys> {

@@ -1,6 +1,6 @@
 # Static build and self hosting
 
-Pinned tools: Node 20.18.x, `npm ci` from `package-lock.json`, `@arkiv-network/sdk` 0.8.1, Tiramisu chain 7738577.
+Pinned tools: Node 20.18.0 exactly, `npm ci` from `package-lock.json`, `@arkiv-network/sdk` 0.8.1, Tiramisu chain 7738577. The static hash changes if the Node version does not match.
 
 The primary static mirror is a separate Vercel project that serves only `out/`. Placeholder URL: https://canarydrop-static.vercel.app. That project has no functions and no API routes. Config: `vercel.static.json` (`buildCommand` `npm run build:static`, `outputDirectory` `out`, plus CSP and no-referrer headers).
 
@@ -9,7 +9,7 @@ npm ci
 npm run build:static
 ```
 
-That script moves `app/api` and `middleware.ts` aside, runs Next static export, writes `out/build.sha256`, then puts those files back. The build id is the git commit SHA when available.
+That script moves `app/api` and `middleware.ts` aside, runs Next static export, writes `out/build.sha256`, then puts those files back. The build id defaults to `canarydrop-v7` unless `NEXT_PUBLIC_BUILD_ID` is set. `npm run repro:hash` builds `out/` twice and compares the two manifests.
 
 Verify a published hash:
 

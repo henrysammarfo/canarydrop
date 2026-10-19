@@ -11,8 +11,12 @@ describe('origin extra cases', () => {
     expect(originAllowed('https://canarydrop.vercel.app:443')).toBe(true);
   });
 
-  it('allows a git preview host', () => {
-    expect(originAllowed('https://canarydrop-git-v2-hardening-henrysammarfo.vercel.app')).toBe(true);
+  it('allows a teamtitanlink git preview host', () => {
+    expect(originAllowed('https://canarydrop-git-v2-hardening-teamtitanlink.vercel.app')).toBe(true);
+  });
+
+  it('rejects a canarydrop preview on another Vercel team', () => {
+    expect(originAllowed('https://canarydrop-git-v2-hardening-henrysammarfo.vercel.app')).toBe(false);
   });
 
   it('rejects a canarydrop prefix on another domain', () => {

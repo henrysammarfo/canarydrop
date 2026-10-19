@@ -8,7 +8,7 @@ import DemoBanner, { DemoSwitch } from '@/components/desk/DemoBanner';
 import { useDesk } from '@/components/desk/DeskProvider';
 import Badge from '@/components/ui/Badge';
 import { bytesToHex } from '@/lib/bytes';
-import { deadDropCopy, deadDropStatus } from '@/lib/dead-drop';
+import { deadDropBadge, deadDropCopy } from '@/lib/dead-drop';
 import { parseRecipientPubHex } from '@/lib/drop-seal';
 
 function pubHex(raw: Uint8Array | null): string {
@@ -18,9 +18,10 @@ function pubHex(raw: Uint8Array | null): string {
 
 export default function DeadDropPage() {
   const d = useDesk();
-  const held = d.alive !== false;
-  const status = deadDropStatus(held, held);
-  const released = status === 'released';
+  const badge = deadDropBadge(d.alive, d.holdAlive);
+  const released = badge === 'released';
+  const checking = badge === 'checking';
+  const status = badge === 'held' || badge === 'released' ? badge : null;
   const [title, setTitle] = useState('Synthetic hold statement');
   const [text, setText] = useState(
     'This is fake sample text for the demo desk. It is not a real disclosure and it names no one.',
@@ -56,12 +57,14 @@ export default function DeadDropPage() {
         <Card className={`stat-hero${released ? '' : ' alive'}`}>
           <div className="stat-hero-top">
             <p className="eyebrow">Hold status</p>
-            <Badge tone={released ? 'wait' : 'ok'}>{released ? 'Released' : 'Held'}</Badge>
+            <Badge tone={checking ? 'wait' : released ? 'wait' : 'ok'}>
+              {checking ? 'Checking' : released ? 'Released' : 'Held'}
+            </Badge>
           </div>
-          <div className={`stat-value ${released ? 'status-gone' : 'status-alive'}`}>
-            {released ? 'Released' : 'Held'}
+          <div className={`stat-value ${checking ? '' : released ? 'status-gone' : 'status-alive'}`}>
+            {checking ? 'Checking' : released ? 'Released' : 'Held'}
           </div>
-          <p className="stat-countdown">{deadDropCopy(status)}</p>
+          <p className="stat-countdown">{status ? deadDropCopy(status) : 'Reading the hold entity for this desk.'}</p>
           <p className="muted" style={{ marginTop: 10 }}>
             Renewing the canary also extends every live hold for this desk.
           </p>

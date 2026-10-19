@@ -187,7 +187,8 @@ async function aliveHead() {
   return gt('$expiresAt', u64(await headBlock()));
 }
 
-function canaryWriteAttrs(deskKey: Hex, signed?: SignedCanaryWrite) {
+/** String attributes only. The EIP-712 sig is 132 hex chars and fails `str()` (128-byte cap). Keep it in the payload. */
+export function canaryWriteAttrs(deskKey: Hex, signed?: SignedCanaryWrite) {
   const attrs: Record<string, ReturnType<typeof str> | ReturnType<typeof key> | ReturnType<typeof u64>> = {
     project: str(PROJECT),
     type: str('canary'),
@@ -196,12 +197,11 @@ function canaryWriteAttrs(deskKey: Hex, signed?: SignedCanaryWrite) {
   if (signed) {
     attrs.statement = str(signed.statement);
     attrs.issuedAt = u64(signed.issuedAt);
-    attrs.sig = str(signed.signature);
   }
   return attrs;
 }
 
-function canaryWritePayload(signed?: SignedCanaryWrite) {
+export function canaryWritePayload(signed?: SignedCanaryWrite) {
   if (!signed) return jsonToPayload({ statement: DEFAULT_CANARY_STATEMENT });
   return jsonToPayload({
     statement: signed.statement,
@@ -429,6 +429,23 @@ export async function repliesForCreator(deskCreator: Hex): Promise<readonly Repl
   ).entities;
 }
 
+export function replyWriteAttrs(tipKey: Hex, stealth?: StealthAnnouncement) {
+  return {
+    project: str(PROJECT),
+    type: str('reply'),
+    tip: key(tipKey),
+    slot: u64(utcDaySlot()),
+    ...(stealth
+      ? {
+          scheme: u64(BigInt(stealth.schemeId)),
+          stealth: str(stealth.stealthAddress),
+          eph: str(stealth.ephemeralPub),
+          vtag: str(stealth.viewTag),
+        }
+      : {}),
+  };
+}
+
 export const reply = (
   w: Wallet,
   tipKey: Hex,
@@ -443,20 +460,7 @@ export const reply = (
         {
           payload: wire,
           contentType: 'application/octet-stream',
-          attributes: {
-            project: str(PROJECT),
-            type: str('reply'),
-            tip: key(tipKey),
-            slot: u64(utcDaySlot()),
-            ...(stealth
-              ? {
-                  scheme: u64(BigInt(stealth.schemeId)),
-                  stealth: str(stealth.stealthAddress),
-                  eph: str(stealth.ephemeralPub),
-                  vtag: str(stealth.viewTag),
-                }
-              : {}),
-          },
+          attributes: replyWriteAttrs(tipKey, stealth),
           expires: ExpirationTime.fromHours(72),
         },
       ],

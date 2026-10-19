@@ -46,6 +46,7 @@ This report lists only issues we reproduced in this repo or measured against the
 | F26 | No stealth address registry | Product | ERC-5564 announcements stay local. See `docs/friction.md` |
 | F27 | No native typed-data entity | Product | EIP-712 canary signatures live in the payload or offline |
 | F28 | Static export cannot run middleware | Product | CSP nonce and Origin checks are the server path. Static talks to Arkiv from the browser |
+| F29 | `str()` is 128 UTF-8 bytes | High | EIP-712 sigs stay in the canary payload. Attributes never call `str(sig)` |
 
 ## Method
 
@@ -213,7 +214,7 @@ Footgun: storing the selection in a `let` widens `true` to `boolean` and you los
 
 Query keywords are case insensitive. Attribute names are case sensitive. `Level` and `level` are different attributes. `NOT` as a name cannot be queried.
 
-We only write `project`, `type`, `desk`, `tip`, `slot`.
+We only write `project`, `type`, `desk`, `tip`, `slot`, and short labels such as `statement` or `path`. The canary signature is not an attribute (F29).
 
 ## F14. Faucet insolvency (ops, previously measured)
 
@@ -232,6 +233,14 @@ If a canary is `permissionlessExtension: true`, anyone can keep it alive. That d
 `MAX_PAYLOAD_BYTES` is 128 KiB. `MAX_ATTRIBUTES` is 32. String attributes are 128 UTF-8 bytes. Indexed attributes are public.
 
 We put ciphertext in the payload, not in attributes. Labels are short. Tips pad plaintext to 2 KiB buckets so length leaks less. The relay still sees ciphertext size.
+
+## F29. `str()` rejects a 132-character EIP-712 signature
+
+An ECDSA signature on secp256k1 is 65 bytes. Written as `0x` plus 130 hex chars it is 132 UTF-8 bytes. SDK `str()` throws `InvalidValueError` at 129 bytes. Putting `sig: str(signature)` on a canary create therefore 500s on renew and on signed create-desk.
+
+Repro: `str('0x' + 'ab'.repeat(65))` throws. `tests/unit/write-strings.test.ts` calls the real SDK helper on every product string attribute and asserts the 132-character sig is absent from `canaryWriteAttrs`.
+
+Workaround we ship: `statement` and `issuedAt` stay queryable attributes. The signature lives only in the JSON payload. `canarySigFromRow` already prefers `payload.sig`.
 
 ## What worked, with evidence
 
@@ -588,7 +597,9 @@ It does not print SELECT, LIMIT, or the projection. The How page shows that stri
 | `arkiv/repro/f24-entity-count.mjs` | chain wide count |
 | `arkiv/repro/f25-query-text.mjs` | predicate `toString()` |
 | `arkiv/repro/run-all.mjs` | runner |
-| `lib/arkiv.ts` | queries, watch, batch helpers |
+| `lib/arkiv.ts` | queries, watch, batch helpers. Canary `sig` is payload-only (F29) |
+| `lib/write-strings.ts` | Every product `str()` value for the unmocked cap test |
+| `tests/unit/write-strings.test.ts` | Real SDK `str()` on each write attribute |
 | `lib/relay.ts` | sealed tip write |
 | `lib/retry.ts` | queue and backoff |
 | `lib/store.ts` | optional Redis REST creds, fallback warning |

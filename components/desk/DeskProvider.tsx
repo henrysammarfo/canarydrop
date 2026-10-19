@@ -82,6 +82,7 @@ export type DeskContextValue = {
   deskKey: Hex | null;
   canaryKey: Hex | null;
   alive: boolean | null;
+  holdAlive: boolean | null;
   priv: CryptoKey | null;
   tips: TipView[];
   setTips: Dispatch<SetStateAction<TipView[]>>;
@@ -152,6 +153,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
   const [deskKey, setDeskKey] = useState<Hex | null>(null);
   const [canaryKey, setCanaryKey] = useState<Hex | null>(null);
   const [alive, setAlive] = useState<boolean | null>(null);
+  const [holdAlive, setHoldAlive] = useState<boolean | null>(null);
   const [priv, setPriv] = useState<CryptoKey | null>(null);
   const [tips, setTips] = useState<TipView[]>([]);
   const unwatchRef = useRef<(() => void) | undefined>(undefined);
@@ -369,10 +371,24 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  async function refreshHolds(key: Hex | null) {
+    if (!key) {
+      setHoldAlive(null);
+      return;
+    }
+    try {
+      const keys = await liveHoldKeys(key);
+      setHoldAlive(keys.length > 0);
+    } catch {
+      setHoldAlive(null);
+    }
+  }
+
   function applyFetchedDesk(d: DeskRow, c: CanaryRow | null) {
     setDeskKey(d.key);
     setCanaryKey(c?.key ?? null);
     setAlive(!!c);
+    void refreshHolds(d.key);
     setCanaryExpiresAt(c?.expiresAt ?? null);
     setCanaryCreatedAt(c?.createdAt ?? null);
     const payload = d.payload ? parseDeskPayload(d.payload) : null;
@@ -385,6 +401,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     setDeskKey(live.deskKey);
     setCanaryKey(live.canaryKey);
     setAlive(live.deskKey ? live.alive : null);
+    void refreshHolds(live.deskKey);
     setCanaryExpiresAt(live.expiresAt);
     setCanaryCreatedAt(live.createdAt);
     if (live.currentBlock != null) setCurrentBlock(live.currentBlock);
@@ -773,6 +790,8 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
         }
         if (j.txHash) setTx(j.txHash);
         setLastDrop({ dropKey: j.dropKey, releaseKey: j.releaseKey, holdKey: j.holdKey, txHash: j.txHash });
+        if (j.holdKey) setHoldAlive(true);
+        else void refreshHolds(deskKey);
         push({ kind: 'success', text: 'Dead drop sealed.' });
         return;
       }
@@ -791,6 +810,8 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
         holdKey: created[2],
         txHash: out.txHash,
       });
+      if (created[2]) setHoldAlive(true);
+      else void refreshHolds(deskKey);
       push({ kind: 'success', text: 'Dead drop sealed.' });
     } catch (e: unknown) {
       push({ kind: 'error', text: uiError(e) });
@@ -809,6 +830,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     deskKey,
     canaryKey,
     alive,
+    holdAlive,
     priv,
     tips,
     setTips,

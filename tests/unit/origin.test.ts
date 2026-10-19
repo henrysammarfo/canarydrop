@@ -27,8 +27,12 @@ describe('origin allow list', () => {
     expect(originAllowed('https://canarydrop-static.vercel.app')).toBe(false);
   });
 
-  it('allows this project preview host', () => {
-    expect(originAllowed('https://canarydrop-git-v2-hardening-user.vercel.app')).toBe(true);
+  it('allows this team preview host', () => {
+    expect(originAllowed('https://canarydrop-git-v7-double-down-teamtitanlink.vercel.app')).toBe(true);
+  });
+
+  it('rejects a canarydrop preview on another Vercel team', () => {
+    expect(originAllowed('https://canarydrop-git-v2-hardening-user.vercel.app')).toBe(false);
   });
 
   it('rejects a sibling vercel app', () => {

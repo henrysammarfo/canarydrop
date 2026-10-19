@@ -8,7 +8,7 @@ These are Ethereum standards we researched and used where they fit. Gaps are wri
 |---|---|---|
 | EIP-712 | https://eips.ethereum.org/EIPS/eip-712 | Signed canary statements. `lib/eip712.ts` hashes a `CanaryStatement` typed payload. Anyone can check the signature offline with the desk address. |
 | EIP-4361 | https://eips.ethereum.org/EIPS/eip-4361 | Newsroom sign in. `lib/siwe.ts` builds and parses the SIWE message. The desk settings page asks the wallet to sign. |
-| ERC-5564 | https://eips.ethereum.org/EIPS/eip-5564 | One time reply addresses on secp256k1. A reply stores scheme 1, the stealth address, the ephemeral public key, and the view tag. |
+| ERC-5564 | https://eips.ethereum.org/EIPS/eip-5564 | Experimental. One time reply addresses on secp256k1. A reply stores scheme 1, the stealth address, the ephemeral public key, and the view tag. Those keys are derived from a meta-address stored with the desk key pair on this device, not from an ERC-6538 registry. Anyone who holds the desk keys can also scan those replies. |
 | ERC-6538 | https://eips.ethereum.org/EIPS/eip-6538 | The registry those stealth meta-addresses would be published to. We cannot ship a chain registry Arkiv does not have. |
 
 ## Proposals for Arkiv

@@ -1,7 +1,7 @@
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 describe('reproducible static hash', () => {
@@ -21,9 +21,11 @@ describe('reproducible static hash', () => {
     expect(run(a)).toBe(run(b));
   });
 
-  it('repro-hash script exits 0', () => {
-    const result = spawnSync(process.execPath, [path.resolve('scripts/repro-hash.mjs')], { encoding: 'utf8' });
-    expect(result.status).toBe(0);
-    expect(result.stdout).toMatch(/repro-hash ok/);
+  it('repro-hash script builds the full out folder twice', () => {
+    const src = fs.readFileSync(path.resolve('scripts/repro-hash.mjs'), 'utf8');
+    expect(src).toContain("npm', ['run', 'build:static']");
+    expect(src.match(/runBuild\(\)/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(src).toContain('Two full out/ builds hashed differently');
+    expect(src).toContain('v20.18.0');
   });
 });

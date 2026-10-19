@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Hex } from 'viem';
 import { SEALED_OWNER } from '@/lib/constants';
 import {
+  deadDropBadge,
   deadDropCopy,
   deadDropCreates,
   deadDropStatus,
@@ -24,9 +25,17 @@ describe('dead drop on silence', () => {
     expect(deadDropStatus(false, false)).toBe('released');
   });
 
+  it('reads the hold entity for the badge, not only the canary', () => {
+    expect(deadDropBadge(true, true)).toBe('held');
+    expect(deadDropBadge(true, false)).toBe('released');
+    expect(deadDropBadge(false, true)).toBe('released');
+    expect(deadDropBadge(true, null)).toBe('checking');
+    expect(deadDropBadge(null, null)).toBe('checking');
+  });
+
   it('uses plain English for both states', () => {
     expect(deadDropCopy('held')).toMatch(/still signing/);
-    expect(deadDropCopy('released')).toMatch(/canary is gone/);
+    expect(deadDropCopy('released')).toMatch(/hold is quiet/);
     expect(deadDropCopy('held')).not.toMatch(/[\u2013\u2014]/);
   });
 

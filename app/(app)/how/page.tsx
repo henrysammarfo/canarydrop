@@ -6,10 +6,15 @@ import Badge from '@/components/ui/Badge';
 import CopyField from '@/components/ui/CopyField';
 import StaleNote from '@/components/ui/StaleNote';
 import HowStatic from '@/components/HowStatic';
+import HowLive from '@/components/HowLive';
 
 export const dynamic = process.env.STATIC_EXPORT === '1' ? 'force-static' : 'force-dynamic';
 
 export default async function HowPage() {
+  if (process.env.STATIC_EXPORT === '1') {
+    return <HowLive />;
+  }
+
   const proofs = await gatherArkivProofs();
 
   return (

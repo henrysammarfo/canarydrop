@@ -3,6 +3,7 @@ import type { Hex } from 'viem';
 import { pub } from '@/lib/arkiv';
 import { b64ToBytes } from '@/lib/bytes';
 import { writeDeadDrop } from '@/lib/dead-drop';
+import { isCanonicalDemoDeskKey, resolveCanonicalDemoDeskKey } from '@/lib/demo-desk';
 import { deskAccount, deskWallet, requireDeskEthKey } from '@/lib/demo-wallet';
 import { AppError } from '@/lib/errors';
 import { assertMinBalance } from '@/lib/guard';
@@ -25,6 +26,8 @@ export async function POST(req: NextRequest) {
     const parsed = dropBody.safeParse(raw);
     if (!parsed.success) throw new AppError('bad_request');
     const { deskKey, dropPayloadB64, releasePayloadB64 } = parsed.data;
+    const canonical = await resolveCanonicalDemoDeskKey();
+    if (!isCanonicalDemoDeskKey(deskKey as Hex, canonical)) throw new AppError('no_desk');
     if (dryRun) return jsonOk({ ok: true, dryRun: true, wouldSeal: deskKey });
     const account = deskAccount();
     await assertMinBalance(pub(), account.address);

@@ -38,6 +38,7 @@ function buildId() {
 
 try {
   stash();
+  fs.rmSync(path.join(ROOT, 'out'), { recursive: true, force: true });
   const id = buildId();
   run('npx', ['next', 'build'], {
     STATIC_EXPORT: '1',
@@ -49,6 +50,7 @@ try {
   run('node', ['scripts/hash-static.mjs', 'out']);
   const note = [
     'CanaryDrop static build',
+    'node 20.18.0 required for expected.sha256',
     `node ${process.version}`,
     `build id ${id}`,
     'SDK @arkiv-network/sdk 0.8.1',
