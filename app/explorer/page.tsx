@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import type { Hex } from 'viem';
 import { DEFAULT_DESK, DEFAULT_IMPOSTOR } from '@/lib/constants';
-import { explorerPage } from '@/lib/arkiv';
+import { explorerPage, type ExplorerKind } from '@/lib/arkiv';
 import { attrStr } from '@/lib/attr';
 import { addressUrl, entityUrl, isSealedOwner, shortHex } from '@/lib/chain';
 import { useToast } from '@/components/Toast';
@@ -16,7 +17,18 @@ type Item = {
   owner: Hex;
   expires: string;
   impostor: boolean;
+  readonly: boolean;
+  openExtend: boolean;
 };
+
+const KINDS: { id: 'all' | ExplorerKind | 'sealed'; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'tip', label: 'Tips' },
+  { id: 'sealed', label: 'Sealed tips' },
+  { id: 'desk', label: 'Desks' },
+  { id: 'canary', label: 'Canaries' },
+  { id: 'reply', label: 'Replies' },
+];
 
 export default function ExplorerPage() {
   const push = useToast();
@@ -24,7 +36,9 @@ export default function ExplorerPage() {
   const [err, setErr] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [atBlock, setAtBlock] = useState<bigint | undefined>(undefined);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState<(typeof KINDS)[number]['id']>('all');
 
   function mapRow(e: {
     key?: Hex;
@@ -32,6 +46,7 @@ export default function ExplorerPage() {
     owner?: Hex;
     expiresAt?: bigint;
     attributes?: Parameters<typeof attrStr>[0];
+    creationFlags?: { readonly?: boolean; permissionlessExtension?: boolean };
   }): Item | null {
     if (!e.key) return null;
     const creator = e.creator ?? ('0x' as Hex);
@@ -41,24 +56,37 @@ export default function ExplorerPage() {
       creator,
       owner: e.owner ?? creator,
       expires: e.expiresAt != null ? String(e.expiresAt) : 'n/a',
-      impostor: creator.toLowerCase() === DEFAULT_IMPOSTOR.toLowerCase() ||
+      impostor:
+        creator.toLowerCase() === DEFAULT_IMPOSTOR.toLowerCase() ||
         (creator.toLowerCase() !== DEFAULT_DESK.toLowerCase() && attrStr(e.attributes, 'type') === 'desk'),
+      readonly: e.creationFlags?.readonly === true,
+      openExtend: e.creationFlags?.permissionlessExtension === true,
     };
   }
 
-  useEffect(() => {
-    (async () => {
+  const load = useCallback(
+    async (mode: 'replace' | 'append', nextCursor?: string, nextBlock?: bigint) => {
       try {
         setLoading(true);
-        const r = await explorerPage();
+        setErr(null);
+        const opts: Parameters<typeof explorerPage>[0] = {};
+        if (filter === 'sealed') {
+          opts.sealed = true;
+          opts.kind = 'tip';
+        } else if (filter !== 'all') opts.kind = filter;
+        if (nextCursor) opts.cursor = nextCursor;
+        if (nextBlock !== undefined) opts.atBlock = nextBlock;
+        const r = await explorerPage(opts);
         const rows: Item[] = [];
         for (const entity of r.entities) {
           const mapped = mapRow(entity);
           if (mapped) rows.push(mapped);
         }
-        setItems(rows);
+        setItems((arr) => (mode === 'append' ? [...arr, ...rows] : rows));
         setCursor(r.cursor);
         setAtBlock(r.blockNumber);
+        setHasMore(r.hasNextPage());
+        if (mode === 'append') push({ kind: 'info', text: `Loaded ${rows.length} more rows.` });
       } catch (e: unknown) {
         const msg = uiError(e);
         setErr(msg);
@@ -66,30 +94,13 @@ export default function ExplorerPage() {
       } finally {
         setLoading(false);
       }
-    })();
-  }, [push]);
+    },
+    [filter, push],
+  );
 
-  async function loadMore() {
-    if (!cursor) return;
-    try {
-      setLoading(true);
-      const r = await explorerPage({ cursor, atBlock });
-      const more: Item[] = [];
-      for (const entity of r.entities) {
-        const mapped = mapRow(entity);
-        if (mapped) more.push(mapped);
-      }
-      setItems((arr) => [...arr, ...more]);
-      setCursor(r.cursor);
-      push({ kind: 'info', text: `Loaded ${more.length} more rows.` });
-    } catch (e: unknown) {
-      const msg = uiError(e);
-      setErr(msg);
-      push({ kind: 'error', text: msg });
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    void load('replace');
+  }, [load]);
 
   return (
     <section className="section">
@@ -97,18 +108,39 @@ export default function ExplorerPage() {
         <p className="kicker">Tiramisu</p>
         <h1 className="h2">Explorer</h1>
         <p className="lead" style={{ marginTop: 10 }}>
-          Live CanaryDrop entities. Impostor desks are marked. The app only trusts the real desk wallet.
+          Live CanaryDrop entities. Impostor desks are marked. Sealed tips show a burn owner. Readonly means the payload cannot change.
         </p>
+        <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 12 }}>
+          <Link className="btn" href="/how">
+            How we use Arkiv <span className="arrow" aria-hidden="true" />
+          </Link>
+        </div>
+
+        <div className="filter-row" role="tablist" aria-label="Entity filter" style={{ marginTop: 16 }}>
+          {KINDS.map((k) => (
+            <button
+              key={k.id}
+              type="button"
+              role="tab"
+              aria-selected={filter === k.id}
+              className={`btn ${filter === k.id ? 'primary' : ''}`}
+              onClick={() => setFilter(k.id)}
+            >
+              {k.label}
+            </button>
+          ))}
+        </div>
 
         <div className="table-wrap" style={{ marginTop: 18 }}>
           <table className="data-table">
+            <caption className="sr-only">CanaryDrop entities on Tiramisu</caption>
             <thead>
               <tr>
-                <th>Type</th>
-                <th>Key</th>
-                <th>Creator</th>
-                <th>Owner</th>
-                <th>Expires</th>
+                <th scope="col">Type</th>
+                <th scope="col">Key</th>
+                <th scope="col">Creator</th>
+                <th scope="col">Owner</th>
+                <th scope="col">Expires</th>
               </tr>
             </thead>
             <tbody>
@@ -119,6 +151,16 @@ export default function ExplorerPage() {
                     {it.impostor && (
                       <div>
                         <span className="pill" style={{ marginTop: 6 }}>Ignored impostor</span>
+                      </div>
+                    )}
+                    {it.readonly && (
+                      <div>
+                        <span className="pill" style={{ marginTop: 6 }}>Readonly</span>
+                      </div>
+                    )}
+                    {!it.openExtend && it.readonly && (
+                      <div>
+                        <span className="pill" style={{ marginTop: 6 }}>No open extend</span>
                       </div>
                     )}
                   </td>
@@ -146,7 +188,7 @@ export default function ExplorerPage() {
               {items.length === 0 && (
                 <tr>
                   <td colSpan={5} className="muted">
-                    {loading ? 'Loading…' : 'No rows yet.'}
+                    <span role="status">{loading ? 'Loading live rows…' : 'No rows for this filter.'}</span>
                   </td>
                 </tr>
               )}
@@ -155,12 +197,17 @@ export default function ExplorerPage() {
         </div>
 
         <div className="ctaRow" style={{ justifyContent: 'flex-start' }}>
-          <button className="btn primary" onClick={loadMore} disabled={!cursor || loading} type="button">
+          <button className="btn primary" onClick={() => void load('append', cursor, atBlock)} disabled={!hasMore || loading} type="button">
             {loading ? 'Loading' : 'Load more'} <span className="arrow" aria-hidden="true" />
           </button>
         </div>
+        {atBlock !== undefined && (
+          <p className="muted" style={{ marginTop: 8 }}>
+            Pinned to block {atBlock.toString()} so extra pages cannot shift.
+          </p>
+        )}
         {err && (
-          <div className="muted" style={{ color: '#ffb048', marginTop: 8 }}>
+          <div className="muted" style={{ color: '#ffb048', marginTop: 8 }} role="alert">
             {err}
           </div>
         )}

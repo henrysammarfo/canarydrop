@@ -32,6 +32,7 @@ export default function DocsPage() {
             <strong>Live pages</strong>
             <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 10 }}>
               <Link className="btn" href="/verify">Verify <span className="arrow" aria-hidden="true" /></Link>
+              <Link className="btn" href="/how">How we use Arkiv <span className="arrow" aria-hidden="true" /></Link>
               <Link className="btn" href="/submit">Submit <span className="arrow" aria-hidden="true" /></Link>
               <Link className="btn" href="/desk">Desk <span className="arrow" aria-hidden="true" /></Link>
               <Link className="btn" href="/explorer">Explorer <span className="arrow" aria-hidden="true" /></Link>

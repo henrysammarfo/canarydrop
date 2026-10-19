@@ -18,3 +18,9 @@ export function attrU64(attrs: Attributes | undefined, name: string): bigint | u
   if (!cell || cell.type !== 'u64') return undefined;
   return cell.value;
 }
+
+export function attrBool(attrs: Attributes | undefined, name: string): boolean | undefined {
+  const cell = attrs?.[name];
+  if (!cell || cell.type !== 'bool') return undefined;
+  return cell.value;
+}

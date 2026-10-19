@@ -31,9 +31,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={sora.variable}>
       <body data-nonce={nonce}>
         <ToastProvider>
+          <a className="skip-link" href="#main">
+            Skip to content
+          </a>
           <div className="container">
             <Nav />
-            {children}
+            <main id="main">{children}</main>
             <Footer />
           </div>
         </ToastProvider>

@@ -12,11 +12,12 @@ Verify in 60 seconds, no keys needed
 
 You do not need a wallet and you do not need to install anything.
 
-1. Open https://canarydrop.vercel.app/verify (or `/verify` on a preview of this branch).
+1. Open https://canarydrop.vercel.app/verify (or `/verify` on a preview).
 2. Open the public canary page. It should say ALIVE if the demo desk has been renewed.
 3. Open Submit. Write a fake sentence. Send it. The sponsor pays the fee.
 4. Open Explorer. Find a tip row. Sealed tips show the burn owner.
-5. Optional: open Desk, turn on Demo mode. On this branch a fresh browser loads a shared testnet desk key so you can read tips. Production on main still keeps that key in the creating browser until this branch is merged. Do not use Demo mode for a real newsroom.
+5. Open How we use Arkiv. Each claim is a live Tiramisu read with explorer links.
+6. Optional: open Desk, turn on Demo mode. A fresh browser loads a shared testnet desk key so you can read tips. Do not use Demo mode for a real newsroom.
 
 Local readback, still no private keys:
 
@@ -68,6 +69,7 @@ Live pages
 - `/explorer` : live feed of CanaryDrop entities on Tiramisu
 - `/canary/[creator]` : public canary status page
 - `/docs` : architecture, schema and friction report
+- `/how` : live Tiramisu proofs for every Arkiv feature the product uses
 - `/verify` : sixty second judge path, no keys needed
 
 Design
@@ -91,10 +93,18 @@ All Arkiv calls are implemented in `lib/arkiv.ts` and `lib/relay.ts`, verified a
 - Read canary status and list tips:
   - `getDesk(deskCreator)`: desk pinned to the newsroom’s wallet
   - `canaryAlive(deskCreator, deskKey)`: polls (expiry fires no event)
-  - `inboxPage(deskKey)`: cursor‑paginated tips, `.createdBy(RELAY)` only
-  - `watchInbox(deskKey, onTip)`: WebSocket live events, then `getEntity` and decrypt client‑side
+  - `canaryAtBlock(deskCreator, deskKey, block)`: the same canary query at a pinned block
+  - `inboxPage(deskKey)`: cursor‑paginated tips, `.createdBy(RELAY)` only, `hasNextPage()`
+  - `watchInbox`: WebSocket live events including seal, patch, and delete, then `getEntity` and decrypt client‑side
 - Reply (desk) and read replies (source):
-  - `reply(w, tipKey, wire)` and `repliesFor(tipKey, deskCreator)`
+  - `reply(w, tipKey, wire)` uses `executeBatch` (same as other writes) and `repliesFor(tipKey, deskCreator)`
+- Sealed proof and explorer:
+  - `sealedTips()`: `.createdBy(RELAY).ownedBy(0x…dEaD)` plus `creationFlags`
+  - `explorerPage({ kind, sealed })`: type filters and burn owner
+  - `tipsOrCanaries()`: `or(eq("type","tip"), eq("type","canary"))`
+- Honest chain facts:
+  - `getEntityNonce(owner)` is the mint counter `predictEntityKeys` reads
+  - `getEntityCount()` is every live entity on Tiramisu, not this project. Queries always add `project`.
 
 Crypto
 ------
@@ -116,17 +126,21 @@ select({key,creator,expiresAt,payload})
   .where(eq("project",P), eq("type","desk"), gt("$expiresAt", u64(head)))
   .createdBy(DESK).limit(1)
 // 2. Canary status
-select({key,expiresAt})
+select({key,expiresAt,creationFlags,owner})
   .where(eq("project",P), eq("type","canary"), eq("desk", key(deskKey)), gt("$expiresAt", u64(head)))
   .createdBy(DESK).limit(1)
 // 3. Desk inbox
 select({key,createdAt,expiresAt,payload})
   .where(eq("project",P), eq("type","tip"), eq("desk", key(deskKey)))
-  .createdBy(RELAY).limit(50).cursor(c)
+  .createdBy(RELAY).limit(50).atBlock(head).cursor(c)
 // 4. Replies a source can trust
 select({key,payload})
   .where(eq("project",P), eq("type","reply"), eq("tip", key(tipKey)))
   .createdBy(DESK).limit(20)
+// 5. Sealed tips (create plus burn owner in one query)
+select({key,owner,creator,creationFlags})
+  .where(eq("project",P), eq("type","tip"))
+  .createdBy(RELAY).ownedBy(0x…dEaD).limit(20)
 ```
 
 Wallet addresses (testnet only)
@@ -189,25 +203,12 @@ Set these Environment Variables (Production + Preview):
 
 Production URL: https://canarydrop.vercel.app
 
-Shared store (Upstash Redis)
-----------------------------
+Shared limits
+-------------
 
-Per IP sliding windows and relay or desk wallet locks need a store every Vercel isolate can see. The app reads these env vars, in this order:
+Per IP sliding windows and relay or desk wallet locks use a Redis REST store when those env vars are already present. If they are missing, the app still boots. Limits and locks stay in that process, and one warning is logged. The Arkiv daily `slot` cap and the GLM floor still bound spend either way.
 
-1. `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`
-2. or the Vercel Marketplace names `KV_REST_API_URL` and `KV_REST_API_TOKEN`
-
-`KV_URL` (the rediss URL) is never read and never logged. If the REST pair is missing, the app still boots. Limits and locks stay in that process, and one warning is logged.
-
-How to connect Upstash for preview deploys of this branch. This is a Vercel dashboard step. It is not a git change, and this repo does not store the token.
-
-1. Open the CanaryDrop project: https://vercel.com/teamtitanlink/canarydrop
-2. Open Storage (or Marketplace / Integrations) and choose Upstash for Redis.
-3. Create a new Redis database, or connect one you already have.
-4. Enable the integration for the Preview environment so `v2-hardening` preview deploys receive the REST URL and token. Leave Production untouched unless you decide to share the store there too.
-5. Redeploy the `v2-hardening` preview from Vercel Deployments so the new env is present. Do not paste the token into `.env` files that might be committed. Do not put it in git.
-
-Local `npm run dev` without those env vars is expected. You will see the missing store warning once.
+Local `npm run dev` without a shared store is expected.
 
 Chain configuration
 -------------------
@@ -226,17 +227,17 @@ Full threat model: `SECURITY.md`. Short version:
 - Write APIs require an allowed Origin. A missing Origin is 403. Host checks are exact hostname matches, not `includes()`.
 - CSRF cookie `cd_csrf` must match header `x-csrf-token`. `Sec-Fetch-Site: cross-site` and `same-site` are rejected.
 - The relay calls `getEntity` and refuses to pay if the target is not a live CanaryDrop desk.
-- Concurrent tips take a Redis lock per relay or desk wallet, then a per process queue, a pending nonce, and backoff. A mutation error with a tx hash is not retried. Redis is not used as an Ethereum nonce counter.
-- Durable spend caps live on Arkiv: `slot` is the UTC day on new tips, replies, and desks. GLM below 0.02 stops writes. Per IP sliding windows use Upstash Redis when the Marketplace env vars are set. If they are missing, the app still runs with an in process window and logs one warning.
+- Concurrent tips take a Redis lock per relay or desk wallet when a REST store is configured, then a per process queue, a pending nonce, and backoff. A mutation error with a tx hash is not retried. Redis is not used as an Ethereum nonce counter.
+- Durable spend caps live on Arkiv: `slot` is the UTC day on new tips, replies, and desks. GLM below 0.02 stops writes. Per IP sliding windows use a Redis REST store when those env vars are set. If they are missing, the app still runs with an in process window and logs one warning.
 - Ciphertext cap is 8192 bytes after base64 decode. Zod and the relay share that constant.
 - Route handlers map failures to public codes. RPC text and stacks are not returned.
 - CSP drops `unsafe-eval`, uses a per request script nonce with `strict-dynamic`, and allowlists Tiramisu RPC on `connect-src`. `style-src` still has `unsafe-inline` because React sets element styles.
-- Demo mode on this branch fetches a shared testnet P-256 key derived from `DESK_PRIVATE_KEY` so a fresh browser can open demo tips. That key is not committed.
+- Demo mode fetches a shared testnet P-256 key derived from `DESK_PRIVATE_KEY` so a fresh browser can open demo tips. That key is not committed.
 
 Friction and SDK notes
 ----------------------
 
-See `arkiv/friction.md` (F1 to F19, live error text from Tiramisu). Repro: `npm run friction` runs `arkiv/repro/run-all.mjs`. Only issues reproduced in this repo are listed.
+See `arkiv/friction.md` (F1 to F25, live error text from Tiramisu). Repro: `npm run friction` runs `arkiv/repro/run-all.mjs`. Only issues reproduced in this repo are listed.
 
 AI usage
 --------
@@ -251,12 +252,12 @@ On Tiramisu the relay `0xa6Aa6a1409eb54028550466169A29EAfd8f7a442` and desk `0x1
 Tests
 -----
 
-GitHub Actions CI runs lint, typecheck, vitest, production build, and Playwright on every push.
+Run these locally. Do not wait on hosted workflows.
 
-- Unit: crypto, origin, CSRF, rate limit, Redis store, wallet lock, retry, CSP, schemas, errors, spend caps, chain helpers
+- Unit: crypto, origin, CSRF, rate limit, Redis store, wallet lock, retry, CSP, schemas, errors, spend caps, chain helpers, proofs text
 - API: tip and demo routes, missing Origin, CSRF mismatch, size caps, missing desk, demo key
-- Integration: live Tiramisu reads, inbox pagination mock, dry run against a live desk
-- E2E: routes, mobile overflow, dry run toast, desk Demo mode, CSP header, verify page, CSRF cookie
+- Integration: live Tiramisu reads (sealed tips, `ownedBy`, flags, nonce, count), inbox pagination mock, dry run against a live desk
+- E2E: routes including `/how`, mobile overflow, dry run toast, desk Demo mode, CSP header, verify page, CSRF cookie
 
 ```bash
 npm run lint

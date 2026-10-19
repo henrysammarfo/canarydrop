@@ -123,6 +123,11 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
               <div style={{ marginTop: 6 }}>
                 <code>{canary.key}</code>
               </div>
+              {canary.creationFlags && (
+                <p className="muted" style={{ marginTop: 8 }}>
+                  Readonly {canary.creationFlags.readonly ? 'yes' : 'no'}. Anyone can extend {canary.creationFlags.permissionlessExtension ? 'yes' : 'no'}.
+                </p>
+              )}
               <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 12 }}>
                 <a className="btn primary" href={entityUrl(canary.key)} target="_blank" rel="noreferrer">
                   View canary entity <span className="arrow" aria-hidden="true" />

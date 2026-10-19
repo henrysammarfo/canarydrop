@@ -16,6 +16,20 @@
       "canaryKey": "0x5a9cc9685585f462cc85dfdc2884f06309aa2cda9cc10acfeaa1a260e5a7cc70"
     }
   ],
+  "tips": [
+    {
+      "key": "0xd4f74471b97a44751650ccb4fd473a6056715d327497838f2a1c36da13e67f51",
+      "tx": "0xfba666e2ed91c4cd35f0020959cfe48520247f3ab6a96efa1b5e0ed2868744d9"
+    },
+    {
+      "key": "0xb4301aeffa5a5364d2de46b6485c04cc44fcf2000ebc1194a672769d5014cab8",
+      "tx": "0x2401d9b57ae4545d4f2aee716476db731bcd7cc260c9c1ae42f1ec5e0b6df83c"
+    },
+    {
+      "key": "0x4e65bf8206c285562c47d5893f15c7f78beb06337e80fe3414b1c196ebfc82b2",
+      "tx": "0x96c37ab0a3592f02abe6ac75565fb5b0c400bb451156d2c156246728f3fc886f"
+    }
+  ],
   "addresses": {
     "relay": "0xa6Aa6a1409eb54028550466169A29EAfd8f7a442",
     "desk": "0x1da3c22c079c264536D831F6F1fCe638aB0b20B0",

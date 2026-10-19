@@ -37,9 +37,16 @@ export default function VerifyPage() {
           </li>
           <li>
             <strong>Open the desk in a fresh browser.</strong>
-            <p className="muted">Turn on Demo mode. This branch loads a shared testnet desk key so you can read tips without the original laptop.</p>
+            <p className="muted">Turn on Demo mode. This site loads a shared testnet desk key so you can read tips without the original laptop.</p>
             <Link className="btn primary" href="/desk">
               Open the desk <span className="arrow" aria-hidden="true" />
+            </Link>
+          </li>
+          <li>
+            <strong>See how each Arkiv feature is used.</strong>
+            <p className="muted">The How page runs live queries and links every claim to Tiramisu explorer.</p>
+            <Link className="btn primary" href="/how">
+              How we use Arkiv <span className="arrow" aria-hidden="true" />
             </Link>
           </li>
         </ol>

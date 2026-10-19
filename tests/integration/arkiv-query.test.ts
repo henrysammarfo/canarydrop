@@ -12,6 +12,7 @@ describe('arkiv query helpers against Tiramisu', () => {
     expect(page.blockNumber).toBeGreaterThan(0n);
     expect(Array.isArray(page.entities)).toBe(true);
     expect(page.cursor === undefined || typeof page.cursor === 'string').toBe(true);
+    expect(typeof page.hasNextPage).toBe('function');
   });
 
   it('requireLiveDesk maps a missing key to no_desk', async () => {

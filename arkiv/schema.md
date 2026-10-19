@@ -23,21 +23,31 @@ No timestamps, names, emails, IPs or hashes of personal data are stored as attri
 ## Queries the app runs
 ```ts
 // 1. Desk page (source side): pinned to the newsroom's on-chain creator, so impersonators never match
-select({key,creator,expiresAt,payload}).where(eq("project",P), eq("type","desk"), gt("$expiresAt", u64(head))).createdBy(DESK).limit(1)
-// 2. Canary status
-select({key,expiresAt}).where(eq("project",P), eq("type","canary"), eq("desk", key(deskKey)), gt("$expiresAt", u64(head))).createdBy(DESK).limit(1)
-// 3. Desk inbox (cursor pagination, client-side sort by createdAt)
-select({key,createdAt,expiresAt,payload}).where(eq("project",P), eq("type","tip"), eq("desk", key(deskKey))).createdBy(RELAY).limit(50).cursor(c)
+select({key,creator,expiresAt,payload}).where(eq("project",P), eq("type","desk"), gt("$expiresAt", u64(head))).createdBy(DESK).limit(20)
+// 2. Canary status, including creationFlags so the page can show readonly / no open extend
+select({key,expiresAt,creationFlags,owner}).where(eq("project",P), eq("type","canary"), eq("desk", key(deskKey)), gt("$expiresAt", u64(head))).createdBy(DESK).limit(1)
+// 3. Desk inbox (cursor pagination, pin the block, client-side sort by createdAt)
+select({key,createdAt,expiresAt,payload}).where(eq("project",P), eq("type","tip"), eq("desk", key(deskKey))).createdBy(RELAY).limit(50).atBlock(head).cursor(c)
 // 4. Replies a source can trust
 select({key,payload}).where(eq("project",P), eq("type","reply"), eq("tip", key(tipKey))).createdBy(DESK).limit(20)
+// 5. Sealed tips: creator is the sponsor, owner is the burn address
+select({key,owner,creator,creationFlags}).where(eq("project",P), eq("type","tip")).createdBy(RELAY).ownedBy(0x…dEaD).limit(20)
+// 6. Explorer filters: type and optional ownedBy(burn)
+select({key,attributes,creator,owner,expiresAt,createdAt,creationFlags}).where(eq("project",P), eq("type", kind?)).ownedBy(burn?).limit(20).atBlock(head)
 ```
-Live: `watchEntityEvents({ onEntityCreated })` over a `webSocket()` transport, no `fromBlock`.
+Live: `watchEntityEvents({ onEntityCreated, onExpiryExtended, onOwnershipTransferred, onEntityPatched, onEntityDeleted })` over a `webSocket()` transport, no `fromBlock`. Walk extra pages only when `hasNextPage()` is true.
+
+`getEntityNonce(owner)` is the mint counter `predictEntityKeys` reads. It is not the Ethereum pending nonce.
+
+`getEntityCount()` is every live entity on Tiramisu. It is not "how many CanaryDrop entities exist". Project counts still use `eq("project", P)`.
+
+`builder.toString()` is the predicate only. It does not print SELECT or LIMIT.
 
 ## Writes
 - `executeBatch({ creates:[desk, canary] })` with keys from `predictEntityKeys` (canary references desk in the same tx)
 - `executeBatch({ extensions:[canary 26h, desk 30d] })` = "sign today's canary"
 - `executeBatch({ creates:[tip], ownershipChanges:[{ entityKey: tip, newOwner: 0x…dEaD }] })` (relay)
-- `createEntity` (reply)
+- `executeBatch({ creates:[reply], extensions:[desk 30d] })` (desk reply)
 
 ## Example on‑chain keys and tx hashes (Tiramisu)
 - Desk `0x874e543a36fd673980ca4f2cd992ef9ac1aca38218f1232452bb5d7a7fac6231` and canary `0x5a9cc9685585f462cc85dfdc2884f06309aa2cda9cc10acfeaa1a260e5a7cc70` created atomically — tx https://tiramisu.explorer.arkiv.network/tx/0x6558bfd29237fd4b131fbee1d74f13ac3ce1152d88a5ae05d24d5f33a1dc35be

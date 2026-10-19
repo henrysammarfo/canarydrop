@@ -7,6 +7,8 @@ import {
 } from '@arkiv-network/sdk';
 import type {
   EntityCreatedEvent,
+  EntityDeletedEvent,
+  EntityPatchedEvent,
   ExpiryExtendedEvent,
   FullEntity,
   ProjectedEntity,
@@ -17,7 +19,7 @@ import type {
 } from '@arkiv-network/sdk';
 import { key, str, u64 } from '@arkiv-network/sdk/attr';
 import { tiramisu } from '@arkiv-network/sdk/chains';
-import { eq, gt } from '@arkiv-network/sdk/query';
+import { eq, gt, gte, lte, or } from '@arkiv-network/sdk/query';
 import type { Hex } from 'viem';
 import { custom } from 'viem';
 import { attrKey, attrStr } from './attr';
@@ -33,10 +35,30 @@ export type Wallet = WalletArkivClient;
 export type PublicClient = PublicArkivClient;
 
 const DESK_SELECT = { key: true, creator: true, expiresAt: true, payload: true, createdAt: true } as const;
-const CANARY_SELECT = { key: true, expiresAt: true, createdAt: true } as const;
-const INBOX_SELECT = { key: true, createdAt: true, expiresAt: true, payload: true } as const;
+const CANARY_SELECT = { key: true, expiresAt: true, createdAt: true, creationFlags: true, owner: true } as const;
+const INBOX_SELECT = { key: true, createdAt: true, expiresAt: true, payload: true, owner: true } as const;
 const REPLY_SELECT = { key: true, payload: true, createdAt: true } as const;
 const COUNT_SELECT = { key: true } as const;
+const SEALED_SELECT = {
+  key: true,
+  owner: true,
+  creator: true,
+  createdAt: true,
+  expiresAt: true,
+  creationFlags: true,
+  attributes: true,
+} as const;
+const EXPLORER_SELECT = {
+  key: true,
+  attributes: true,
+  creator: true,
+  owner: true,
+  expiresAt: true,
+  createdAt: true,
+  creationFlags: true,
+} as const;
+
+export type ExplorerKind = 'tip' | 'desk' | 'canary' | 'reply';
 
 export type DeskRow = ProjectedEntity<typeof DESK_SELECT>;
 export type CanaryRow = ProjectedEntity<typeof CANARY_SELECT>;
@@ -218,6 +240,8 @@ export type InboxWatchHandlers = {
   onTip: (k: Hex) => void;
   onExpiry?: (k: Hex, expiresAt: bigint) => void;
   onSealed?: (k: Hex) => void;
+  onPatched?: (k: Hex) => void;
+  onDeleted?: (k: Hex) => void;
   onError?: (err: Error) => void;
 };
 
@@ -246,6 +270,12 @@ export function watchInbox(deskKey: Hex, onTipOrHandlers: ((k: Hex) => void) | I
       },
       onOwnershipTransferred: (ev) => {
         if (ev.newOwner.toLowerCase() === SEALED_OWNER.toLowerCase()) handlers.onSealed?.(ev.entityKey);
+      },
+      onEntityPatched: (ev: EntityPatchedEvent) => {
+        handlers.onPatched?.(ev.entityKey);
+      },
+      onEntityDeleted: (ev: EntityDeletedEvent) => {
+        handlers.onDeleted?.(ev.entityKey);
       },
       onError: (err: Error) => {
         handlers.onError?.(err);
@@ -300,13 +330,90 @@ export async function countBySlot(kind: 'tip' | 'reply' | 'desk', creator: Hex, 
   return page.entities.length;
 }
 
-export async function explorerPage(opts?: PageWalk) {
+export type ExplorerWalk = PageWalk & {
+  kind?: ExplorerKind;
+  sealed?: boolean;
+};
+
+export async function explorerPage(opts?: ExplorerWalk) {
+  const head = opts?.atBlock ?? (await headBlock());
+  const filters = [eq('project', PROJECT)];
+  if (opts?.kind) filters.push(eq('type', opts.kind));
+  let q = pub().select(EXPLORER_SELECT).where(...filters).limit(20).atBlock(head);
+  if (opts?.sealed) q = q.ownedBy(SEALED_OWNER);
+  if (opts?.cursor) q = q.cursor(opts.cursor);
+  return q.fetch();
+}
+
+/** Tips the sponsor created and then handed to the burn address. Nobody can extend them. */
+export async function sealedTips(opts?: PageWalk) {
   const head = opts?.atBlock ?? (await headBlock());
   let q = pub()
-    .select({ key: true, attributes: true, creator: true, owner: true, expiresAt: true, createdAt: true })
-    .where(eq('project', PROJECT))
+    .select(SEALED_SELECT)
+    .where(eq('project', PROJECT), eq('type', 'tip'))
+    .createdBy(relayAddress())
+    .ownedBy(SEALED_OWNER)
     .limit(20)
     .atBlock(head);
   if (opts?.cursor) q = q.cursor(opts.cursor);
   return q.fetch();
+}
+
+export async function tipsOrCanaries() {
+  return pub()
+    .select({ key: true, attributes: true, owner: true, creator: true })
+    .where(eq('project', PROJECT), or(eq('type', 'tip'), eq('type', 'canary')))
+    .limit(20)
+    .fetch();
+}
+
+/** slot is YYYYMMDD. Use this instead of filtering $createdAt, which the node rejects. */
+export async function countTipsFromSlot(creator: Hex, fromSlot: bigint): Promise<number> {
+  const page = await pub()
+    .select(COUNT_SELECT)
+    .where(eq('project', PROJECT), eq('type', 'tip'), gte('slot', u64(fromSlot)))
+    .createdBy(creator)
+    .limit(200)
+    .fetch();
+  return page.entities.length;
+}
+
+export async function countTipsToSlot(creator: Hex, toSlot: bigint): Promise<number> {
+  const page = await pub()
+    .select(COUNT_SELECT)
+    .where(eq('project', PROJECT), eq('type', 'tip'), lte('slot', u64(toSlot)))
+    .createdBy(creator)
+    .limit(200)
+    .fetch();
+  return page.entities.length;
+}
+
+export function mintNonce(owner: Hex): Promise<bigint> {
+  return pub().getEntityNonce(owner);
+}
+
+export function chainEntityCount(): Promise<number> {
+  return pub().getEntityCount();
+}
+
+/** Predicate text the node will parse. This is not the full select or limit. */
+export function queryPredicate(builder: { toString: () => string }): string {
+  return builder.toString();
+}
+
+export function sealedTipsQueryText(): string {
+  return pub()
+    .select(SEALED_SELECT)
+    .where(eq('project', PROJECT), eq('type', 'tip'))
+    .createdBy(relayAddress())
+    .ownedBy(SEALED_OWNER)
+    .toString();
+}
+
+export function liveDeskQueryText(creator: Hex): string {
+  return pub()
+    .select(DESK_SELECT)
+    .where(eq('project', PROJECT), eq('type', 'desk'))
+    .createdBy(creator)
+    .toString();
 }

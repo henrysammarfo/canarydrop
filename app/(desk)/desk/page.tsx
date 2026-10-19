@@ -147,7 +147,7 @@ export default function DeskPage() {
       for (const row of page.entities) {
         if (row.key && row.payload) await ingestTip(row.key, row.payload, row.createdAt ?? 0n, deskPriv);
       }
-      setInboxCursor(page.cursor);
+      setInboxCursor(page.hasNextPage() ? page.cursor : undefined);
       setInboxBlock(page.blockNumber);
     } catch (e: unknown) {
       push({ kind: 'error', text: uiError(e) });
@@ -177,6 +177,15 @@ export default function DeskPage() {
             },
             onExpiry: (k) => {
               if (k === c?.key) setAlive(true);
+            },
+            onSealed: () => {
+              push({ kind: 'info', text: 'A tip was sealed to the burn address.' });
+            },
+            onPatched: () => {
+              push({ kind: 'info', text: 'An entity was patched. Sealed tips should never patch.' });
+            },
+            onDeleted: (k) => {
+              push({ kind: 'info', text: `An entity was deleted ${shortHex(k)}.` });
             },
             onError: () => {
               if (d.key && priv) void loadHistory(d.key, priv);
@@ -450,7 +459,13 @@ export default function DeskPage() {
 
           <div className="tabs" style={{ marginTop: 18 }}>
             {(['inbox', 'canary', 'keys', 'settings'] as const).map((k) => (
-              <button key={k} className={`btn ${tab === k ? 'primary' : ''}`} onClick={() => setTab(k)}>
+              <button
+                key={k}
+                type="button"
+                className={`btn ${tab === k ? 'primary' : ''}`}
+                onClick={() => setTab(k)}
+                aria-pressed={tab === k}
+              >
                 {k}
               </button>
             ))}
@@ -472,7 +487,9 @@ export default function DeskPage() {
                   Older tips load from Arkiv. New tips arrive live. {skippedTips > 0 ? `${skippedTips} sealed tips could not be opened with this key.` : ''}
                 </p>
                 {tips.length === 0 ? (
-                  <p className="muted" style={{ marginTop: 8 }}>{loadingInbox ? 'Loading tips…' : 'No tips yet. This view updates live.'}</p>
+                  <p className="muted empty-state" style={{ marginTop: 8 }} role="status">
+                    {loadingInbox ? 'Loading tips from Arkiv…' : 'No tips yet. This view updates live when a source sends one.'}
+                  </p>
                 ) : (
                   <ul style={{ padding: 0, marginTop: 12 }}>
                     {tips.map((t) => (

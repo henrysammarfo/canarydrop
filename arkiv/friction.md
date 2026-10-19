@@ -1,7 +1,7 @@
 # Friction report: CanaryDrop on Arkiv Tiramisu
 
 Environment: `@arkiv-network/sdk` 0.8.1, viem 2.57.7, Node 20+, Tiramisu chain 7738577.
-Date of this pass: 19 Oct 2026. Head at repro time: block 770062, 2s blocks.
+Date of this pass: 19 Oct 2026. Head at repro time: block 772182, 2s blocks.
 Repro: `npm run friction` runs `arkiv/repro/run-all.mjs`. Every script is read only and needs no wallet.
 
 This report lists only issues we reproduced in this repo or measured against the live Tiramisu RPC. Severity is from the point of view of an app that posts sealed tips and a warrant canary.
@@ -29,6 +29,12 @@ This report lists only issues we reproduced in this repo or measured against the
 | F17 | `QueryResult.next()` throws `NoMoreResultsError` | Medium | Check `hasNextPage()` or a missing `cursor` |
 | F18 | `TxParams.nonce` is how you pin a pending nonce | Medium | We pass `{ nonce }` into `executeBatch` |
 | F19 | `jsonToPayload` is not for ciphertext | Low | Tips stay `Uint8Array`. We never call `Entity.toJson()` |
+| F20 | `exists` / `NOT EXISTS` | Medium | QueryError kind `type`. We never ship this operator |
+| F21 | `ne` / `!=` | Medium | QueryError kind `type`. Filters stay positive `eq` |
+| F22 | `hasType` / `TYPEOF` | Medium | QueryError kind `type`. Types are set at write time |
+| F23 | Empty `toString()` | Low | A query needs at least one filter |
+| F24 | `getEntityCount` is chain wide | Medium | We print it as whole-chain, then query `project` |
+| F25 | `toString()` is predicate only | Low | Judge page shows the predicate, not SELECT/LIMIT |
 
 ## Method
 
@@ -88,7 +94,7 @@ InvalidPredicateError "$expiresAt" is a u64, but the value is a u256. System att
 Wrapped:
 
 ```
-F3 wrap ok entities 1 block 770062
+F3 wrap ok entities 1 block 772182
 ```
 
 A canary "is alive" query that forgets `u64(...)` looks like an empty result if you swallow the error. We never swallow it on the canary page.
@@ -118,7 +124,7 @@ Script: `arkiv/repro/f5-query-page.mjs`
 F5 keys entities,true,true,false
 F5 cursorType string
 F5 hasNext true
-F5 count 5 block 770062
+F5 count 5 block 772183
 ```
 
 `nextCursor` is not on the SDK `QueryResult`. Main's explorer used `r.nextCursor`, so Load more never armed. v2 uses `page.cursor`, `page.blockNumber`, and `page.hasNextPage()`.
@@ -143,7 +149,7 @@ The inbox watcher therefore:
 2. Calls `getEntity`.
 3. Reads `attributes.type` and `attributes.desk`.
 
-That is an extra read per create. An attribute topic on the log would remove it. We also listen for `onExpiryExtended` so a canary renew can flip the ALIVE badge without a full poll, and `onOwnershipTransferred` so a seal to the burn address is visible.
+That is an extra read per create. An attribute topic on the log would remove it. We also listen for `onExpiryExtended` so a canary renew can flip the ALIVE badge without a full poll, `onOwnershipTransferred` so a seal to the burn address is visible, and `onEntityPatched` / `onEntityDeleted` so a change attempt is visible.
 
 ## F8. Expiry is silent
 
@@ -166,7 +172,7 @@ What we do:
 - No retry when `EntityMutationError.txHash` is set. That case means the tx may have landed and a replay would double spend.
 - We do not store the next Ethereum nonce in Redis. A skipped nonce would stall the wallet.
 
-If Upstash env vars are missing, this falls back to the process queue and one warning is logged. The Arkiv daily `slot` cap and the GLM floor still bound spend.
+If Redis REST env vars are missing, this falls back to the process queue and one warning is logged. The Arkiv daily `slot` cap and the GLM floor still bound spend.
 
 ## F10. Anonymous RPC budget
 
@@ -174,7 +180,7 @@ The default Tiramisu HTTP URL is public and rate limited. viem's default transpo
 
 We set `retryCount: 0` and `timeout: 20_000` on both HTTP and WebSocket. Failures map to `rate_limited` or `try_later`. We never log the RPC URL with a credential appended. This repo does not use a Hub access key.
 
-We did not measure a fresh 429 in this pass. Sealdrop and Safe Journal documented the hang. Our change is fail fast, which we can unit test, plus live reads in CI that will fail loudly if the public RPC is down.
+We did not measure a fresh 429 in this pass. Our change is fail fast, which we can unit test, plus live reads in the test suite that fail loudly if the public RPC is down.
 
 ## F11. WebSocket watch does not replay a gap
 
@@ -225,7 +231,7 @@ These paths were already on chain from the seed (see `arkiv/evidence.json` and t
 - `extendEntity` renewing canary and desk together.
 - `createdBy` ignoring an impersonator desk.
 - `getBlockTiming` plus `u64` expiry queries.
-- `QueryResult.cursor` pagination on live `project = canarydrop-gts26-hm` rows (F5, 5 entities at block 770062).
+- `QueryResult.cursor` pagination on live `project = canarydrop-gts26-hm` rows (F5, 5 entities at block 772183).
 
 ## Smooth SDK paths we now lean on
 
@@ -237,6 +243,10 @@ From Arkiv docs, `arkiv-sdk-js` 0.8.1, and `Arkiv-Network/skills` AGENTS.md:
 - `onExpiryExtended` and `onOwnershipTransferred` in addition to `onEntityCreated`.
 - Explicit `str`, `key`, `u64` constructors on writes.
 - Fail fast HTTP, no Hub key in git.
+- `.ownedBy` plus `.createdBy` in one sealed-tip query.
+- `creationFlags` on canary and sealed tip rows.
+- `or(...)` for mixed type explorer pages.
+- `QueryResult.hasNextPage()` instead of guessing at `nextCursor`.
 
 ## What we did not reproduce this pass
 
@@ -252,7 +262,7 @@ npm i
 npm run friction
 ```
 
-Expected: each script prints an `F*` line. `run-all.mjs` exits 0 if every script exits 0. F1–F3 are successful when they throw the documented SDK error. F3 wrap, F4, and F5 are successful when they return.
+Expected: each script prints an `F*` line. `run-all.mjs` exits 0 if every script exits 0. F1–F3 and F20–F23 are successful when they throw the documented SDK error. F3 wrap, F4, F5, F24, and F25 are successful when they return.
 
 ## Notes for SDK authors
 
@@ -263,12 +273,13 @@ Expected: each script prints an `F*` line. `run-all.mjs` exits 0 if every script
 5. Lead with WebSocket `watchEntityEvents` and say events have no attributes.
 6. Say `extendEntity` sets, it does not add.
 7. Say `predictEntityKeys` is racy under concurrent creates from one owner.
+8. Either implement `exists`, `ne`, and `hasType` on Tiramisu or stop exporting them from 0.8.1. The current error is QueryError kind `type` with "Requested resource not available."
+9. Say `getEntityCount` is chain wide.
+10. Say `toString()` is the predicate only.
 
 ## Honesty
 
-This report is longer because the earlier 47 line file skipped the live error text. Length is not the goal. Reproducible error classes are. If a future SDK release fixes F1–F4, the scripts here will start exiting 2 and CI can catch the drift.
-
-On the Clock published a 458 line friction file. Ours is not a rewrite of theirs. The extra pages here are the live class names from 0.8.1, the `cursor` trap that bit our own explorer, the predict-and-batch race, and the spend cap that uses `slot` because `$createdAt` cannot be filtered. If those pages are wrong, the repro scripts will say so.
+This report is longer because the earlier 47 line file skipped the live error text. Length is not the goal. Reproducible error classes are. If a future SDK release fixes F1–F4 or F20–F22, the scripts here will start exiting 2.
 
 ## Query cookbook we actually run
 
@@ -333,13 +344,31 @@ select({ key, payload, createdAt })
 Explorer:
 
 ```
-select({ key, attributes, creator, owner, expiresAt, createdAt })
+select({ key, attributes, creator, owner, expiresAt, createdAt, creationFlags })
   .where(eq("project", P))
   .limit(20)
   .atBlock(head)
 ```
 
-If you copy these into a one off script, wrap every numeric compare with `u64`. Do not filter `$createdAt`.
+Sealed tips:
+
+```
+select({ key, owner, creator, creationFlags })
+  .where(eq("project", P), eq("type", "tip"))
+  .createdBy(RELAY)
+  .ownedBy(0x…dEaD)
+  .limit(20)
+```
+
+Tips or canaries:
+
+```
+select({ key, attributes, owner, creator })
+  .where(eq("project", P), or(eq("type", "tip"), eq("type", "canary")))
+  .limit(20)
+```
+
+If you copy these into a one off script, wrap every numeric compare with `u64`. Do not filter `$createdAt`. Do not use `exists`, `ne`, or `hasType` on this node. They throw QueryError kind `type`.
 
 ## Concurrent write sequence
 
@@ -373,7 +402,7 @@ From `@arkiv-network/sdk` 0.8.1:
 - `ProjectedEntity<typeof SELECT>` for desk, canary, inbox, reply rows
 - `QueryResult<T>` for pages (`entities`, `cursor`, `blockNumber`, `hasNextPage`, `next`)
 - `FullEntity` for `getEntity`
-- `EntityCreatedEvent`, `ExpiryExtendedEvent`
+- `EntityCreatedEvent`, `ExpiryExtendedEvent`, `EntityPatchedEvent`, `EntityDeletedEvent`
 - `ExecuteBatchReturnType` for `txHash` and `createdEntities`
 - `EntityMutationError`, `NoEntityFoundError`
 - `Attributes` plus small helpers `attrStr`, `attrKey`, `attrU64`
@@ -387,27 +416,22 @@ From `@arkiv-network/sdk` 0.8.1:
 - `onEntityCreated`: owner must be the relay, then `getEntity`, then `type === "tip"` and `desk === deskKey`
 - `onExpiryExtended`: if the key is the current canary, mark ALIVE
 - `onOwnershipTransferred`: if `newOwner` is the burn address, the tip is sealed
+- `onEntityPatched` / `onEntityDeleted`: toast so a change attempt is visible
 - `onError`: unwatch, wait 2s, watch again, then `inboxPage` catch up
 
 We do not pass `fromBlock` on the first subscribe, because a desk that has been open for days would replay the chain. Catch up is a query, which is cheaper than a full log rewind.
 
 ## Product friction that is on us, not the SDK
 
-1. Demo decrypt on a fresh browser needs a shared P-256 key. Real desks must not use it. We derive it from `DESK_PRIVATE_KEY` at runtime so it is not in git. Production main, until this branch is merged, still only has the key in the creating browser.
+1. Demo decrypt on a fresh browser needs a shared P-256 key. Real desks must not use it. We derive it from `DESK_PRIVATE_KEY` at runtime so it is not in git.
 
-2. Per IP sliding windows and wallet locks use Upstash Redis when `UPSTASH_REDIS_REST_*` or `KV_REST_API_*` are set. Without those env vars the in process Map and queue remain, and we log one warning. That fallback is honest in SECURITY.md.
+2. Per IP sliding windows and wallet locks use a Redis REST store when those env vars are set. Without them the in process Map and queue remain, and we log one warning. That fallback is honest in SECURITY.md.
 
 3. `style-src 'unsafe-inline'` stays because React sets element styles. Script eval is gone. That is a trade, not a win on every axis.
 
 4. Historical tips without `slot` do not count toward the new daily cap. Operators who want a hard global cap still have the GLM floor.
 
 5. `getDesk` now prefers the newest live desk for a creator. Creating a second demo desk hides the old one. Old ciphertext will not open with the new public key. The inbox reports how many sealed tips it could not open.
-
-## Independent overlap with other Tiramisu reports
-
-Other hackathon repos also hit `$createdAt` (no index), bare `Date.now()`, `u64` on `$expiresAt`, uppercase attributes, faucet insolvency, and silent expiry. We re-ran the first four against 0.8.1 on 19 Oct 2026 instead of copying their logs. F5 (`cursor` vs `nextCursor`) bit our own explorer. F9 is the predict-and-batch race the SDK already warns about; we turned it into a queue plus a no-retry-on-txHash rule.
-
-We did not copy another team's friction file. If our error text matches theirs, that is the SDK speaking twice.
 
 ## F17. `next()` is not a boolean
 
@@ -430,13 +454,96 @@ Cursors are bound to the block they were read at. Mixing a cursor from block N w
 
 The SDK wallet client will fill a nonce if you omit it. That is fine for a human MetaMask click. It is not fine for a relay that may have two serverless isolates. We still pass `{ nonce }` so a retry on a 429 does not reuse a consumed prediction by accident: the retry reads pending count again inside the lock and queue.
 
-`predictEntityKeys` is a separate counter (entity minting nonce). The Redis wallet lock plus `SerialQueue` keep both reads together across isolates.
+`predictEntityKeys` is a separate counter (entity minting nonce). The wallet lock plus `SerialQueue` keep both reads together across isolates when a Redis REST store is configured.
 
 ## F19. JSON helpers are for JSON entities only
 
 `jsonToPayload` / `payloadToJson` are for desks and canaries. Tips and replies are `Uint8Array` ciphertext with `contentType: application/octet-stream`. Putting a tip through `payloadToJson` throws or yields garbage.
 
 `Entity.toJson()` in the SDK is typed as `any` because it is `JSON.parse`. We never call it. Desk JSON is parsed with `parseDeskPayload`, which checks `name` and a 65 byte `pub` array.
+
+## F20. `exists` is in the SDK and dead on Tiramisu
+
+Script: `arkiv/repro/f20-exists.mjs`
+
+```
+pub.select({ key: true }).where(eq("project", P), eq("type", "tip"), exists("slot")).limit(1).fetch()
+```
+
+Actual:
+
+```
+QueryError type Query rejected (type, -32002): Requested resource not available.. Query: project = str('canarydrop-gts26-hm') AND type = str('tip') AND EXISTS(slot)
+QueryError type Query rejected (type, -32002): Requested resource not available.. Query: project = str('canarydrop-gts26-hm') AND type = str('tip') AND NOT EXISTS(slot)
+```
+
+The SDK still exports `exists`. We wanted this to split seed tips (no `slot`) from new tips. Instead we query `eq("slot", u64(YYYYMMDD))` for the daily cap and we do not pretend older rows are in that bucket.
+
+## F21. `ne` is in the SDK and dead on Tiramisu
+
+Script: `arkiv/repro/f21-ne.mjs`
+
+```
+pub.select({ key: true }).where(eq("project", P), ne("type", "desk")).limit(1).fetch()
+```
+
+Actual:
+
+```
+QueryError type Query rejected (type, -32002): Requested resource not available.. Query: project = str('canarydrop-gts26-hm') AND type != str('desk')
+```
+
+Explorer filters therefore use `eq("type", kind)` for one type, or `or(eq("type","tip"), eq("type","canary"))` when a mixed page is useful. There is no working "not this type" operator on this node.
+
+## F22. `hasType` is in the SDK and dead on Tiramisu
+
+Script: `arkiv/repro/f22-has-type.mjs`
+
+```
+pub.select({ key: true }).where(eq("project", P), hasType("slot", "u64")).limit(1).fetch()
+```
+
+Actual:
+
+```
+QueryError type Query rejected (type, -32002): Requested resource not available.. Query: project = str('canarydrop-gts26-hm') AND TYPEOF(slot) = u64
+```
+
+Attribute types are fixed at write time. We wrap writes with `str`, `key`, `u64` and we do not ask the node to filter by type of an attribute.
+
+## F23. An empty query has no spelling
+
+Script: `arkiv/repro/f23-empty-query.mjs`
+
+```
+pub.select({ key: true }).toString()
+```
+
+Actual:
+
+```
+InvalidPredicateError A query needs at least one filter — the language has no spelling for 'match every entity". Add a where(...) predicate, or narrow by ownedBy(...) / createdBy(...).
+```
+
+We always start from `eq("project", P)`. That is also why `getEntityCount()` cannot replace a project query.
+
+## F24. `getEntityCount` is the whole chain
+
+Script: `arkiv/repro/f24-entity-count.mjs`
+
+`getEntityCount()` returns every live entity on Tiramisu. On this pass: `F24 count 35916 projectPage 7`. One CanaryDrop page with `limit(20)` is not in the same class of number. The How page prints the chain count and says so. Product counts still use `eq("project", P)` plus `type`.
+
+## F25. `toString()` is the predicate, not the full request
+
+Script: `arkiv/repro/f25-query-text.mjs`
+
+`SelectQueryBuilder.toString()` prints the filter the node will parse. A sealed tips builder renders as:
+
+```
+project = str('canarydrop-gts26-hm') AND type = str('tip') AND $owner = addr(0x000000000000000000000000000000000000dEaD) AND $creator = addr(0xa6Aa6a1409eb54028550466169A29EAfd8f7a442)
+```
+
+It does not print SELECT, LIMIT, or the projection. The How page shows that string on purpose. Copying it into a raw RPC without a select still needs those fields.
 
 ## Remaining unknowns
 
@@ -453,13 +560,20 @@ The SDK wallet client will fill a nonce if you omit it. That is fine for a human
 | `arkiv/repro/f3-head-type.mjs` | u256 vs u64 |
 | `arkiv/repro/f4-attribute-name.mjs` | SDK name grammar |
 | `arkiv/repro/f5-query-page.mjs` | `cursor` field |
+| `arkiv/repro/f20-exists.mjs` | `exists` QueryError |
+| `arkiv/repro/f21-ne.mjs` | `ne` QueryError |
+| `arkiv/repro/f22-has-type.mjs` | `hasType` QueryError |
+| `arkiv/repro/f23-empty-query.mjs` | empty `toString()` |
+| `arkiv/repro/f24-entity-count.mjs` | chain wide count |
+| `arkiv/repro/f25-query-text.mjs` | predicate `toString()` |
 | `arkiv/repro/run-all.mjs` | runner |
 | `lib/arkiv.ts` | queries, watch, batch helpers |
 | `lib/relay.ts` | sealed tip write |
 | `lib/retry.ts` | queue and backoff |
-| `lib/store.ts` | Upstash REST creds, fallback warning |
+| `lib/store.ts` | optional Redis REST creds, fallback warning |
 | `lib/wallet-lock.ts` | distributed lock per relay or desk wallet |
-| `lib/rate-limit.ts` | Upstash sliding window plus in process fallback |
+| `lib/rate-limit.ts` | Redis sliding window plus in process fallback |
+| `lib/proofs.ts` | live How page claims |
 | `SECURITY.md` | attacks we block and residual risk |
 | `lib/guard.ts` | GLM floor and Arkiv `slot` daily caps |
 
