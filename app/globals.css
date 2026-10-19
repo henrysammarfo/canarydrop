@@ -869,17 +869,17 @@ label.small {
 }
 .data-table {
   width: 100%;
-  min-width: 1080px;
+  min-width: 960px;
   border-collapse: collapse;
   font-size: 13px;
   table-layout: fixed;
 }
-.data-table .col-type { width: 32%; }
+.data-table .col-type { width: 26%; }
 .data-table .col-key { width: 14%; }
 .data-table .col-creator { width: 12%; }
 .data-table .col-owner { width: 14%; }
 .data-table .col-expires { width: 12%; }
-.data-table .col-actions { width: 16%; }
+.data-table .col-actions { width: 22%; }
 .data-table th, .data-table td {
   padding: 8px 12px;
   text-align: left;
@@ -914,6 +914,7 @@ label.small {
 .data-table .actions-cell {
   white-space: nowrap;
   overflow: visible;
+  min-width: 148px;
 }
 .data-table .actions-cell .ctaRow { gap: 6px; flex-wrap: nowrap; }
 .filter-row { display: flex; flex-wrap: wrap; gap: 8px; }

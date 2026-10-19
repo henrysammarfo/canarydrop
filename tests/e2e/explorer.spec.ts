@@ -50,17 +50,24 @@ for (const width of [1024, 1280, 1440, 1920] as const) {
     await page.goto('/explorer', { waitUntil: 'domcontentloaded' });
     await expect.poll(() => explorerTableText(page), { timeout: 45_000 }).toMatch(/tip|desk|canary/i);
     const clipped = await page.evaluate(() => {
+      const wrap = document.querySelector('.table-wrap');
       const table = document.querySelector('.data-table');
-      if (!table) return [{ text: 'missing table', overflowRight: 1, overflowLeft: 0 }];
-      return [...table.querySelectorAll('.flag')].flatMap((el) => {
-        const cell = el.closest('td');
-        if (!cell) return [];
+      if (!wrap || !table) return [{ text: 'missing table', overflowRight: 1, overflowLeft: 0 }];
+      const wr = wrap.getBoundingClientRect();
+      const nodes = [
+        ...table.querySelectorAll('.flag'),
+        ...table.querySelectorAll('.actions-cell .btn'),
+      ];
+      return nodes.flatMap((el) => {
+        const cell = el.closest('td') ?? el;
         const r = el.getBoundingClientRect();
         const cr = cell.getBoundingClientRect();
+        const visibleInWrap = r.right > wr.left + 1 && r.left < wr.right - 1;
+        const cutByWrap = visibleInWrap && (r.right - wr.right > 1 || wr.left - r.left > 1);
         const overflowRight = r.right - cr.right;
         const overflowLeft = cr.left - r.left;
-        if (overflowRight > 1 || overflowLeft > 1) {
-          return [{ text: (el.textContent ?? '').trim(), overflowRight, overflowLeft }];
+        if (cutByWrap || overflowRight > 1 || overflowLeft > 1) {
+          return [{ text: (el.textContent ?? '').trim(), overflowRight, overflowLeft, cutByWrap }];
         }
         return [];
       });
