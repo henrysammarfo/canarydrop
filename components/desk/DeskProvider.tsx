@@ -25,7 +25,8 @@ import {
   watchInbox,
 } from '@/lib/arkiv';
 import { canarySignPayload } from '@/lib/canary-sign';
-import { liveHoldKeys, writeDeadDrop } from '@/lib/dead-drop';
+import { extendableHoldKeys, liveHoldKeys, writeDeadDrop } from '@/lib/dead-drop';
+import { renewNotice } from '@/lib/renew-ui';
 import { DEFAULT_CANARY_STATEMENT, issuedAtNow } from '@/lib/eip712';
 import { deskWriteAllowed, restoreSiweSession, saveSiweSession, type SiweSession } from '@/lib/siwe-session';
 import { announcementForReply, loadOrCreateStealthMeta } from '@/lib/stealth-store';
@@ -88,6 +89,7 @@ export type DeskContextValue = {
   setTips: Dispatch<SetStateAction<TipView[]>>;
   busy: boolean;
   tx: Hex | null;
+  txConfirming: boolean;
   confirm: ConfirmKind;
   setConfirm: (v: ConfirmKind) => void;
   inboxCursor: string | undefined;
@@ -159,6 +161,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
   const unwatchRef = useRef<(() => void) | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [tx, setTx] = useState<Hex | null>(null);
+  const [txConfirming, setTxConfirming] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmKind>(null);
   const [inboxCursor, setInboxCursor] = useState<string | undefined>(undefined);
   const [inboxBlock, setInboxBlock] = useState<bigint | undefined>(undefined);
@@ -654,6 +657,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     if (!deskKey || !canaryKey) return;
     setBusy(true);
     setTx(null);
+    setTxConfirming(false);
     try {
       if (!dryRun) requireWriter();
       if (demo || dryRun) {
@@ -661,14 +665,21 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
           method: 'POST',
           body: JSON.stringify({ deskKey, canaryKey }),
         });
-        const j = (await r.json()) as { message?: string; error?: string; txHash?: Hex };
-        if (!r.ok) throw new Error(j.message ?? j.error ?? 'failed');
-        if (dryRun) {
-          push({ kind: 'info', text: 'Dry run ok. Lifetime extension was not sent.' });
-        } else {
-          if (j.txHash) setTx(j.txHash);
-          push({ kind: 'success', text: 'Canary renewed.' });
-        }
+        const j = (await r.json()) as {
+          message?: string;
+          error?: string;
+          txHash?: Hex;
+          confirming?: boolean;
+          dryRun?: boolean;
+        };
+        const notice = renewNotice(r.status, j);
+        if (notice.txHash) setTx(notice.txHash as Hex);
+        if (notice.kind === 'error') throw new Error(notice.text);
+        if (notice.kind === 'confirming') setTxConfirming(true);
+        push({
+          kind: notice.kind === 'ok' ? 'success' : 'info',
+          text: notice.text,
+        });
       } else {
         if (!connected) await connect();
         const provider = getInjectedProvider();
@@ -677,7 +688,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
         const owner = connected;
         if (!owner) throw new Error('No account returned by the wallet.');
         const signed = await signCanary(owner);
-        const holdKeys = await liveHoldKeys(deskKey);
+        const holdKeys = await extendableHoldKeys(deskKey, owner);
         const out = await renew(w, deskKey, canaryKey, undefined, { holdKeys, signed, owner });
         setTx(out.txHash);
         push({ kind: 'success', text: 'Canary renewed.' });
@@ -836,6 +847,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     setTips,
     busy,
     tx,
+    txConfirming,
     confirm,
     setConfirm,
     inboxCursor,

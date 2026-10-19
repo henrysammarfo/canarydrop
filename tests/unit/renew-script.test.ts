@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 describe('renew.mjs', () => {
   it('extends live dead drop holds with the canary', () => {
     const src = fs.readFileSync(path.resolve('scripts/renew.mjs'), 'utf8');
-    expect(src).toContain('liveHoldKeys');
+    expect(src).toContain('extendableHoldKeys');
     expect(src).toContain('holdKeys: plan.holdKeys');
     expect(src).toContain('renew(');
     expect(src).not.toMatch(/[\u2013\u2014]/);

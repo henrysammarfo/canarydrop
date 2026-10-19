@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import type { Hex } from 'viem';
 import { pub, renew } from '@/lib/arkiv';
-import { liveHoldKeys } from '@/lib/dead-drop';
+import { extendableHoldKeys } from '@/lib/dead-drop';
 import { deskAccount, deskWallet, requireDeskEthKey } from '@/lib/demo-wallet';
 import { DEFAULT_CANARY_STATEMENT, canaryTypedData, issuedAtNow } from '@/lib/eip712';
 import { AppError } from '@/lib/errors';
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     if (dryRun) return jsonOk({ ok: true, dryRun: true, wouldRenew: [deskKey, canaryKey] });
     const account = deskAccount();
     await assertMinBalance(pub(), account.address);
-    const holdKeys = await liveHoldKeys(deskKey as Hex);
+    const holdKeys = await extendableHoldKeys(deskKey as Hex, account.address);
     const issuedAt = issuedAtNow();
     const signed = {
       statement: DEFAULT_CANARY_STATEMENT,

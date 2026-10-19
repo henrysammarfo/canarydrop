@@ -1,8 +1,9 @@
-import { ExpirationTime, jsonToPayload, type TxParams } from '@arkiv-network/sdk';
+import { ExpirationTime, jsonToPayload, type Attributes, type TxParams } from '@arkiv-network/sdk';
 import { key, str, u64 } from '@arkiv-network/sdk/attr';
 import { eq, gt } from '@arkiv-network/sdk/query';
 import type { Hex } from 'viem';
 import { PROJECT, SEALED_OWNER, headBlock, pub, type Wallet } from './arkiv';
+import { attrKey, attrStr } from './attr';
 import { utcDaySlot } from './day';
 
 export const DROP_TYPE = 'drop';
@@ -159,6 +160,43 @@ export async function liveHoldKeys(deskKey: Hex): Promise<Hex[]> {
     .limit(20)
     .fetch();
   return r.entities.filter((row) => row.key).map((row) => row.key as Hex);
+}
+
+export type HoldEntityShape = {
+  owner?: Hex | null;
+  expiresAt?: bigint;
+  attributes?: Attributes | undefined;
+};
+
+/** A hold the desk wallet can still extend: present, unexpired, and owned by this desk. */
+export function holdOwnedByDesk(
+  entity: HoldEntityShape | null | undefined,
+  owner: Hex,
+  deskKey: Hex,
+  head: bigint,
+): boolean {
+  if (!entity) return false;
+  if (entity.expiresAt !== undefined && entity.expiresAt <= head) return false;
+  if (!entity.owner || entity.owner.toLowerCase() !== owner.toLowerCase()) return false;
+  if (attrStr(entity.attributes, 'type') !== HOLD_TYPE) return false;
+  const labeled = attrKey(entity.attributes, 'desk');
+  return !!labeled && labeled.toLowerCase() === deskKey.toLowerCase();
+}
+
+export async function extendableHoldKeys(deskKey: Hex, owner: Hex): Promise<Hex[]> {
+  const candidates = await liveHoldKeys(deskKey);
+  if (!candidates.length) return [];
+  const head = await headBlock();
+  const owned: Hex[] = [];
+  for (const holdKey of candidates) {
+    try {
+      const entity = await pub().getEntity(holdKey);
+      if (holdOwnedByDesk(entity, owner, deskKey, head)) owned.push(holdKey);
+    } catch {
+      // Missing, expired, or unreadable. Skip so it cannot fail the canary batch.
+    }
+  }
+  return owned;
 }
 
 export async function writeDeadDrop(

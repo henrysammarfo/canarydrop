@@ -5,7 +5,7 @@
  * Set DRY_RUN=0 to broadcast. Never print secrets.
  */
 import { canaryAlive, deskAddress, getDesk, renew } from '../lib/arkiv.ts';
-import { liveHoldKeys } from '../lib/dead-drop.ts';
+import { extendableHoldKeys } from '../lib/dead-drop.ts';
 import { preferPubForCreator } from '../lib/demo-pub.ts';
 import { deskAccount, deskWallet, requireDeskEthKey } from '../lib/demo-wallet.ts';
 
@@ -17,7 +17,7 @@ export async function planRenew(deskCreator) {
   if (!desk?.key) throw new Error('No live desk for this wallet.');
   const canary = await canaryAlive(creator, desk.key);
   if (!canary?.key) throw new Error('No live canary for this desk.');
-  const holdKeys = await liveHoldKeys(desk.key);
+  const holdKeys = await extendableHoldKeys(desk.key, creator);
   return {
     deskKey: desk.key,
     canaryKey: canary.key,

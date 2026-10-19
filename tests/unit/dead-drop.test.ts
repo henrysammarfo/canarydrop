@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { Attributes } from '@arkiv-network/sdk';
 import type { Hex } from 'viem';
 import { SEALED_OWNER } from '@/lib/constants';
 import {
@@ -8,6 +9,7 @@ import {
   deadDropStatus,
   encodeDropPlaintext,
   holdExtensions,
+  holdOwnedByDesk,
   parseDropDocument,
   parseRecipients,
 } from '@/lib/dead-drop';
@@ -57,6 +59,34 @@ describe('dead drop on silence', () => {
     const ext = holdExtensions(hold.key, `0x${'c4'.repeat(32)}` as Hex);
     expect(ext.extensions).toHaveLength(2);
     expect(ext.extensions[0]?.entityKey).toBe(hold.key);
+  });
+
+  it('extends only holds that still exist and that the desk owns', () => {
+    const owner = `0x${'a1'.repeat(20)}` as Hex;
+    const other = `0x${'b2'.repeat(20)}` as Hex;
+    const attrs = {
+      type: { type: 'str', value: 'hold' },
+      desk: { type: 'key', value: desk },
+    } as unknown as Attributes;
+    const live = { owner, expiresAt: 500n, attributes: attrs };
+    expect(holdOwnedByDesk(live, owner, desk, 100n)).toBe(true);
+    expect(holdOwnedByDesk(null, owner, desk, 100n)).toBe(false);
+    expect(holdOwnedByDesk({ ...live, expiresAt: 50n }, owner, desk, 100n)).toBe(false);
+    expect(holdOwnedByDesk({ ...live, owner: other }, owner, desk, 100n)).toBe(false);
+    expect(
+      holdOwnedByDesk(
+        {
+          ...live,
+          attributes: {
+            type: { type: 'str', value: 'hold' },
+            desk: { type: 'key', value: drop.key },
+          } as unknown as Attributes,
+        },
+        owner,
+        desk,
+        100n,
+      ),
+    ).toBe(false);
   });
 
   it('parses documents and recipients', () => {

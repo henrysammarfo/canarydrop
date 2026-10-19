@@ -144,6 +144,7 @@ export default function DeskOverviewPage() {
         {d.tx ? (
           <a className="btn" href={txUrl(d.tx)} target="_blank" rel="noreferrer" style={{ marginTop: 12 }}>
             Last tx {shortHex(d.tx, 6, 4)}
+            {d.txConfirming ? ' still confirming' : ''}
           </a>
         ) : (
           <p className="muted" style={{ marginTop: 12 }}>
