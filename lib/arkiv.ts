@@ -66,6 +66,16 @@ const EXPLORER_SELECT = {
   createdAt: true,
   creationFlags: true,
 } as const;
+const BUNDLE_SELECT = {
+  key: true,
+  creator: true,
+  expiresAt: true,
+  payload: true,
+  createdAt: true,
+  owner: true,
+  creationFlags: true,
+  attributes: true,
+} as const;
 
 export type ExplorerKind = 'tip' | 'desk' | 'canary' | 'reply';
 
@@ -85,6 +95,11 @@ export function deskAddress(): Hex {
 
 let _pub: PublicArkivClient | undefined;
 let _ws: PublicArkivClient | undefined;
+
+export function resetPublicClients() {
+  _pub = undefined;
+  _ws = undefined;
+}
 
 export function pub(): PublicArkivClient {
   if (!_pub) _pub = createPublicClient({ chain: tiramisu, transport: rpcHttp() });
@@ -144,14 +159,66 @@ export const renew = (w: Wallet, deskKey: Hex, canaryKey: Hex, txParams?: TxPara
     txParams,
   );
 
-export async function getDesk(deskCreator: Hex, preferPub?: Uint8Array): Promise<DeskRow | undefined> {
+export async function getDesk(deskCreator: Hex, preferPub?: Uint8Array, head?: bigint): Promise<DeskRow | undefined> {
+  const alive = head != null ? gt('$expiresAt', u64(head)) : await aliveHead();
   const r = await pub()
     .select(DESK_SELECT)
-    .where(eq('project', PROJECT), eq('type', 'desk'), await aliveHead())
+    .where(eq('project', PROJECT), eq('type', 'desk'), alive)
     .createdBy(deskCreator)
     .limit(20)
     .fetch();
   return pickLiveDesk([...r.entities], preferPub);
+}
+
+/** One query for the live desk and its canary. Pass head to skip a second block read. */
+export async function deskAndCanary(
+  deskCreator: Hex,
+  preferPub?: Uint8Array,
+  head?: bigint,
+): Promise<{
+  desk: DeskRow | undefined;
+  canary: CanaryRow | null;
+  currentBlock: bigint;
+  blockDuration: number;
+}> {
+  let currentBlock = head;
+  let blockDuration = 2;
+  if (currentBlock == null) {
+    const timing = await pub().getBlockTiming();
+    currentBlock = timing.currentBlock;
+    blockDuration = timing.blockDuration || 2;
+  }
+  const r = await pub()
+    .select(BUNDLE_SELECT)
+    .where(
+      eq('project', PROJECT),
+      or(eq('type', 'desk'), eq('type', 'canary')),
+      gt('$expiresAt', u64(currentBlock)),
+    )
+    .createdBy(deskCreator)
+    .limit(40)
+    .fetch();
+  const desks = r.entities.filter((row) => attrStr(row.attributes, 'type') === 'desk');
+  const canaries = r.entities.filter((row) => attrStr(row.attributes, 'type') === 'canary');
+  const desk = pickLiveDesk(desks, preferPub);
+  const deskKey = desk?.key?.toLowerCase();
+  const canaryRow = deskKey
+    ? canaries.find((row) => attrKey(row.attributes, 'desk')?.toLowerCase() === deskKey) ?? null
+    : null;
+  return {
+    desk: desk as DeskRow | undefined,
+    canary: canaryRow
+      ? {
+          key: canaryRow.key,
+          expiresAt: canaryRow.expiresAt,
+          createdAt: canaryRow.createdAt,
+          owner: canaryRow.owner,
+          creationFlags: canaryRow.creationFlags,
+        }
+      : null,
+    currentBlock: r.blockNumber ?? currentBlock,
+    blockDuration,
+  };
 }
 
 export async function listDesks(deskCreator: Hex): Promise<readonly DeskRow[]> {
@@ -172,10 +239,11 @@ export async function listProjectDesks() {
     .fetch();
 }
 
-export async function canaryAlive(deskCreator: Hex, deskKey: Hex): Promise<CanaryRow | null> {
+export async function canaryAlive(deskCreator: Hex, deskKey: Hex, head?: bigint): Promise<CanaryRow | null> {
+  const alive = head != null ? gt('$expiresAt', u64(head)) : await aliveHead();
   const r = await pub()
     .select(CANARY_SELECT)
-    .where(eq('project', PROJECT), eq('type', 'canary'), eq('desk', key(deskKey)), await aliveHead())
+    .where(eq('project', PROJECT), eq('type', 'canary'), eq('desk', key(deskKey)), alive)
     .createdBy(deskCreator)
     .limit(1)
     .fetch();
@@ -218,6 +286,27 @@ export async function repliesFor(tipKey: Hex, deskCreator: Hex): Promise<readonl
       .where(eq('project', PROJECT), eq('type', 'reply'), eq('tip', key(tipKey)))
       .createdBy(deskCreator)
       .limit(20)
+      .fetch()
+  ).entities;
+}
+
+const REPLY_LIST_SELECT = {
+  key: true,
+  payload: true,
+  createdAt: true,
+  attributes: true,
+} as const;
+
+export type ReplyListRow = ProjectedEntity<typeof REPLY_LIST_SELECT>;
+
+/** One page of replies from this desk, instead of one query per tip. */
+export async function repliesForCreator(deskCreator: Hex): Promise<readonly ReplyListRow[]> {
+  return (
+    await pub()
+      .select(REPLY_LIST_SELECT)
+      .where(eq('project', PROJECT), eq('type', 'reply'))
+      .createdBy(deskCreator)
+      .limit(50)
       .fetch()
   ).entities;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EntityMutationError } from '@arkiv-network/sdk';
-import { backoffMs, isRetryableChainError, SerialQueue, withBackoff } from '@/lib/retry';
+import { backoffMs, isRetryableChainError, jitterMs, SerialQueue, withBackoff, withReadBackoff } from '@/lib/retry';
 
 describe('retry helpers', () => {
   it('doubles backoff', () => {
@@ -47,6 +47,31 @@ describe('retry helpers', () => {
     expect(out).toBe('ok');
     expect(n).toBe(3);
     expect(pauses).toEqual([50, 100]);
+  });
+
+  it('jitter stays between half and one and a half of the base', () => {
+    expect(jitterMs(1000, () => 0)).toBe(500);
+    expect(jitterMs(1000, () => 1)).toBe(1500);
+    expect(jitterMs(1000, () => 0.5)).toBe(1000);
+  });
+
+  it('read backoff retries once with jitter instead of a fast loop', async () => {
+    let n = 0;
+    const pauses: number[] = [];
+    await expect(
+      withReadBackoff(
+        async () => {
+          n += 1;
+          throw new Error('429 ANON_COST_LIMITED');
+        },
+        async (ms) => {
+          pauses.push(ms);
+        },
+        () => 0.5,
+      ),
+    ).rejects.toThrow(/429/);
+    expect(n).toBe(2);
+    expect(pauses).toEqual([700]);
   });
 
   it('withBackoff stops on a fatal error', async () => {

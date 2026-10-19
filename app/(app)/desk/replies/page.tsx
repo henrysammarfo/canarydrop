@@ -9,7 +9,9 @@ import PageHeader from '@/components/ui/PageHeader';
 import Table from '@/components/ui/Table';
 import DemoBanner, { DemoSwitch } from '@/components/desk/DemoBanner';
 import { useDesk } from '@/components/desk/DeskProvider';
-import { repliesFor } from '@/lib/arkiv';
+import { repliesForCreator } from '@/lib/arkiv';
+import { attrKey } from '@/lib/attr';
+import StaleNote from '@/components/ui/StaleNote';
 
 type Row = { key: Hex; tipKey: Hex; tipPreview: string; createdAt: string };
 
@@ -19,7 +21,7 @@ export default function RepliesPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!d.creator || d.tips.length === 0) {
+    if (!d.creator) {
       setRows([]);
       return;
     }
@@ -28,18 +30,20 @@ export default function RepliesPage() {
     (async () => {
       setLoading(true);
       try {
+        const listed = await repliesForCreator(creator);
+        const byTip = new Map(d.tips.map((tip) => [tip.key.toLowerCase(), tip]));
         const next: Row[] = [];
-        for (const tip of d.tips) {
-          const rs = await repliesFor(tip.key, creator);
-          for (const r of rs) {
-            if (!r.key) continue;
-            next.push({
-              key: r.key,
-              tipKey: tip.key,
-              tipPreview: tip.text.slice(0, 80),
-              createdAt: r.createdAt?.toString() ?? 'n/a',
-            });
-          }
+        for (const r of listed) {
+          if (!r.key) continue;
+          const tipKey = attrKey(r.attributes, 'tip');
+          if (!tipKey) continue;
+          const tip = byTip.get(tipKey.toLowerCase());
+          next.push({
+            key: r.key,
+            tipKey,
+            tipPreview: tip?.text.slice(0, 80) ?? '',
+            createdAt: r.createdAt?.toString() ?? 'n/a',
+          });
         }
         if (!cancelled) setRows(next);
       } catch {
@@ -62,6 +66,7 @@ export default function RepliesPage() {
         actions={<DemoSwitch />}
       />
       <DemoBanner />
+      <StaleNote text={d.staleNote} />
       <Card>
         {loading ? (
           <EmptyState title="Loading replies from Arkiv…" />
@@ -81,7 +86,7 @@ export default function RepliesPage() {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.key}>
+                <tr key={row.key} id={`reply-${row.key}`}>
                   <td>
                     <CopyField value={row.key} />
                   </td>

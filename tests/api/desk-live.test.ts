@@ -41,6 +41,7 @@ vi.mock('@/lib/live-read', () => ({
 const { GET } = await import('@/app/api/desk/live/route');
 const { GET: inboxGet } = await import('@/app/api/desk/inbox/route');
 const { GET: explorerGet } = await import('@/app/api/explorer/route');
+const { loadDeskLive } = await import('@/lib/live-read');
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -90,5 +91,15 @@ describe('desk live routes', () => {
   it('rejects an unknown explorer filter', async () => {
     const r = await explorerGet(getJson('http://localhost:3000/api/explorer?filter=nope'));
     expect(r.status).toBe(400);
+  });
+
+  it('returns 200 with a calm note when the live loader throws a 429', async () => {
+    vi.mocked(loadDeskLive).mockRejectedValueOnce(new Error('HTTP 429 ANON_COST_LIMITED'));
+    const r = await GET(getJson(`http://localhost:3000/api/desk/live?creator=${DEFAULT_DESK}`));
+    expect(r.status).toBe(200);
+    const j = await r.json();
+    expect(j.ok).toBe(true);
+    expect(j.note).toMatch(/try again on its own/);
+    expect(j.deskKey).toBeNull();
   });
 });

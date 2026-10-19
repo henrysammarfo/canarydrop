@@ -2,17 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CHAIN_READ_FAILED, SEALED_TIPS_EMPTY } from '@/lib/constants';
-import { explorerPage, pub, type ExplorerKind } from '@/lib/arkiv';
+import { type ExplorerKind } from '@/lib/arkiv';
 import { addressUrl, entityUrl, isSealedOwner, shortHex } from '@/lib/chain';
 import { explorerTypeBadges, SEALED_BADGE } from '@/lib/explorer-label';
-import { mapExplorerEntity, type ExplorerItem } from '@/lib/explorer-map';
+import { type ExplorerItem } from '@/lib/explorer-map';
 import { fetchExplorerLive } from '@/lib/live-client';
 import { bumpGeneration, isStaleGeneration } from '@/lib/load-gen';
-import { sleep, withBackoff } from '@/lib/retry';
 import { remainingPhrase } from '@/lib/time';
 import Flag from '@/components/ui/Flag';
 import PageHeader from '@/components/ui/PageHeader';
 import Button from '@/components/ui/Button';
+import StaleNote from '@/components/ui/StaleNote';
 import Table from '@/components/ui/Table';
 
 type Item = ExplorerItem;
@@ -78,6 +78,7 @@ function expiryView(expiresAt: bigint | null, current: bigint | null, duration: 
 export default function ExplorerPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [atBlock, setAtBlock] = useState<bigint | undefined>(undefined);
   const [hasMore, setHasMore] = useState(false);
@@ -94,50 +95,19 @@ export default function ExplorerPage() {
       try {
         setLoading(true);
         setErr(null);
-        try {
-          const liveOpts: { cursor?: string; atBlock?: bigint } = {};
-          if (nextCursor) liveOpts.cursor = nextCursor;
-          if (nextBlock !== undefined) liveOpts.atBlock = nextBlock;
-          const live = await fetchExplorerLive(filter, liveOpts);
-          if (isStaleGeneration(started, gen.current.current)) return;
-          setItems((arr) => (mode === 'append' ? [...arr, ...live.items] : live.items));
-          setCursor(live.cursor);
-          setAtBlock(live.atBlock);
-          setHasMore(live.hasMore);
-          if (live.currentBlock != null) setCurrentBlock(live.currentBlock);
-          setBlockDuration(live.blockDuration);
-          if (live.canonicalDeskKey) setCanonicalKey(live.canonicalDeskKey);
-          return;
-        } catch {
-          // Fall through to a direct chain read from this browser.
-        }
-        const opts: Parameters<typeof explorerPage>[0] = {};
-        if (filter === 'sealed') {
-          opts.sealed = true;
-          opts.kind = 'tip';
-        } else if (filter !== 'all') opts.kind = filter;
-        if (nextCursor) opts.cursor = nextCursor;
-        if (nextBlock !== undefined) opts.atBlock = nextBlock;
-        const r = await withBackoff(() => explorerPage(opts), 8, (ms) => sleep(Math.max(400, ms)));
+        const liveOpts: { cursor?: string; atBlock?: bigint } = {};
+        if (nextCursor) liveOpts.cursor = nextCursor;
+        if (nextBlock !== undefined) liveOpts.atBlock = nextBlock;
+        const live = await fetchExplorerLive(filter, liveOpts);
         if (isStaleGeneration(started, gen.current.current)) return;
-        try {
-          const timing = await pub().getBlockTiming();
-          if (!isStaleGeneration(started, gen.current.current)) {
-            setCurrentBlock(timing.currentBlock);
-            setBlockDuration(timing.blockDuration || 2);
-          }
-        } catch {
-          // Expiry can fall back to the raw block number.
-        }
-        const rows: Item[] = [];
-        for (const entity of r.entities) {
-          const mapped = mapExplorerEntity(entity, canonicalKey);
-          if (mapped) rows.push(mapped);
-        }
-        setItems((arr) => (mode === 'append' ? [...arr, ...rows] : rows));
-        setCursor(r.cursor);
-        setAtBlock(r.blockNumber);
-        setHasMore(r.hasNextPage());
+        setItems((arr) => (mode === 'append' ? [...arr, ...live.items] : live.items));
+        setCursor(live.cursor);
+        setAtBlock(live.atBlock);
+        setHasMore(live.hasMore);
+        if (live.currentBlock != null) setCurrentBlock(live.currentBlock);
+        setBlockDuration(live.blockDuration);
+        if (live.canonicalDeskKey) setCanonicalKey(live.canonicalDeskKey);
+        setNote(live.note);
       } catch {
         if (isStaleGeneration(started, gen.current.current)) return;
         setErr(CHAIN_READ_FAILED);
@@ -145,7 +115,7 @@ export default function ExplorerPage() {
         if (!isStaleGeneration(started, gen.current.current)) setLoading(false);
       }
     },
-    [filter, canonicalKey],
+    [filter],
   );
 
   useEffect(() => {
@@ -153,12 +123,13 @@ export default function ExplorerPage() {
   }, [load]);
 
   useEffect(() => {
-    if (!err || items.length > 0 || loading) return;
+    if (loading || items.length > 0) return;
+    if (!err && !note) return;
     const timer = window.setTimeout(() => {
       void load('replace');
-    }, 2500);
+    }, 15_000);
     return () => window.clearTimeout(timer);
-  }, [err, items.length, loading, load]);
+  }, [err, note, items.length, loading, load]);
 
   function rowActions(it: Item) {
     return (
@@ -194,6 +165,7 @@ export default function ExplorerPage() {
           ))}
         </div>
 
+        <StaleNote text={note} />
         {loading && items.length === 0 && (
           <p className="muted" role="status" style={{ marginTop: 18 }}>
             Loading live rows…
@@ -254,7 +226,7 @@ export default function ExplorerPage() {
                 <tr>
                   <td colSpan={6} className="muted" style={{ whiteSpace: 'normal', height: 'auto' }}>
                     <span role="status">
-                      {err
+                      {err || note
                         ? 'Still reading Tiramisu…'
                         : filter === 'sealed'
                           ? SEALED_TIPS_EMPTY
@@ -302,7 +274,7 @@ export default function ExplorerPage() {
           })}
           {items.length === 0 && !loading && (
             <p className="muted" role="status">
-              {err
+              {err || note
                 ? 'Still reading Tiramisu…'
                 : filter === 'sealed'
                   ? SEALED_TIPS_EMPTY

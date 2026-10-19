@@ -32,13 +32,16 @@ export async function POST(req: NextRequest) {
     const account = deskAccount();
     await assertMinBalance(pub(), account.address);
     await assertDeskSpendRoom(account.address);
+    const [pred] = await pub().predictEntityKeys({ owner: account.address, count: 1 });
     const out = await withWalletLock('desk', account.address, () =>
       withBackoff(async () => {
         const nonce = await pub().getTransactionCount({ address: account.address, blockTag: 'pending' });
         return reply(deskWallet(), tipKey as Hex, b64ToBytes(wireB64), undefined, { nonce });
       }),
     );
-    return jsonOk({ ok: true, txHash: out.txHash });
+    const created = Array.isArray(out.createdEntities) ? out.createdEntities[0] : undefined;
+    const replyKey = typeof created === 'string' ? created : pred.key;
+    return jsonOk({ ok: true, txHash: out.txHash, replyKey });
   } catch (err: unknown) {
     return jsonFail(err);
   }

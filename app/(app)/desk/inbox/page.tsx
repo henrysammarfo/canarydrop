@@ -5,7 +5,9 @@ import EmptyState from '@/components/ui/EmptyState';
 import PageHeader from '@/components/ui/PageHeader';
 import DemoBanner, { DemoSwitch } from '@/components/desk/DemoBanner';
 import { useDesk } from '@/components/desk/DeskProvider';
+import StaleNote from '@/components/ui/StaleNote';
 import { shortHex } from '@/lib/chain';
+import Link from 'next/link';
 
 export default function InboxPage() {
   const d = useDesk();
@@ -34,6 +36,7 @@ export default function InboxPage() {
         actions={<DemoSwitch />}
       />
       <DemoBanner />
+      <StaleNote text={d.staleNote} />
       <Card>
         {d.skippedTips > 0 && (
           <p className="muted" style={{ marginBottom: 12 }}>
@@ -67,6 +70,14 @@ export default function InboxPage() {
                       Send reply
                     </button>
                   </div>
+                  {t.sentReplyKey !== undefined && (
+                    <p className="page-note compact reply-sent" role="status">
+                      Reply sent.{' '}
+                      <Link href={t.sentReplyKey ? `/desk/replies#reply-${t.sentReplyKey}` : '/desk/replies'}>
+                        Open it on Replies
+                      </Link>
+                    </p>
+                  )}
                 </article>
               </li>
             ))}

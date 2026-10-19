@@ -1,13 +1,13 @@
 import type { Hex } from 'viem';
 import Link from 'next/link';
-import { canaryAlive, canaryAtBlock, getDesk, pub } from '@/lib/arkiv';
+import { canaryAtBlock, pub } from '@/lib/arkiv';
 import { atBlockAbsenceDetail } from '@/lib/at-block-copy';
-import { preferPubForCreator } from '@/lib/demo-pub';
-import type { CanaryRow } from '@/lib/arkiv';
+import { loadDeskLive } from '@/lib/live-read';
 import { PROJECT } from '@/lib/constants';
 import { addressUrl, entityUrl, TIRAMISU_EXPLORER } from '@/lib/chain';
-import { uiError } from '@/lib/ui-error';
 import CopyField from '@/components/ui/CopyField';
+import StaleNote from '@/components/ui/StaleNote';
+import { withReadBackoff } from '@/lib/retry';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,46 +24,45 @@ function asTime(timing: { currentBlockTime: number; blockDuration: number; curre
 
 export default async function CanaryStatus({ params }: { params: { creator: string } }) {
   const creator = params.creator as Hex;
-  let desk: Awaited<ReturnType<typeof getDesk>> | null = null;
-  let canary: CanaryRow | null = null;
+  const live = await loadDeskLive(creator);
+  const unavailable = !live.deskKey && !!live.note && !live.stale;
   let pastNote: string | null = null;
   let timing: { currentBlock: bigint; currentBlockTime: number; blockDuration: number } | null = null;
-  let loadError: string | null = null;
-  let head = 0n;
+  const head = live.currentBlock ? BigInt(live.currentBlock) : 0n;
 
-  try {
-    timing = await pub().getBlockTiming();
-    head = timing.currentBlock;
-    desk = (await getDesk(creator, preferPubForCreator(creator))) ?? null;
-    if (desk) {
-      canary = await canaryAlive(creator, desk.key);
+  if (live.deskKey && live.canaryKey && head > 0n) {
+    try {
+      timing = await withReadBackoff(() => pub().getBlockTiming());
       const hourAgo = head > 1800n ? head - 1800n : 0n;
-      const past = await canaryAtBlock(creator, desk.key, hourAgo);
+      const past = await withReadBackoff(() => canaryAtBlock(creator, live.deskKey as Hex, hourAgo));
       pastNote = atBlockAbsenceDetail({
         hourAgo,
         pastAlive: past !== null,
-        createdAt: canary?.createdAt,
+        createdAt: live.createdAt ? BigInt(live.createdAt) : null,
       }).detail;
+    } catch {
+      timing = null;
     }
-  } catch (e: unknown) {
-    loadError = uiError(e);
   }
 
-  const alive = !!canary;
-  const duration = timing?.blockDuration || 2;
-  const expiresAt = canary?.expiresAt ? BigInt(canary.expiresAt) : null;
-  const createdAt = canary?.createdAt ? BigInt(canary.createdAt) : null;
-  const current = timing?.currentBlock ?? 0n;
+  const alive = live.alive;
+  const duration = live.blockDuration || timing?.blockDuration || 2;
+  const expiresAt = live.expiresAt ? BigInt(live.expiresAt) : null;
+  const createdAt = live.createdAt ? BigInt(live.createdAt) : null;
+  const current = live.currentBlock ? BigInt(live.currentBlock) : timing?.currentBlock ?? 0n;
   const blocksLeft = expiresAt ? Number(expiresAt - current) : 0;
   const hoursLeft = Math.max(0, (blocksLeft * duration) / 3600);
   const lifeBlocks = BigInt(Math.round((26 * 3600) / duration));
   let lastRenewedBlock = expiresAt ? expiresAt - lifeBlocks : null;
   if (lastRenewedBlock && createdAt && lastRenewedBlock < createdAt) lastRenewedBlock = createdAt;
   const lastRenewed =
-    lastRenewedBlock && timing ? asTime(timing, lastRenewedBlock) : 'Not renewed yet';
+    lastRenewedBlock && timing ? asTime(timing, lastRenewedBlock) : lastRenewedBlock ? `block ${lastRenewedBlock.toString()}` : 'Not renewed yet';
 
-  const query = desk
-    ? `select key, expiresAt where project = "${PROJECT}" and type = "canary" and desk = key(${desk.key}) and $expiresAt > u64(${head.toString()}) createdBy(${creator}) limit 1`
+  const statusWord = unavailable ? 'Not available' : alive ? 'ALIVE' : 'GONE';
+  const statusClass = unavailable ? '' : alive ? 'status-alive' : 'status-gone';
+
+  const query = live.deskKey
+    ? `select key, expiresAt where project = "${PROJECT}" and type = "canary" and desk = key(${live.deskKey}) and $expiresAt > u64(${head.toString()}) createdBy(${creator}) limit 1`
     : 'Desk not found for this creator.';
 
   return (
@@ -74,10 +73,15 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
         <p className="lead" style={{ marginTop: 10 }}>
           If this page says GONE, the newsroom has not renewed its canary. That is the signal.
         </p>
+        <StaleNote text={live.note} />
 
         <div className="card" style={{ marginTop: 22, textAlign: 'center', padding: '36px 20px' }}>
-          <div className={`status-word ${alive ? 'status-alive' : 'status-gone'}`}>{alive ? 'ALIVE' : 'GONE'}</div>
-          {alive ? (
+          <div className={`status-word ${statusClass}`}>{statusWord}</div>
+          {unavailable ? (
+            <p className="lead" style={{ marginTop: 14 }}>
+              The live canary could not be read just now. This is not a GONE signal.
+            </p>
+          ) : alive ? (
             <p className="lead" style={{ marginTop: 14 }}>
               {hoursLeft.toFixed(1)} hours left · {Math.max(0, blocksLeft)} blocks left
             </p>
@@ -122,32 +126,26 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
         <div className="card" style={{ marginTop: 16 }}>
           <div className="muted">Desk key</div>
           <div style={{ marginTop: 8 }}>
-            {desk ? <CopyField value={desk.key} /> : <span className="muted">No live desk found.</span>}
+            {live.deskKey ? <CopyField value={live.deskKey} /> : <span className="muted">No live desk found.</span>}
           </div>
-          {canary?.key && (
+          {live.canaryKey && (
             <div style={{ marginTop: 12 }}>
               <div className="muted">Canary key</div>
               <div style={{ marginTop: 8 }}>
-                <CopyField value={canary.key} />
+                <CopyField value={live.canaryKey} />
               </div>
-              {canary.creationFlags && (
-                <p className="muted" style={{ marginTop: 8 }}>
-                  Readonly {canary.creationFlags.readonly ? 'yes' : 'no'}. Anyone can extend {canary.creationFlags.permissionlessExtension ? 'yes' : 'no'}.
-                </p>
-              )}
               <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 12 }}>
-                <a className="btn primary" href={entityUrl(canary.key)} target="_blank" rel="noreferrer">
+                <a className="btn primary" href={entityUrl(live.canaryKey)} target="_blank" rel="noreferrer">
                   View canary entity <span className="arrow" aria-hidden="true" />
                 </a>
               </div>
             </div>
           )}
-          {timing && (
+          {live.currentBlock && (
             <div className="muted" style={{ marginTop: 12 }}>
-              Latest block {timing.currentBlock.toString()} · {duration}s per block
+              Latest block {live.currentBlock} · {duration}s per block
             </div>
           )}
-          {loadError && <p className="muted" style={{ color: '#ffb048', marginTop: 10 }}>{loadError}</p>}
         </div>
 
         <div className="card" style={{ marginTop: 16 }}>

@@ -1,22 +1,15 @@
 import { gatherArkivProofs } from '@/lib/proofs';
-import { CHAIN_READ_FAILED, DEFAULT_DESK } from '@/lib/constants';
+import { DEFAULT_DESK } from '@/lib/constants';
 import PageHeader from '@/components/ui/PageHeader';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import CopyField from '@/components/ui/CopyField';
+import StaleNote from '@/components/ui/StaleNote';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HowPage() {
-  let proofs: Awaited<ReturnType<typeof gatherArkivProofs>> | null = null;
-  let loadError: string | null = null;
-  try {
-    proofs = await gatherArkivProofs();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message.replace(/0x[0-9a-fA-F]{64}/g, '0x…').slice(0, 300) : String(err);
-    console.error('CanaryDrop proofs page:', msg);
-    loadError = CHAIN_READ_FAILED;
-  }
+  const proofs = await gatherArkivProofs();
 
   return (
     <>
@@ -34,15 +27,12 @@ export default async function HowPage() {
           </>
         }
       />
+      <StaleNote text={proofs.note} />
       <p className="muted" role="status" style={{ marginBottom: 18 }}>
-        {proofs
-          ? `Latest block ${proofs.head}. Live entities on the whole chain ${proofs.chainEntities}.`
-          : loadError
-            ? loadError
-            : 'Loading live proofs…'}
+        {`Latest block ${proofs.head}. Live entities on the whole chain ${proofs.chainEntities}.`}
       </p>
 
-      {proofs && (
+      {proofs.claims.length > 0 && (
         <div className="proof-list">
           {proofs.claims.map((claim) => (
             <article id={claim.id} key={claim.id} className="card proof-card">
@@ -84,7 +74,7 @@ export default async function HowPage() {
           These transactions are on Tiramisu. The claims above query those entities again.
         </p>
         <div className="ctaRow" style={{ marginTop: 12 }}>
-          {(proofs?.seedTxs ?? []).map((link) => (
+          {proofs.seedTxs.map((link) => (
             <Button key={link.href} href={link.href} external>
               {link.label}
             </Button>

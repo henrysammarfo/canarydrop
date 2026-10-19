@@ -2,19 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import type { Hex } from 'viem';
-import { canaryAlive, getDesk } from '@/lib/arkiv';
-import { preferPubForCreatorClient } from '@/lib/demo-pub-client';
 import { bytesToB64 } from '@/lib/bytes';
 import { appFetch } from '@/lib/client-fetch';
 import { CHAIN_READ_FAILED, DEFAULT_DESK, LIFETIME_KEYS, type Lifetime } from '@/lib/constants';
 import { sealTo } from '@/lib/crypto';
 import { asAddress } from '@/lib/hex';
-import { deskPubBytes, parseDeskPayload } from '@/lib/payload';
 import { fetchDeskLive } from '@/lib/live-client';
 import { uiError } from '@/lib/ui-error';
-import { sleep, withBackoff } from '@/lib/retry';
 import Link from 'next/link';
 import Modal from '@/components/Modal';
+import StaleNote from '@/components/ui/StaleNote';
 import { useToast } from '@/components/Toast';
 import { entityUrl, shortHex, txUrl } from '@/lib/chain';
 import CopyField from '@/components/ui/CopyField';
@@ -35,6 +32,7 @@ export default function SubmitPage() {
   const [infoOpen, setInfoOpen] = useState(false);
   const [looking, setLooking] = useState(true);
   const [lookupError, setLookupError] = useState<string | null>(null);
+  const [staleNote, setStaleNote] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,21 +43,7 @@ export default function SubmitPage() {
     setAlive(null);
     setLooking(true);
     setLookupError(null);
-
-    async function fromChain() {
-      const prefer = await preferPubForCreatorClient(creator);
-      const d = await withBackoff(() => getDesk(creator, prefer), 8, (ms) => sleep(Math.max(400, ms)));
-      if (cancelled) return false;
-      if (d) {
-        setDeskKey(d.key);
-        const parsed = d.payload ? parseDeskPayload(d.payload) : null;
-        if (parsed?.name) setDeskName(parsed.name);
-        setDeskPubRaw(parsed ? deskPubBytes(parsed) : null);
-        const isAlive = await canaryAlive(creator, d.key);
-        if (!cancelled) setAlive(!!isAlive);
-      }
-      return true;
-    }
+    setStaleNote(null);
 
     async function attempt() {
       try {
@@ -70,33 +54,30 @@ export default function SubmitPage() {
         setDeskPubRaw(live.deskPub);
         setAlive(live.deskKey ? live.alive : null);
         setLookupError(null);
+        setStaleNote(live.note);
         setLooking(false);
+        if (live.stale || live.note) {
+          timer = window.setTimeout(() => {
+            void attempt();
+          }, 15_000);
+        }
         return;
       } catch {
-        try {
-          const ok = await fromChain();
-          if (ok && !cancelled) {
-            setLookupError(null);
-            setLooking(false);
-            return;
-          }
-        } catch {
-          // Keep retrying quietly on a first visit.
-        }
+        // Keep retrying quietly on a first visit.
       }
       if (cancelled) return;
       if (Date.now() < deadline) {
         setLooking(true);
         timer = window.setTimeout(() => {
           void attempt();
-        }, 2500);
+        }, 15_000);
         return;
       }
       setLookupError(CHAIN_READ_FAILED);
       setLooking(false);
       timer = window.setTimeout(() => {
         void attempt();
-      }, 5000);
+      }, 30_000);
     }
 
     void attempt();
@@ -110,7 +91,7 @@ export default function SubmitPage() {
   const step1 = deskKey ? 'done' : looking ? 'on' : 'on';
   const step2 = deskKey && text.trim() ? 'done' : deskKey ? 'on' : '';
   const step3 = valid ? 'on' : '';
-  const verified = !!deskKey && !lookupError;
+  const verified = !!deskKey;
 
   async function send(dryRun: boolean) {
     if (!deskKey || !deskPubRaw || !text.trim()) return;
@@ -151,6 +132,7 @@ export default function SubmitPage() {
         <p className="lead" style={{ marginTop: 10 }}>
           Synthetic data only. Your words are locked on this device, then posted by a sponsor wallet.
         </p>
+        <StaleNote text={staleNote} />
 
         <div className="steps" style={{ marginTop: 20 }}>
           <div className={`step ${step1}`}>
@@ -173,14 +155,14 @@ export default function SubmitPage() {
               <IcoVerify />
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <p className="eyebrow">{looking ? 'Checking Arkiv' : verified ? 'Verified desk' : lookupError ? 'Desk lookup' : 'Desk not found'}</p>
+              <p className="eyebrow">{looking ? 'Checking Arkiv' : verified ? 'Verified desk' : lookupError || staleNote ? 'Desk lookup' : 'Desk not found'}</p>
               <h2 className="h3" style={{ marginTop: 4 }}>{deskName}</h2>
               <p className="muted" style={{ marginTop: 6 }} role="status">
                 {looking
                   ? 'Looking up this desk on Arkiv…'
-                  : lookupError
-                    ? lookupError
-                    : `Canary ${alive === null ? 'unknown' : alive ? 'alive' : 'gone'}${deskKey ? `. Desk ${shortHex(deskKey)}.` : ''}`}
+                  : verified
+                    ? `Canary ${alive === null ? 'unknown' : alive ? 'alive' : 'gone'}${deskKey ? `. Desk ${shortHex(deskKey)}.` : ''}`
+                    : lookupError || staleNote || 'No live desk found.'}
               </p>
               <div className="ctaRow" style={{ marginTop: 12 }}>
                 <Link className="btn" href={`/canary/${creator}`}>

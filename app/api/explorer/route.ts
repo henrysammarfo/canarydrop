@@ -26,6 +26,19 @@ export async function GET(req: NextRequest) {
     return jsonOk(live);
   } catch (err: unknown) {
     if (err instanceof AppError) return jsonFail(err);
-    return jsonFail(new AppError('try_later', CHAIN_READ_FAILED));
+    return jsonOk({
+      ok: true,
+      items: [],
+      cursor: null,
+      atBlock: '0',
+      hasMore: false,
+      currentBlock: null,
+      blockDuration: 2,
+      canonicalDeskKey: null,
+      fetchedAt: Date.now(),
+      stale: false,
+      staleAgeMs: 0,
+      note: CHAIN_READ_FAILED,
+    });
   }
 }

@@ -7,6 +7,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import DemoBanner, { DemoSwitch } from '@/components/desk/DemoBanner';
 import RenewAction from '@/components/desk/RenewAction';
 import { useDesk } from '@/components/desk/DeskProvider';
+import StaleNote from '@/components/ui/StaleNote';
 import { DEFAULT_DESK } from '@/lib/constants';
 import { lastRenewedPhrase, remainingPhrase } from '@/lib/time';
 
@@ -33,6 +34,7 @@ export default function DeskCanaryPage() {
         actions={<DemoSwitch />}
       />
       <DemoBanner />
+      <StaleNote text={d.staleNote} />
       <div className="grid cols-2">
         <Card className={`stat-hero${d.alive ? ' alive' : ''}`} style={{ textAlign: 'left' }}>
           <div className="stat-hero-top">

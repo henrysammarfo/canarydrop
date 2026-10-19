@@ -15,8 +15,7 @@ import type { Hex } from 'viem';
 import {
   canaryAlive,
   createDesk,
-  getDesk,
-  inboxPage,
+  deskAndCanary,
   type CanaryRow,
   type DeskRow,
   pub,
@@ -27,7 +26,7 @@ import {
 } from '@/lib/arkiv';
 import { bytesEqual, bytesToB64 } from '@/lib/bytes';
 import { appFetch } from '@/lib/client-fetch';
-import { CHAIN_READ_FAILED, DEFAULT_DESK } from '@/lib/constants';
+import { CHAIN_READ_FAILED, DEFAULT_DESK, ENTITY_KEY_RE } from '@/lib/constants';
 import {
   exportPrivJwk,
   exportPub,
@@ -45,11 +44,9 @@ import {
   DESK_CREATED_TOAST,
   fetchedDeskIsReady,
 } from '@/lib/desk-pick';
-import { fetchSharedDemoPub } from '@/lib/demo-pub-client';
 import { bumpGeneration, isStaleGeneration } from '@/lib/load-gen';
 import { fetchDeskLive, fetchInboxLive, type DeskLiveView } from '@/lib/live-client';
 import { deskPubBytes, parseDeskPayload } from '@/lib/payload';
-import { sleep, withBackoff } from '@/lib/retry';
 import { uiError } from '@/lib/ui-error';
 import { connectTiramisu, existingAccount } from '@/lib/wallet';
 import { shortHex } from '@/lib/chain';
@@ -61,6 +58,7 @@ export type TipView = {
   text: string;
   ephPub: CryptoKey;
   replyText?: string;
+  sentReplyKey?: Hex | null;
 };
 
 const DESK_KEY_STORE = 'canarydrop/deskPrivJwk';
@@ -94,6 +92,7 @@ export type DeskContextValue = {
   createdNotice: string | null;
   loadingDesk: boolean;
   loadError: string | null;
+  staleNote: string | null;
   chainName: string;
   canaryExpiresAt: bigint | null;
   canaryCreatedAt: bigint | null;
@@ -146,6 +145,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
   const [createdNotice, setCreatedNotice] = useState<string | null>(null);
   const [loadingDesk, setLoadingDesk] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [staleNote, setStaleNote] = useState<string | null>(null);
   const [chainName, setChainName] = useState('CanaryDrop Demo Desk');
   const [canaryExpiresAt, setCanaryExpiresAt] = useState<bigint | null>(null);
   const [canaryCreatedAt, setCanaryCreatedAt] = useState<bigint | null>(null);
@@ -250,29 +250,16 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
   async function loadHistory(key: Hex, deskPriv: CryptoKey, cursor?: string, atBlock?: bigint) {
     setLoadingInbox(true);
     try {
-      try {
-        const liveOpts: { cursor?: string; atBlock?: bigint } = {};
-        if (cursor) liveOpts.cursor = cursor;
-        if (atBlock !== undefined) liveOpts.atBlock = atBlock;
-        const page = await fetchInboxLive(key, liveOpts);
-        for (const row of page.tips) {
-          await ingestTip(row.key, row.payload, row.createdAt, deskPriv);
-        }
-        setInboxCursor(page.hasMore ? page.cursor : undefined);
-        setInboxBlock(page.atBlock);
-        return;
-      } catch {
-        // Fall through to a direct chain read from this browser.
+      const liveOpts: { cursor?: string; atBlock?: bigint } = {};
+      if (cursor) liveOpts.cursor = cursor;
+      if (atBlock !== undefined) liveOpts.atBlock = atBlock;
+      const page = await fetchInboxLive(key, liveOpts);
+      if (page.note) setStaleNote(page.note);
+      for (const row of page.tips) {
+        await ingestTip(row.key, row.payload, row.createdAt, deskPriv);
       }
-      const opts: { cursor?: string; atBlock?: bigint } = {};
-      if (cursor) opts.cursor = cursor;
-      if (atBlock !== undefined) opts.atBlock = atBlock;
-      const page = await inboxPage(key, opts);
-      for (const row of page.entities) {
-        if (row.key && row.payload) await ingestTip(row.key, row.payload, row.createdAt ?? 0n, deskPriv);
-      }
-      setInboxCursor(page.hasNextPage() ? page.cursor : undefined);
-      setInboxBlock(page.blockNumber);
+      setInboxCursor(page.hasMore ? page.cursor : undefined);
+      setInboxBlock(page.atBlock);
     } catch {
       // Keep the inbox quiet. A later watch or retry can fill it.
     } finally {
@@ -326,6 +313,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     setBlockDuration(live.blockDuration || 2);
     if (live.name) setChainName(live.name);
     setDeskPubRaw(live.deskPub);
+    setStaleNote(live.note);
     if (live.deskKey) startWatch(live.deskKey, live.canaryKey);
   }
 
@@ -334,23 +322,23 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     const started = bumpGeneration(deskLoad.current);
     for (let i = 0; i < 8; i++) {
       if (isStaleGeneration(started, deskLoad.current.current)) return;
-      const d = await getDesk(creator, preferPub);
-      if (d && fetchedDeskIsReady(d, preferPub, expectedKey)) {
+      const bundle = await deskAndCanary(creator, preferPub);
+      if (bundle.desk && fetchedDeskIsReady(bundle.desk, preferPub, expectedKey)) {
         if (isStaleGeneration(started, deskLoad.current.current)) return;
-        const c = await canaryAlive(creator, d.key);
-        if (isStaleGeneration(started, deskLoad.current.current)) return;
-        applyFetchedDesk(d, c);
+        applyFetchedDesk(bundle.desk, bundle.canary);
+        setCurrentBlock(bundle.currentBlock);
+        setBlockDuration(bundle.blockDuration || 2);
         return;
       }
       await new Promise((resolve) => setTimeout(resolve, 400));
     }
     if (expectedKey) return;
     if (isStaleGeneration(started, deskLoad.current.current)) return;
-    const d = await getDesk(creator, preferPub);
-    if (!d || isStaleGeneration(started, deskLoad.current.current)) return;
-    const c = await canaryAlive(creator, d.key);
-    if (isStaleGeneration(started, deskLoad.current.current)) return;
-    applyFetchedDesk(d, c);
+    const bundle = await deskAndCanary(creator, preferPub);
+    if (!bundle.desk || isStaleGeneration(started, deskLoad.current.current)) return;
+    applyFetchedDesk(bundle.desk, bundle.canary);
+    setCurrentBlock(bundle.currentBlock);
+    setBlockDuration(bundle.blockDuration || 2);
   }
 
   useEffect(() => {
@@ -373,69 +361,36 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     let timer: number | undefined;
     const deadline = Date.now() + 28_000;
 
-    async function fromChain() {
-      let preferPub = demoKey?.pub;
-      if (demo && !preferPub) preferPub = await fetchSharedDemoPub();
-      const d = await withBackoff(() => getDesk(creator!, preferPub), 6, (ms) => sleep(Math.max(300, ms)));
-      if (cancelled || isStaleGeneration(started, deskLoad.current.current)) return false;
-      try {
-        const timing = await pub().getBlockTiming();
-        if (!cancelled && !isStaleGeneration(started, deskLoad.current.current)) {
-          setCurrentBlock(timing.currentBlock);
-          setBlockDuration(timing.blockDuration || 2);
-        }
-      } catch {
-        // Countdown can wait. Desk identity still loads.
-      }
-      if (d) {
-        const c = await withBackoff(() => canaryAlive(creator!, d.key), 4, (ms) => sleep(Math.max(300, ms)));
-        if (cancelled || isStaleGeneration(started, deskLoad.current.current)) return false;
-        applyFetchedDesk(d, c);
-      } else {
-        setDeskKey(null);
-        setCanaryKey(null);
-        setAlive(null);
-        setCanaryExpiresAt(null);
-        setCanaryCreatedAt(null);
-        setDeskPubRaw(null);
-      }
-      return true;
-    }
-
     async function attempt() {
       if (cancelled || isStaleGeneration(started, deskLoad.current.current)) return;
       try {
-        const live = await withBackoff(() => fetchDeskLive(creator!), 6, (ms) => sleep(Math.max(400, ms)));
+        const live = await fetchDeskLive(creator!);
         if (cancelled || isStaleGeneration(started, deskLoad.current.current)) return;
         applyLive(live);
         setLoadError(null);
         setLoadingDesk(false);
+        if (live.stale || live.note) {
+          timer = window.setTimeout(() => {
+            void attempt();
+          }, 15_000);
+        }
         return;
       } catch {
-        try {
-          const ok = await fromChain();
-          if (ok) {
-            setLoadError(null);
-            setLoadingDesk(false);
-            return;
-          }
-        } catch {
-          // Keep retrying quietly on a first visit.
-        }
+        // Keep retrying quietly on a first visit.
       }
       if (cancelled || isStaleGeneration(started, deskLoad.current.current)) return;
       if (Date.now() < deadline) {
         if (!deskKeyRef.current) setLoadingDesk(true);
         timer = window.setTimeout(() => {
           void attempt();
-        }, 2500);
+        }, 15_000);
         return;
       }
-      setLoadError(CHAIN_READ_FAILED);
+      if (!deskKeyRef.current) setLoadError(CHAIN_READ_FAILED);
       setLoadingDesk(false);
       timer = window.setTimeout(() => {
         void attempt();
-      }, 5000);
+      }, 30_000);
     }
 
     void attempt();
@@ -647,15 +602,17 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     try {
       if (!t.replyText || !deskKey) return;
       if (!priv) throw new Error('Load a desk key first.');
+      let replyKey: Hex | null = null;
       if (demo) {
         const w = await sealReply(priv, t.ephPub, t.replyText);
         const r = await appFetch('/api/demo/reply', {
           method: 'POST',
           body: JSON.stringify({ tipKey: t.key, wireB64: bytesToB64(w) }),
         });
-        const j = (await r.json()) as { message?: string; error?: string; txHash?: Hex };
+        const j = (await r.json()) as { message?: string; error?: string; txHash?: Hex; replyKey?: Hex };
         if (!r.ok) throw new Error(j.message ?? j.error ?? 'failed');
         if (j.txHash) setTx(j.txHash);
+        if (typeof j.replyKey === 'string') replyKey = j.replyKey;
       } else {
         if (!connected) await connect();
         const provider = getInjectedProvider();
@@ -664,8 +621,10 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
         const wire = await sealReply(priv, t.ephPub, t.replyText);
         const out = await reply(w, t.key, wire, deskKey);
         setTx(out.txHash);
+        const created = Array.isArray(out.createdEntities) ? out.createdEntities[0] : undefined;
+        if (typeof created === 'string' && ENTITY_KEY_RE.test(created)) replyKey = created;
       }
-      setTips((arr) => arr.map((x) => (x.key === t.key ? { ...x, replyText: '' } : x)));
+      setTips((arr) => arr.map((x) => (x.key === t.key ? { ...x, replyText: '', sentReplyKey: replyKey } : x)));
       push({ kind: 'success', text: 'Reply sent.' });
     } catch (e: unknown) {
       push({ kind: 'error', text: uiError(e) });
@@ -699,6 +658,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     createdNotice,
     loadingDesk,
     loadError,
+    staleNote,
     chainName,
     canaryExpiresAt,
     canaryCreatedAt,

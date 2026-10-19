@@ -22,6 +22,24 @@ export async function GET(req: NextRequest) {
     return jsonOk(live);
   } catch (err: unknown) {
     if (err instanceof AppError) return jsonFail(err);
-    return jsonFail(new AppError('try_later', CHAIN_READ_FAILED));
+    return jsonOk(
+      {
+        ok: true,
+        creator: DEFAULT_DESK,
+        deskKey: null,
+        canaryKey: null,
+        alive: false,
+        name: 'CanaryDrop desk',
+        deskPubB64: null,
+        expiresAt: null,
+        createdAt: null,
+        currentBlock: null,
+        blockDuration: 2,
+        fetchedAt: Date.now(),
+        stale: false,
+        staleAgeMs: 0,
+        note: CHAIN_READ_FAILED,
+      },
+    );
   }
 }

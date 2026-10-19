@@ -10,6 +10,8 @@ import {
   IP_RATE_MAX_DESK,
   IP_RATE_MAX_READ,
   IP_RATE_MAX_RELAY,
+  LIVE_CACHE_MS,
+  LIVE_STALE_MS,
   REDIS_LOCK_PREFIX,
   REDIS_RL_PREFIX,
   WALLET_LOCK_TTL_MS,
@@ -68,5 +70,7 @@ describe('constants', () => {
     expect(PRODUCTION_HOST).toBe('canarydrop.vercel.app');
     expect(MAX_WIRE_BYTES).toBe(8192);
     expect(MAX_PLAINTEXT_CHARS).toBe(4000);
+    expect(LIVE_CACHE_MS).toBe(45_000);
+    expect(LIVE_STALE_MS).toBe(15 * 60 * 1000);
   });
 });
