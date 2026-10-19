@@ -15,10 +15,12 @@ export default function ReaderPage() {
   const [receipt, setReceipt] = useState('');
   const [reading, setReading] = useState(false);
   const [messages, setMessages] = useState<string[]>([]);
+  const [looked, setLooked] = useState(false);
 
   async function load() {
     setReading(true);
     setMessages([]);
+    setLooked(false);
     try {
       const tip = await pub().getEntity(tipKey as Hex);
       const deskKey = attrKey(tip.attributes, 'desk');
@@ -38,6 +40,7 @@ export default function ReaderPage() {
         outs.push(await openReply(ephPriv, deskPub, new Uint8Array(r.payload)));
       }
       setMessages(outs);
+      setLooked(true);
       push({ kind: outs.length ? 'success' : 'info', text: outs.length ? `Found ${outs.length} replies.` : 'No replies yet.' });
     } catch (e: unknown) {
       push({ kind: 'error', text: uiError(e) });
@@ -74,9 +77,14 @@ export default function ReaderPage() {
           </div>
         </div>
 
+        {looked && messages.length === 0 && (
+          <p className="muted empty-state" style={{ marginTop: 18 }} role="status">
+            {reading ? 'Looking up replies on Arkiv…' : 'No replies yet for this tip.'}
+          </p>
+        )}
         {messages.length > 0 && (
           <div className="card" style={{ marginTop: 18 }}>
-            <p className="muted">{messages.length} replies</p>
+            <p className="muted" role="status">{messages.length} replies</p>
             <ul style={{ marginTop: 10, padding: 0 }}>
               {messages.map((m, i) => (
                 <li key={i} style={{ listStyle: 'none', marginBottom: 12 }}>

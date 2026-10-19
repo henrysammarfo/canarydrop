@@ -123,8 +123,10 @@ export default function SubmitPage() {
             </div>
             <div className="card" style={{ marginTop: 14 }}>
               <div className="kicker">Desk</div>
-              <p className="muted" style={{ marginTop: 8 }}>
-                Canary: {alive === null ? 'unknown' : alive ? 'ALIVE' : 'GONE'}
+              <p className="muted" style={{ marginTop: 8 }} role="status">
+                {alive === null && !deskKey
+                  ? 'Looking up this desk on Arkiv…'
+                  : `Canary: ${alive === null ? 'unknown' : alive ? 'ALIVE' : 'GONE'}`}
               </p>
               <p className="muted" style={{ marginTop: 6 }}>
                 Desk key: {deskKey ? <code>{deskKey.slice(0, 10)}…</code> : 'Not found'}
@@ -166,6 +168,9 @@ export default function SubmitPage() {
                 Submit tip <span className="arrow" aria-hidden="true" />
               </button>
             </div>
+            <p className="muted" style={{ marginTop: 8 }}>
+              New tips stay live at least until 27 Oct 2026.
+            </p>
           </div>
         </div>
 

@@ -6,7 +6,10 @@ import {
   NoEntityFoundError,
 } from '@arkiv-network/sdk';
 import type {
+  Attributes,
   EntityCreatedEvent,
+  EntityDeletedEvent,
+  EntityPatchedEvent,
   ExpiryExtendedEvent,
   FullEntity,
   ProjectedEntity,
@@ -17,11 +20,18 @@ import type {
 } from '@arkiv-network/sdk';
 import { key, str, u64 } from '@arkiv-network/sdk/attr';
 import { tiramisu } from '@arkiv-network/sdk/chains';
-import { eq, gt } from '@arkiv-network/sdk/query';
+import { eq, gt, gte, lte, or } from '@arkiv-network/sdk/query';
 import type { Hex } from 'viem';
 import { custom } from 'viem';
 import { attrKey, attrStr } from './attr';
-import { DEFAULT_RELAY, LIFETIME_KEYS, PROJECT, SEALED_OWNER, type Lifetime } from './constants';
+import {
+  DEFAULT_RELAY,
+  DEMO_TIP_LIVE_UNTIL,
+  LIFETIME_KEYS,
+  PROJECT,
+  SEALED_OWNER,
+  type Lifetime,
+} from './constants';
 import { utcDaySlot } from './day';
 import { AppError } from './errors';
 import { envAddress } from './hex';
@@ -33,10 +43,30 @@ export type Wallet = WalletArkivClient;
 export type PublicClient = PublicArkivClient;
 
 const DESK_SELECT = { key: true, creator: true, expiresAt: true, payload: true, createdAt: true } as const;
-const CANARY_SELECT = { key: true, expiresAt: true, createdAt: true } as const;
-const INBOX_SELECT = { key: true, createdAt: true, expiresAt: true, payload: true } as const;
+const CANARY_SELECT = { key: true, expiresAt: true, createdAt: true, creationFlags: true, owner: true } as const;
+const INBOX_SELECT = { key: true, createdAt: true, expiresAt: true, payload: true, owner: true } as const;
 const REPLY_SELECT = { key: true, payload: true, createdAt: true } as const;
 const COUNT_SELECT = { key: true } as const;
+const SEALED_SELECT = {
+  key: true,
+  owner: true,
+  creator: true,
+  createdAt: true,
+  expiresAt: true,
+  creationFlags: true,
+  attributes: true,
+} as const;
+const EXPLORER_SELECT = {
+  key: true,
+  attributes: true,
+  creator: true,
+  owner: true,
+  expiresAt: true,
+  createdAt: true,
+  creationFlags: true,
+} as const;
+
+export type ExplorerKind = 'tip' | 'desk' | 'canary' | 'reply';
 
 export type DeskRow = ProjectedEntity<typeof DESK_SELECT>;
 export type CanaryRow = ProjectedEntity<typeof CANARY_SELECT>;
@@ -218,14 +248,71 @@ export type InboxWatchHandlers = {
   onTip: (k: Hex) => void;
   onExpiry?: (k: Hex, expiresAt: bigint) => void;
   onSealed?: (k: Hex) => void;
+  onPatched?: (k: Hex) => void;
+  onDeleted?: (k: Hex) => void;
   onError?: (err: Error) => void;
 };
+
+export type DeskEntityShape = {
+  key?: Hex;
+  attributes?: Attributes;
+};
+
+/** True when the entity is a CanaryDrop tip, canary, or desk row for this desk key. */
+export function entityBelongsToDesk(entity: DeskEntityShape | null | undefined, deskKey: Hex): boolean {
+  if (!entity?.key) return false;
+  if (attrStr(entity.attributes, 'project') !== PROJECT) return false;
+  const type = attrStr(entity.attributes, 'type');
+  const desk = deskKey.toLowerCase();
+  if (type === 'desk') return entity.key.toLowerCase() === desk;
+  if (type === 'tip' || type === 'canary') {
+    const labeled = attrKey(entity.attributes, 'desk');
+    return !!labeled && labeled.toLowerCase() === desk;
+  }
+  return false;
+}
+
+export type WatchKind = 'sealed' | 'patched' | 'deleted';
+
+/** Decide whether a chain-wide watch event is about this desk. Fetch when you can; use known keys after a delete. */
+export function watchEventForDesk(opts: {
+  kind: WatchKind;
+  entityKey: Hex;
+  deskKey: Hex;
+  knownKeys: ReadonlySet<string>;
+  entity?: DeskEntityShape | null;
+  newOwner?: Hex;
+}): boolean {
+  if (opts.kind === 'sealed' && opts.newOwner && opts.newOwner.toLowerCase() !== SEALED_OWNER.toLowerCase()) {
+    return false;
+  }
+  if (opts.entity) return entityBelongsToDesk(opts.entity, opts.deskKey);
+  return opts.knownKeys.has(opts.entityKey.toLowerCase());
+}
 
 export function watchInbox(deskKey: Hex, onTipOrHandlers: ((k: Hex) => void) | InboxWatchHandlers) {
   const handlers: InboxWatchHandlers =
     typeof onTipOrHandlers === 'function' ? { onTip: onTipOrHandlers } : onTipOrHandlers;
   let stopped = false;
   let unwatch: (() => void) | undefined;
+  const knownKeys = new Set<string>();
+
+  const remember = (k: Hex) => {
+    knownKeys.add(k.toLowerCase());
+  };
+
+  const ours = async (entityKey: Hex): Promise<boolean> => {
+    try {
+      const e = await pub().getEntity(entityKey);
+      if (entityBelongsToDesk(e, deskKey)) {
+        remember(entityKey);
+        return true;
+      }
+      return false;
+    } catch {
+      return knownKeys.has(entityKey.toLowerCase());
+    }
+  };
 
   const start = () => {
     if (stopped) return;
@@ -234,18 +321,35 @@ export function watchInbox(deskKey: Hex, onTipOrHandlers: ((k: Hex) => void) | I
         if (ev.owner.toLowerCase() !== relayAddress().toLowerCase()) return;
         try {
           const e = await pub().getEntity(ev.entityKey);
-          if (attrStr(e.attributes, 'type') === 'tip' && attrKey(e.attributes, 'desk') === deskKey) {
+          if (entityBelongsToDesk(e, deskKey) && attrStr(e.attributes, 'type') === 'tip') {
+            remember(ev.entityKey);
             handlers.onTip(ev.entityKey);
           }
         } catch {
           return;
         }
       },
-      onExpiryExtended: (ev: ExpiryExtendedEvent) => {
-        handlers.onExpiry?.(ev.entityKey, ev.expiresAt);
+      onExpiryExtended: async (ev: ExpiryExtendedEvent) => {
+        if (await ours(ev.entityKey)) handlers.onExpiry?.(ev.entityKey, ev.expiresAt);
       },
-      onOwnershipTransferred: (ev) => {
-        if (ev.newOwner.toLowerCase() === SEALED_OWNER.toLowerCase()) handlers.onSealed?.(ev.entityKey);
+      onOwnershipTransferred: async (ev) => {
+        if (ev.newOwner.toLowerCase() !== SEALED_OWNER.toLowerCase()) return;
+        if (await ours(ev.entityKey)) handlers.onSealed?.(ev.entityKey);
+      },
+      onEntityPatched: async (ev: EntityPatchedEvent) => {
+        if (await ours(ev.entityKey)) handlers.onPatched?.(ev.entityKey);
+      },
+      onEntityDeleted: (ev: EntityDeletedEvent) => {
+        if (
+          watchEventForDesk({
+            kind: 'deleted',
+            entityKey: ev.entityKey,
+            deskKey,
+            knownKeys,
+          })
+        ) {
+          handlers.onDeleted?.(ev.entityKey);
+        }
       },
       onError: (err: Error) => {
         handlers.onError?.(err);
@@ -269,6 +373,15 @@ export const LIFETIMES = {
   '72h': ExpirationTime.fromHours(72),
   '7d': ExpirationTime.fromDays(7),
 } as const;
+
+/** Chosen lifetime, but never shorter than DEMO_TIP_LIVE_UNTIL while that date is still ahead. */
+export function tipExpires(life: Lifetime, now = new Date()) {
+  const chosen = LIFETIMES[life];
+  if (now.getTime() < DEMO_TIP_LIVE_UNTIL.getTime()) {
+    return ExpirationTime.atDate(DEMO_TIP_LIVE_UNTIL, { atLeast: chosen });
+  }
+  return chosen;
+}
 
 export function isLifetime(value: string): value is Lifetime {
   return (LIFETIME_KEYS as readonly string[]).includes(value);
@@ -300,13 +413,91 @@ export async function countBySlot(kind: 'tip' | 'reply' | 'desk', creator: Hex, 
   return page.entities.length;
 }
 
-export async function explorerPage(opts?: PageWalk) {
+export type ExplorerWalk = PageWalk & {
+  kind?: ExplorerKind;
+  sealed?: boolean;
+};
+
+export async function explorerPage(opts?: ExplorerWalk) {
+  const head = opts?.atBlock ?? (await headBlock());
+  const filters = [eq('project', PROJECT)];
+  if (opts?.sealed && !opts.kind) filters.push(eq('type', 'tip'));
+  else if (opts?.kind) filters.push(eq('type', opts.kind));
+  let q = pub().select(EXPLORER_SELECT).where(...filters).limit(20).atBlock(head);
+  if (opts?.sealed) q = q.createdBy(relayAddress()).ownedBy(SEALED_OWNER);
+  if (opts?.cursor) q = q.cursor(opts.cursor);
+  return q.fetch();
+}
+
+/** Tips the sponsor created and then handed to the burn address. Nobody can extend them. */
+export async function sealedTips(opts?: PageWalk) {
   const head = opts?.atBlock ?? (await headBlock());
   let q = pub()
-    .select({ key: true, attributes: true, creator: true, owner: true, expiresAt: true, createdAt: true })
-    .where(eq('project', PROJECT))
+    .select(SEALED_SELECT)
+    .where(eq('project', PROJECT), eq('type', 'tip'))
+    .createdBy(relayAddress())
+    .ownedBy(SEALED_OWNER)
     .limit(20)
     .atBlock(head);
   if (opts?.cursor) q = q.cursor(opts.cursor);
   return q.fetch();
+}
+
+export async function tipsOrCanaries() {
+  return pub()
+    .select({ key: true, attributes: true, owner: true, creator: true })
+    .where(eq('project', PROJECT), or(eq('type', 'tip'), eq('type', 'canary')))
+    .limit(20)
+    .fetch();
+}
+
+/** slot is YYYYMMDD. Use this instead of filtering $createdAt, which the node rejects. */
+export async function countTipsFromSlot(creator: Hex, fromSlot: bigint): Promise<number> {
+  const page = await pub()
+    .select(COUNT_SELECT)
+    .where(eq('project', PROJECT), eq('type', 'tip'), gte('slot', u64(fromSlot)))
+    .createdBy(creator)
+    .limit(200)
+    .fetch();
+  return page.entities.length;
+}
+
+export async function countTipsToSlot(creator: Hex, toSlot: bigint): Promise<number> {
+  const page = await pub()
+    .select(COUNT_SELECT)
+    .where(eq('project', PROJECT), eq('type', 'tip'), lte('slot', u64(toSlot)))
+    .createdBy(creator)
+    .limit(200)
+    .fetch();
+  return page.entities.length;
+}
+
+export function mintNonce(owner: Hex): Promise<bigint> {
+  return pub().getEntityNonce(owner);
+}
+
+export function chainEntityCount(): Promise<number> {
+  return pub().getEntityCount();
+}
+
+/** Predicate text the node will parse. This is not the full select or limit. */
+export function queryPredicate(builder: { toString: () => string }): string {
+  return builder.toString();
+}
+
+export function sealedTipsQueryText(): string {
+  return pub()
+    .select(SEALED_SELECT)
+    .where(eq('project', PROJECT), eq('type', 'tip'))
+    .createdBy(relayAddress())
+    .ownedBy(SEALED_OWNER)
+    .toString();
+}
+
+export function liveDeskQueryText(creator: Hex): string {
+  return pub()
+    .select(DESK_SELECT)
+    .where(eq('project', PROJECT), eq('type', 'desk'))
+    .createdBy(creator)
+    .toString();
 }

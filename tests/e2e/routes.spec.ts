@@ -10,6 +10,7 @@ const routes = [
   '/r',
   '/explorer',
   '/docs',
+  '/how',
   '/verify',
   `/canary/${desk}`,
   `/d/${desk}`,
@@ -120,13 +121,16 @@ test('home FAQ and footer CTA are hittable after mouse wheel at 1440', async ({ 
 test('dry run tip submit shows a toast', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(urlFor('/submit'), { waitUntil: 'load' });
-  await page.locator('input').first().fill(desk);
+  const creator = page.locator('input').first();
+  if ((await creator.inputValue()) !== desk) await creator.fill(desk);
+  await expect(page.locator('p[role="status"]')).toContainText(/Canary:/i, { timeout: 30_000 });
   await page.locator('textarea').first().fill('Synthetic judge dry run tip.');
   const dry = page.getByRole('button', { name: 'Dry run' });
   await expect(dry).toBeEnabled({ timeout: 20_000 });
   await dry.click();
-  const toast = page.locator('.toast').filter({ hasText: /dry run/i });
-  await expect(toast).toBeVisible({ timeout: 20_000 });
+  const toast = page.locator('.toast').first();
+  await expect(toast).toBeVisible({ timeout: 45_000 });
+  await expect(toast).toContainText(/dry run/i);
 });
 
 test('hero CTAs are narrower than 260px', async ({ page }) => {

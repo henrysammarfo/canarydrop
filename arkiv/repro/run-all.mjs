@@ -4,7 +4,19 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
-const files = ['f1-created-at.mjs', 'f2-bare-number.mjs', 'f3-head-type.mjs', 'f4-attribute-name.mjs', 'f5-query-page.mjs'];
+const files = [
+  'f1-created-at.mjs',
+  'f2-bare-number.mjs',
+  'f3-head-type.mjs',
+  'f4-attribute-name.mjs',
+  'f5-query-page.mjs',
+  'f20-exists.mjs',
+  'f21-ne.mjs',
+  'f22-has-type.mjs',
+  'f23-empty-query.mjs',
+  'f24-entity-count.mjs',
+  'f25-query-text.mjs',
+];
 let failed = 0;
 for (const file of files) {
   const r = spawnSync(process.execPath, [path.join(dir, file)], { encoding: 'utf8' });

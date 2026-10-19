@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     if (raw === null) throw new AppError('bad_request');
     throwIfOversizedWire(raw);
     const parsed = tipBody.safeParse(raw);
-    if (!parsed.success) throw new AppError('bad_request', parsed.error.issues.map((i) => i.message).join('; '));
+    if (!parsed.success) throw new AppError('bad_request');
     const { deskKey, wireB64, lifetime } = parsed.data;
     assertWireB64(wireB64);
     const wire = b64ToBytes(wireB64);

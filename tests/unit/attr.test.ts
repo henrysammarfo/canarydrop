@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Attributes } from '@arkiv-network/sdk';
-import { attrKey, attrStr, attrU64 } from '@/lib/attr';
+import { attrBool, attrKey, attrStr, attrU64 } from '@/lib/attr';
 
 const attrs = {
   type: { type: 'str', value: 'tip' },
   desk: { type: 'key', value: `0x${'ab'.repeat(32)}` },
   slot: { type: 'u64', value: 20261019n },
+  padded: { type: 'bool', value: true },
 } as unknown as Attributes;
 
 describe('attribute helpers', () => {
@@ -23,5 +24,11 @@ describe('attribute helpers', () => {
   it('reads u64', () => {
     expect(attrU64(attrs, 'slot')).toBe(20261019n);
     expect(attrU64(attrs, 'type')).toBeUndefined();
+  });
+
+  it('reads bool', () => {
+    expect(attrBool(attrs, 'padded')).toBe(true);
+    expect(attrBool(attrs, 'type')).toBeUndefined();
+    expect(attrBool(undefined, 'padded')).toBeUndefined();
   });
 });

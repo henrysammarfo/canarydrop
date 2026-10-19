@@ -47,6 +47,16 @@ export const CSRF_HEADER = 'x-csrf-token';
 export const LIFETIME_KEYS = ['1h', '24h', '72h', '7d'] as const;
 export type Lifetime = (typeof LIFETIME_KEYS)[number];
 
+/** Floor so new tips stay live through judging. After this instant, the picker lifetime stands alone. */
+export const DEMO_TIP_LIVE_UNTIL = new Date('2026-10-27T23:59:59.000Z');
+
+export const SEALED_TIPS_EMPTY =
+  'No live sealed tips right now. Earlier demo tips have expired. Send a new tip from Submit. New tips last at least until 27 Oct 2026.';
+
+export const CHAIN_READ_FAILED = 'Could not read Tiramisu right now. Please reload in a moment.';
+
+export const PROOF_CACHE_MS = 20_000;
+
 export const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 export const ENTITY_KEY_RE = /^0x[0-9a-fA-F]{64}$/;
 export const PRIVATE_KEY_RE = /^0x[0-9a-fA-F]{64}$/;

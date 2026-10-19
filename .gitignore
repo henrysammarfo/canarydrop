@@ -13,8 +13,10 @@ npm-debug.log*
 # builds
 *.log
 test-results
+test-results/.last-run.json
 playwright-report
 playwright/.cache
+autocannon_home.json
 
 # uploads (local only)
 /home/ubuntu/.cursor/projects/workspace/uploads/

@@ -100,27 +100,27 @@ export default function HomePage() {
       <section className="section">
         <div className="wrap">
           <div className="home-bento">
-            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts" target="_blank" rel="noreferrer">
+            <a className="card" href="/how#batch">
               <div className="mono">executeBatch</div>
               <div>Create desk and canary in one transaction.</div>
             </a>
-            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/relay.ts" target="_blank" rel="noreferrer">
-              <div className="mono">sealed to 0x…dEaD</div>
+            <a className="card" href="/how#ownedBy">
+              <div className="mono">ownedBy the burn address</div>
               <div>Tips are handed to a burn address so nobody can change them.</div>
             </a>
-            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts" target="_blank" rel="noreferrer">
+            <a className="card" href="/how#expiry">
               <div className="mono">Entity Expiration</div>
               <div>Different lifetimes per type: canary hours, desk days.</div>
             </a>
-            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts" target="_blank" rel="noreferrer">
-              <div className="mono">extendEntity</div>
-              <div>Renew canary and desk leases with one call.</div>
+            <a className="card" href="/how#atBlock">
+              <div className="mono">atBlock</div>
+              <div>Ask whether the canary was alive at a pinned block.</div>
             </a>
-            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts" target="_blank" rel="noreferrer">
+            <a className="card" href="/how#createdBy">
               <div className="mono">createdBy</div>
               <div>Read only what the real desk created. Impostors are ignored.</div>
             </a>
-            <a className="card" href="https://github.com/henrysammarfo/canarydrop/blob/main/lib/arkiv.ts" target="_blank" rel="noreferrer">
+            <a className="card" href="/how#watch">
               <div className="mono">watchEntityEvents</div>
               <div>Live inbox over WebSocket. No refresh loop.</div>
             </a>
@@ -213,6 +213,7 @@ export default function HomePage() {
             <div className="links">
               <a href="https://github.com/henrysammarfo/canarydrop" target="_blank" rel="noreferrer">GitHub</a>
               <a href="/verify">Verify in 60 seconds</a>
+              <a href="/how">How we use Arkiv</a>
               <a href="/docs">Docs</a>
               <a href="https://tiramisu.explorer.arkiv.network" target="_blank" rel="noreferrer">Explorer</a>
               <a href="/LICENSE" target="_blank" rel="noreferrer">MIT</a>

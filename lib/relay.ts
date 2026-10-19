@@ -3,7 +3,7 @@ import { key, str, u64 } from '@arkiv-network/sdk/attr';
 import { tiramisu } from '@arkiv-network/sdk/chains';
 import type { Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { LIFETIMES, PROJECT, SEALED_OWNER, pub, requireLiveDesk, type Wallet } from './arkiv';
+import { PROJECT, SEALED_OWNER, pub, requireLiveDesk, tipExpires, type Wallet } from './arkiv';
 import type { Lifetime } from './constants';
 import { utcDaySlot } from './day';
 import { AppError } from './errors';
@@ -30,7 +30,7 @@ export function relayWallet(): Wallet {
 
 /**
  * Create the tip and hand ownership to 0x…dEaD in one batch. Nobody can extend, patch, or delete
- * it afterwards, so the lifetime the source picked is the lifetime it gets.
+ * it afterwards. Until 27 Oct 2026 the chosen lifetime is a floor against that date so demo tips stay live for judging.
  */
 export async function postTip(deskKey: Hex, wire: Uint8Array, life: Lifetime) {
   return withWalletLock('relay', relayAccount().address, () => postTipOnce(deskKey, wire, life));
@@ -63,7 +63,7 @@ async function postTipOnce(deskKey: Hex, wire: Uint8Array, life: Lifetime) {
                 desk: key(deskKey),
                 slot: u64(utcDaySlot()),
               },
-              expires: LIFETIMES[life],
+              expires: tipExpires(life),
               flags: { readonly: true },
             },
           ],
