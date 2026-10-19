@@ -1,5 +1,6 @@
 import type { Hex } from 'viem';
 import { bytesEqual } from './bytes';
+import { ENTITY_KEY_RE } from './constants';
 import { deskPubBytes, parseDeskPayload } from './payload';
 
 export type DeskPickRow = {
@@ -27,4 +28,25 @@ export function pickLiveDesk<T extends DeskPickRow>(rows: readonly T[], preferPu
     if (match) return match;
   }
   return sorted[0];
+}
+
+export const DESK_CREATED_TOAST = 'Desk and canary created.';
+export const DESK_CREATED_NOTICE =
+  'Desk and canary created. This browser now uses the new live desk.';
+
+export function createdDeskAndCanary(created: unknown): { deskKey?: Hex | undefined; canaryKey?: Hex | undefined } {
+  if (!Array.isArray(created)) return {};
+  const keys = created.filter((k): k is Hex => typeof k === 'string' && ENTITY_KEY_RE.test(k));
+  return { deskKey: keys[0], canaryKey: keys[1] };
+}
+
+export function fetchedDeskIsReady(
+  row: DeskPickRow | undefined,
+  preferPub?: Uint8Array,
+  expectedKey?: Hex,
+): boolean {
+  if (!row?.key) return false;
+  if (expectedKey && row.key.toLowerCase() !== expectedKey.toLowerCase()) return false;
+  if (preferPub && !deskRowMatchesPub(row, preferPub)) return false;
+  return true;
 }

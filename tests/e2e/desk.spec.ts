@@ -23,6 +23,51 @@ test('demo key GET from a real page is not blocked as a missing Origin', async (
   }
 });
 
+test('create demo desk shows a success notice and drops the stale key warning', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/desk', { waitUntil: 'load' });
+  const demo = page.locator('label.badge', { hasText: 'Demo mode' });
+  await expect(demo).toBeVisible();
+  const box = demo.locator('input[type="checkbox"]');
+  if (!(await box.isChecked())) await box.check();
+  await expect(page.getByText(/Demo mode is on/i)).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('button', { name: 'keys' }).click();
+  const createBtn = page.getByRole('button', { name: /Create demo desk/i });
+  try {
+    await expect(createBtn.first()).toBeEnabled({ timeout: 15_000 });
+  } catch {
+    test.skip(true, 'Demo mode is off in this environment');
+    return;
+  }
+  await page.route('**/api/demo/desk/create**', async (route) => {
+    const req = route.request();
+    if (req.method() !== 'POST') {
+      await route.continue();
+      return;
+    }
+    const dryRun = new URL(req.url()).searchParams.get('dryRun') === '1';
+    if (dryRun) {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        txHash: `0x${'b3'.repeat(32)}`,
+        created: [`0x${'1d'.repeat(32)}`, `0x${'3c'.repeat(32)}`],
+      }),
+    });
+  });
+  await createBtn.first().click();
+  await expect(page.getByRole('status').filter({ hasText: /Desk and canary created/i })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(page.getByText(/This browser now uses the new live desk/i)).toBeVisible();
+  await expect(page.getByText(/The live desk still has an older public key/i)).toHaveCount(0);
+});
+
 test('desk demo mode toggle is usable without a wallet', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/desk', { waitUntil: 'load' });

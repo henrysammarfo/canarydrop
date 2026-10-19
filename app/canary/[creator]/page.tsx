@@ -1,6 +1,7 @@
 import type { Hex } from 'viem';
 import Link from 'next/link';
 import { canaryAlive, canaryAtBlock, getDesk, pub } from '@/lib/arkiv';
+import { atBlockAbsenceDetail } from '@/lib/at-block-copy';
 import { preferPubForCreator } from '@/lib/demo-pub';
 import type { CanaryRow } from '@/lib/arkiv';
 import { PROJECT } from '@/lib/constants';
@@ -24,7 +25,7 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
   const creator = params.creator as Hex;
   let desk: Awaited<ReturnType<typeof getDesk>> | null = null;
   let canary: CanaryRow | null = null;
-  let pastAlive: boolean | null = null;
+  let pastNote: string | null = null;
   let timing: { currentBlock: bigint; currentBlockTime: number; blockDuration: number } | null = null;
   let loadError: string | null = null;
   let head = 0n;
@@ -36,7 +37,12 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
     if (desk) {
       canary = await canaryAlive(creator, desk.key);
       const hourAgo = head > 1800n ? head - 1800n : 0n;
-      pastAlive = !!(await canaryAtBlock(creator, desk.key, hourAgo));
+      const past = await canaryAtBlock(creator, desk.key, hourAgo);
+      pastNote = atBlockAbsenceDetail({
+        hourAgo,
+        pastAlive: past !== null,
+        createdAt: canary?.createdAt,
+      }).detail;
     }
   } catch (e: unknown) {
     loadError = uiError(e);
@@ -90,9 +96,9 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
                 block {lastRenewedBlock.toString()}
               </div>
             )}
-            {pastAlive !== null && (
+            {pastNote && (
               <div className="muted" style={{ marginTop: 8 }}>
-                About one hour ago this canary was {pastAlive ? 'ALIVE' : 'GONE'} at a pinned block.
+                {pastNote}
               </div>
             )}
           </div>

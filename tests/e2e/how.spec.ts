@@ -8,6 +8,9 @@ test('how page shows live Arkiv claims', async ({ page }) => {
   await expect(page.locator('#ownedBy')).toBeVisible();
   await expect(page.locator('#createdBy')).toBeVisible();
   await expect(page.locator('#atBlock .proof-title')).toContainText('Was this canary alive about an hour ago?');
+  const atBlock = await page.locator('#atBlock').innerText();
+  expect(atBlock).toMatch(/ALIVE at block|did not exist yet about an hour ago/i);
+  expect(atBlock).not.toMatch(/GONE at block/);
   await expect(page.locator('#ownedBy .query-box')).toContainText('$owner');
   const owned = await page.locator('#ownedBy').innerText();
   expect(owned).toMatch(/No live sealed tips|live sealed tips/i);

@@ -23,6 +23,7 @@ import {
   PROOF_CACHE_MS,
   SEALED_TIPS_EMPTY,
 } from './constants';
+import { atBlockAbsenceDetail } from './at-block-copy';
 import { addressUrl, entityUrl, isSealedOwner, txUrl } from './chain';
 import { preferPubForCreator } from './demo-pub';
 import { eq, gt, or } from '@arkiv-network/sdk/query';
@@ -151,15 +152,18 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
       });
 
       const past = await canaryAtBlock(DEFAULT_DESK, desk.key, hourAgo);
+      const absence = atBlockAbsenceDetail({
+        hourAgo,
+        pastAlive: past !== null,
+        createdAt: canary?.createdAt,
+      });
       claims.push({
         id: 'atBlock',
         title: 'Was this canary alive about an hour ago?',
-        why: 'A pinned block is a small time machine. Absence at that block is still the signal.',
+        why: 'A pinned block is a small time machine. If the canary was created later, it will not appear at that block.',
         query: `same canary query, atBlock(${hourAgo.toString()}) and $expiresAt > u64(${hourAgo.toString()})`,
-        ok: past !== null,
-        detail: past
-          ? `ALIVE at block ${hourAgo.toString()}.`
-          : `GONE at block ${hourAgo.toString()}.`,
+        ok: absence.ok,
+        detail: absence.detail,
         links: [{ label: 'Public canary page', href: `/canary/${DEFAULT_DESK}` }],
       });
     }
