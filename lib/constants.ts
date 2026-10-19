@@ -1,0 +1,43 @@
+import type { Hex } from 'viem';
+
+/** Unique project attribute on every entity and every query. */
+export const PROJECT = 'canarydrop-gts26-hm';
+
+export const SEALED_OWNER = '0x000000000000000000000000000000000000dEaD' as Hex;
+
+export const DEFAULT_RELAY = '0xa6Aa6a1409eb54028550466169A29EAfd8f7a442' as Hex;
+export const DEFAULT_DESK = '0x1da3c22c079c264536D831F6F1fCe638aB0b20B0' as Hex;
+export const DEFAULT_IMPOSTOR = '0x97250dcDbE5fB229Fb532AAC0d62be44e028b7Af' as Hex;
+
+export const PRODUCTION_HOST = 'canarydrop.vercel.app';
+
+/** Ciphertext plus envelope must stay under this. Matches the relay write cap. */
+export const MAX_WIRE_BYTES = 8192;
+/** Base64 of MAX_WIRE_BYTES, with a little slack for padding. */
+export const MAX_WIRE_B64_CHARS = Math.ceil(MAX_WIRE_BYTES / 3) * 4 + 8;
+export const MAX_PLAINTEXT_CHARS = 4000;
+export const MAX_DESK_NAME = 60;
+export const MAX_PUB_B64 = 200;
+
+export const RELAY_DAILY_TIP_CAP = 120;
+export const DESK_DAILY_WRITE_CAP = 40;
+export const DESK_DAILY_CREATE_CAP = 10;
+/** Refuse writes if the sponsor wallet holds less than 0.02 GLM. */
+export const MIN_WALLET_WEI = 20n * 10n ** 15n;
+
+export const IP_RATE_WINDOW_MS = 60_000;
+export const IP_RATE_MAX_RELAY = 8;
+export const IP_RATE_MAX_DESK = 8;
+
+export const CHAIN_RETRY_ATTEMPTS = 4;
+export const CHAIN_RETRY_BASE_MS = 50;
+
+export const CSRF_COOKIE = 'cd_csrf';
+export const CSRF_HEADER = 'x-csrf-token';
+
+export const LIFETIME_KEYS = ['1h', '24h', '72h', '7d'] as const;
+export type Lifetime = (typeof LIFETIME_KEYS)[number];
+
+export const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+export const ENTITY_KEY_RE = /^0x[0-9a-fA-F]{64}$/;
+export const PRIVATE_KEY_RE = /^0x[0-9a-fA-F]{64}$/;

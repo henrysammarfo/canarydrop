@@ -5,7 +5,13 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Hex } from 'viem';
 import { canaryAlive, getDesk } from '@/lib/arkiv';
+import type { DeskRow } from '@/lib/arkiv';
+import { bytesToB64 } from '@/lib/bytes';
+import { appFetch } from '@/lib/client-fetch';
+import { LIFETIME_KEYS, type Lifetime } from '@/lib/constants';
 import { sealTo } from '@/lib/crypto';
+import { deskPubBytes, parseDeskPayload } from '@/lib/payload';
+import { uiError } from '@/lib/ui-error';
 import Modal from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { entityUrl, txUrl } from '@/lib/chain';
@@ -13,13 +19,13 @@ import { entityUrl, txUrl } from '@/lib/chain';
 export default function SourceDeskPage() {
   const push = useToast();
   const { creator } = useParams<{ creator: Hex }>();
-  const [desk, setDesk] = useState<any>(null);
+  const [desk, setDesk] = useState<DeskRow | null>(null);
   const [deskKey, setDeskKey] = useState<Hex | null>(null);
   const [alive, setAlive] = useState<boolean | null>(null);
   const [text, setText] = useState('');
-  const [life, setLife] = useState<'1h' | '24h' | '72h' | '7d'>('24h');
+  const [life, setLife] = useState<Lifetime>('24h');
   const [sending, setSending] = useState(false);
-  const [ok, setOk] = useState<{ tipKey: Hex; txHash: Hex; receipt: object } | null>(null);
+  const [ok, setOk] = useState<{ tipKey: Hex; txHash: Hex; receipt: JsonWebKey } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
@@ -31,19 +37,16 @@ export default function SourceDeskPage() {
           setDeskKey(d.key);
           setAlive(!!(await canaryAlive(creator, d.key)));
         }
-      } catch (e: any) {
-        push({ kind: 'error', text: String(e?.message ?? e) });
+      } catch (e: unknown) {
+        push({ kind: 'error', text: uiError(e) });
       }
     })();
   }, [creator, push]);
 
   const deskPubRaw = useMemo(() => {
     if (!desk?.payload) return null;
-    try {
-      return new Uint8Array(JSON.parse(new TextDecoder().decode(desk.payload)).pub as number[]);
-    } catch {
-      return null;
-    }
+    const parsed = parseDeskPayload(desk.payload);
+    return parsed ? deskPubBytes(parsed) : null;
   }, [desk]);
 
   async function send() {
@@ -51,22 +54,26 @@ export default function SourceDeskPage() {
     setSending(true);
     try {
       const { wire, receipt } = await sealTo(deskPubRaw, text);
-      const res = await fetch('/api/tip', {
+      const res = await appFetch('/api/tip', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ deskKey, wireB64: Buffer.from(wire).toString('base64'), lifetime: life }),
+        body: JSON.stringify({ deskKey, wireB64: bytesToB64(wire), lifetime: life }),
       });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j?.message ?? j?.error ?? 'failed');
-      setOk({ tipKey: j.tipKey as Hex, txHash: j.txHash as Hex, receipt });
+      const j = (await res.json()) as { message?: string; error?: string; tipKey?: Hex; txHash?: Hex };
+      if (!res.ok) throw new Error(j.message ?? j.error ?? 'failed');
+      if (!j.tipKey || !j.txHash) throw new Error('The tip was not confirmed.');
+      setOk({ tipKey: j.tipKey, txHash: j.txHash, receipt });
       setText('');
       push({ kind: 'success', text: 'Tip sent. Keep your receipt private.' });
-    } catch (e: any) {
-      push({ kind: 'error', text: String(e?.message ?? e) });
+    } catch (e: unknown) {
+      push({ kind: 'error', text: uiError(e) });
     } finally {
       setSending(false);
       setConfirmOpen(false);
     }
+  }
+
+  function onLife(value: string) {
+    if ((LIFETIME_KEYS as readonly string[]).includes(value)) setLife(value as Lifetime);
   }
 
   return (
@@ -100,7 +107,7 @@ export default function SourceDeskPage() {
         <div className="ctaRow" style={{ marginTop: 12, justifyContent: 'flex-start' }}>
           <label className="badge" style={{ background: 'rgba(10,16,24,.45)' }}>
             Lifetime:&nbsp;
-            <select value={life} onChange={(e) => setLife(e.target.value as any)} style={{ background: 'transparent', color: 'inherit', border: 'none', outline: 'none' }}>
+            <select value={life} onChange={(e) => onLife(e.target.value)} style={{ background: 'transparent', color: 'inherit', border: 'none', outline: 'none' }}>
               <option value="1h">1 hour</option>
               <option value="24h">24 hours</option>
               <option value="72h">72 hours</option>

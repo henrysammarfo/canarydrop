@@ -2,28 +2,37 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Hex } from 'viem';
-import { custom } from 'viem';
-import { createWalletClient } from '@arkiv-network/sdk';
-import { tiramisu } from '@arkiv-network/sdk/chains';
-import { canaryAlive, getDesk, pub, renew, reply, watchInbox } from '@/lib/arkiv';
+import {
+  canaryAlive,
+  createDesk,
+  getDesk,
+  inboxPage,
+  pub,
+  renew,
+  reply,
+  walletFromProvider,
+  watchInbox,
+} from '@/lib/arkiv';
+import { bytesEqual, bytesToB64 } from '@/lib/bytes';
+import { appFetch } from '@/lib/client-fetch';
+import { DEFAULT_DESK } from '@/lib/constants';
 import {
   exportPrivJwk,
   exportPub,
   importPrivJwk,
+  jwkToUncompressed,
   newKeyPair,
   openAsDesk,
   sealReply,
 } from '@/lib/crypto';
+import { asAddress } from '@/lib/hex';
+import { getInjectedProvider } from '@/lib/injected';
+import { deskPubBytes, parseDeskPayload } from '@/lib/payload';
+import { uiError } from '@/lib/ui-error';
 import { connectTiramisu } from '@/lib/wallet';
 import { shortHex, txUrl } from '@/lib/chain';
 import Modal from '@/components/Modal';
 import { useToast } from '@/components/Toast';
-
-declare global {
-  interface Window {
-    ethereum?: any;
-  }
-}
 
 type TipView = {
   key: Hex;
@@ -35,18 +44,15 @@ type TipView = {
 
 const DESK_KEY_STORE = 'canarydrop/deskPrivJwk';
 
+type DemoKey = { jwk: JsonWebKey; pub: Uint8Array };
+
 export default function DeskPage() {
   const push = useToast();
   const [demo, setDemo] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('canarydrop/demo') === '1';
   });
-  const [creator, setCreator] = useState<Hex | null>(() => {
-    const raw = process.env.NEXT_PUBLIC_DESK_ADDRESS || '';
-    return /^0x[0-9a-fA-F]{40}$/.test(raw)
-      ? (raw as Hex)
-      : ('0x1da3c22c079c264536D831F6F1fCe638aB0b20B0' as Hex);
-  });
+  const [creator, setCreator] = useState<Hex | null>(() => asAddress(process.env.NEXT_PUBLIC_DESK_ADDRESS || '', DEFAULT_DESK));
   const [connected, setConnected] = useState<Hex | null>(null);
   const [deskName, setDeskName] = useState('CanaryDrop Demo Desk');
   const [deskKey, setDeskKey] = useState<Hex | null>(null);
@@ -59,6 +65,13 @@ export default function DeskPage() {
   const [tx, setTx] = useState<Hex | null>(null);
   const [tab, setTab] = useState<'inbox' | 'canary' | 'keys' | 'settings'>('inbox');
   const [confirm, setConfirm] = useState<null | 'renew' | 'clear'>(null);
+  const [inboxCursor, setInboxCursor] = useState<string | undefined>(undefined);
+  const [inboxBlock, setInboxBlock] = useState<bigint | undefined>(undefined);
+  const [loadingInbox, setLoadingInbox] = useState(false);
+  const [skippedTips, setSkippedTips] = useState(0);
+  const [demoKey, setDemoKey] = useState<DemoKey | null>(null);
+  const [pubMatch, setPubMatch] = useState<boolean | null>(null);
+  const seenTips = useRef(new Set<string>());
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -66,15 +79,37 @@ export default function DeskPage() {
   }, [demo]);
 
   useEffect(() => {
+    if (demo) return;
     (async () => {
       try {
         const raw = localStorage.getItem(DESK_KEY_STORE);
-        if (raw) setPriv(await importPrivJwk(JSON.parse(raw)));
-      } catch (e) {
-        console.warn('Failed to import stored desk key', e);
+        if (raw) setPriv(await importPrivJwk(JSON.parse(raw) as JsonWebKey));
+      } catch {
+        push({ kind: 'error', text: 'Could not open the desk key stored in this browser.' });
       }
     })();
-  }, []);
+  }, [demo, push]);
+
+  useEffect(() => {
+    if (!demo) {
+      setDemoKey(null);
+      return;
+    }
+    (async () => {
+      try {
+        const r = await appFetch('/api/demo/desk/key');
+        const j = (await r.json()) as { jwk?: JsonWebKey; pubB64?: string; message?: string };
+        if (!r.ok || !j.jwk) throw new Error(j.message ?? 'Demo mode could not load the shared desk key.');
+        const k = await importPrivJwk(j.jwk);
+        setPriv(k);
+        setDemoKey({ jwk: j.jwk, pub: jwkToUncompressed(j.jwk) });
+        setCreator(asAddress(process.env.NEXT_PUBLIC_DESK_ADDRESS || '', DEFAULT_DESK));
+        push({ kind: 'success', text: 'Demo mode loaded the shared desk key for this browser.' });
+      } catch (e: unknown) {
+        push({ kind: 'error', text: uiError(e) });
+      }
+    })();
+  }, [demo, push]);
 
   const connect = useCallback(async () => {
     const result = await connectTiramisu();
@@ -83,9 +118,43 @@ export default function DeskPage() {
       return;
     }
     setConnected(result.address as Hex);
-    setCreator(demo ? (process.env.NEXT_PUBLIC_DESK_ADDRESS as Hex | null) : (result.address as Hex));
+    setCreator(demo ? asAddress(process.env.NEXT_PUBLIC_DESK_ADDRESS || '', DEFAULT_DESK) : (result.address as Hex));
     push({ kind: 'success', text: `Wallet connected ${shortHex(result.address)}` });
   }, [demo, push]);
+
+  async function ingestTip(entityKey: Hex, wire: Uint8Array, createdAt: bigint, deskPriv: CryptoKey) {
+    if (seenTips.current.has(entityKey)) return;
+    try {
+      const { text, ephPub } = await openAsDesk(deskPriv, wire);
+      seenTips.current.add(entityKey);
+      setTips((old) => {
+        const next = [...old, { key: entityKey, createdAt, text, ephPub }];
+        next.sort((a, b) => Number(b.createdAt - a.createdAt));
+        return next;
+      });
+    } catch {
+      setSkippedTips((n) => n + 1);
+    }
+  }
+
+  async function loadHistory(key: Hex, deskPriv: CryptoKey, cursor?: string, atBlock?: bigint) {
+    setLoadingInbox(true);
+    try {
+      const opts: { cursor?: string; atBlock?: bigint } = {};
+      if (cursor) opts.cursor = cursor;
+      if (atBlock !== undefined) opts.atBlock = atBlock;
+      const page = await inboxPage(key, opts);
+      for (const row of page.entities) {
+        if (row.key && row.payload) await ingestTip(row.key, row.payload, row.createdAt ?? 0n, deskPriv);
+      }
+      setInboxCursor(page.cursor);
+      setInboxBlock(page.blockNumber);
+    } catch (e: unknown) {
+      push({ kind: 'error', text: uiError(e) });
+    } finally {
+      setLoadingInbox(false);
+    }
+  }
 
   useEffect(() => {
     (async () => {
@@ -97,22 +166,42 @@ export default function DeskPage() {
           const c = await canaryAlive(creator, d.key);
           if (c) setCanaryKey(c.key);
           setAlive(!!c);
+          const payload = d.payload ? parseDeskPayload(d.payload) : null;
+          if (payload && demoKey) {
+            setPubMatch(bytesEqual(deskPubBytes(payload), demoKey.pub));
+          }
           if (unwatchRef.current) unwatchRef.current();
-          unwatchRef.current = watchInbox(d.key, (k) => {
-            loadTip(k);
+          unwatchRef.current = watchInbox(d.key, {
+            onTip: (k) => {
+              void loadTip(k);
+            },
+            onExpiry: (k) => {
+              if (k === c?.key) setAlive(true);
+            },
+            onError: () => {
+              if (d.key && priv) void loadHistory(d.key, priv);
+            },
           });
         } else {
           setDeskKey(null);
           setAlive(null);
         }
-      } catch (e: any) {
-        push({ kind: 'error', text: String(e?.message ?? e) });
+      } catch (e: unknown) {
+        push({ kind: 'error', text: uiError(e) });
       }
     })();
     return () => {
       if (unwatchRef.current) unwatchRef.current();
     };
-  }, [creator, push]);
+  }, [creator, demoKey, push, priv]);
+
+  useEffect(() => {
+    if (!deskKey || !priv) return;
+    seenTips.current.clear();
+    setTips([]);
+    setSkippedTips(0);
+    void loadHistory(deskKey, priv);
+  }, [deskKey, priv]);
 
   async function generateDeskKey() {
     const kp = await newKeyPair();
@@ -135,13 +224,13 @@ export default function DeskPage() {
   }
   async function importDeskKey(file: File) {
     try {
-      const jwk = JSON.parse(await file.text());
+      const jwk = JSON.parse(await file.text()) as JsonWebKey;
       const k = await importPrivJwk(jwk);
       localStorage.setItem(DESK_KEY_STORE, JSON.stringify(jwk));
       setPriv(k);
       push({ kind: 'success', text: 'Desk key imported.' });
-    } catch (e: any) {
-      push({ kind: 'error', text: String(e?.message ?? e) });
+    } catch (e: unknown) {
+      push({ kind: 'error', text: uiError(e) });
     }
   }
   function clearKeys() {
@@ -155,36 +244,42 @@ export default function DeskPage() {
     setBusy(true);
     setTx(null);
     try {
-      if (!priv && !dryRun) throw new Error('Generate or import a desk key first');
-      const pair = await newKeyPair();
-      const pubRaw = await exportPub(pair.publicKey);
-      if (!dryRun) {
-        const jwk = await exportPrivJwk(pair.privateKey);
-        localStorage.setItem(DESK_KEY_STORE, JSON.stringify(jwk));
-        setPriv(pair.privateKey);
+      if (!priv && !dryRun && !demo) throw new Error('Generate or import a desk key first');
+      let pubRaw: Uint8Array;
+      if (demo && demoKey) {
+        pubRaw = demoKey.pub;
+      } else {
+        const pair = await newKeyPair();
+        pubRaw = await exportPub(pair.publicKey);
+        if (!dryRun) {
+          const jwk = await exportPrivJwk(pair.privateKey);
+          localStorage.setItem(DESK_KEY_STORE, JSON.stringify(jwk));
+          setPriv(pair.privateKey);
+        }
       }
 
       if (demo || dryRun) {
-        const r = await fetch(`/api/demo/desk/create${dryRun ? '?dryRun=1' : ''}`, {
+        const r = await appFetch(`/api/demo/desk/create${dryRun ? '?dryRun=1' : ''}`, {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ name: deskName, deskPubRawB64: Buffer.from(pubRaw).toString('base64') }),
+          body: JSON.stringify({ name: deskName, deskPubRawB64: bytesToB64(pubRaw) }),
         });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j?.message ?? j?.error ?? 'failed');
+        const j = (await r.json()) as { message?: string; error?: string; predicted?: string[]; txHash?: Hex };
+        if (!r.ok) throw new Error(j.message ?? j.error ?? 'failed');
         if (dryRun) {
           push({ kind: 'info', text: `Dry run ok. Predicted keys ${Array.isArray(j.predicted) ? j.predicted.join(', ') : 'ready'}.` });
         } else {
-          setTx(j.txHash);
+          if (j.txHash) setTx(j.txHash);
           push({ kind: 'success', text: 'Desk and canary created.' });
         }
       } else {
         if (!connected) await connect();
-        if (!window.ethereum) throw new Error('No wallet found. Install MetaMask, or use Demo mode on the desk.');
-        const w = createWalletClient({ chain: tiramisu, transport: custom(window.ethereum as any) });
-        const owner = (await window.ethereum.request({ method: 'eth_accounts' }))[0] as Hex;
-        const { createDesk } = await import('@/lib/arkiv');
-        const out = await createDesk(w as any, owner, deskName, pubRaw);
+        const provider = getInjectedProvider();
+        if (!provider) throw new Error('No wallet found. Install MetaMask, or use Demo mode on the desk.');
+        const w = walletFromProvider(provider);
+        const accounts = (await provider.request({ method: 'eth_accounts' })) as unknown;
+        const owner = Array.isArray(accounts) && typeof accounts[0] === 'string' ? (accounts[0] as Hex) : null;
+        if (!owner) throw new Error('No account returned by the wallet.');
+        const out = await createDesk(w, owner, deskName, pubRaw);
         setTx(out.txHash);
         push({ kind: 'success', text: 'Desk and canary created.' });
       }
@@ -197,8 +292,8 @@ export default function DeskPage() {
           setAlive(!!c);
         }
       }
-    } catch (e: any) {
-      push({ kind: 'error', text: String(e?.message ?? e) });
+    } catch (e: unknown) {
+      push({ kind: 'error', text: uiError(e) });
     } finally {
       setBusy(false);
     }
@@ -210,29 +305,30 @@ export default function DeskPage() {
     setTx(null);
     try {
       if (demo || dryRun) {
-        const r = await fetch(`/api/demo/desk/renew${dryRun ? '?dryRun=1' : ''}`, {
+        const r = await appFetch(`/api/demo/desk/renew${dryRun ? '?dryRun=1' : ''}`, {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ deskKey, canaryKey }),
         });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j?.message ?? j?.error ?? 'failed');
+        const j = (await r.json()) as { message?: string; error?: string; txHash?: Hex };
+        if (!r.ok) throw new Error(j.message ?? j.error ?? 'failed');
         if (dryRun) {
           push({ kind: 'info', text: 'Dry run ok. Lifetime extension was not sent.' });
         } else {
-          setTx(j.txHash);
+          if (j.txHash) setTx(j.txHash);
           push({ kind: 'success', text: 'Canary renewed.' });
         }
       } else {
         if (!connected) await connect();
-        const w = createWalletClient({ chain: tiramisu, transport: custom(window.ethereum) });
-        const out = await renew(w as any, deskKey, canaryKey);
+        const provider = getInjectedProvider();
+        if (!provider) throw new Error('No wallet found. Install MetaMask, or use Demo mode on the desk.');
+        const w = walletFromProvider(provider);
+        const out = await renew(w, deskKey, canaryKey);
         setTx(out.txHash);
         push({ kind: 'success', text: 'Canary renewed.' });
       }
       if (creator && !dryRun) setAlive(!!(await canaryAlive(creator, deskKey)));
-    } catch (e: any) {
-      push({ kind: 'error', text: String(e?.message ?? e) });
+    } catch (e: unknown) {
+      push({ kind: 'error', text: uiError(e) });
     } finally {
       setBusy(false);
       setConfirm(null);
@@ -241,44 +337,41 @@ export default function DeskPage() {
 
   async function loadTip(entityKey: Hex) {
     try {
-      const e = await pub.getEntity(entityKey);
-      const wire = new Uint8Array(e.payload!);
+      const e = await pub().getEntity(entityKey);
+      const wire = new Uint8Array(e.payload ?? new Uint8Array());
       if (!priv) return;
-      const { text, ephPub } = await openAsDesk(priv, wire);
-      setTips((old) => {
-        const next = [...old, { key: entityKey, createdAt: e.createdAt!, text, ephPub }];
-        next.sort((a, b) => Number(a.createdAt - b.createdAt));
-        return next;
-      });
-    } catch (e) {
-      console.error('Failed to open tip', e);
+      await ingestTip(entityKey, wire, e.createdAt ?? 0n, priv);
+    } catch {
+      setSkippedTips((n) => n + 1);
     }
   }
 
   async function sendReply(t: TipView) {
     try {
       if (!t.replyText || !deskKey) return;
+      if (!priv) throw new Error('Load a desk key first.');
       if (demo) {
-        const w = await sealReply(priv!, t.ephPub, t.replyText);
-        const r = await fetch('/api/demo/reply', {
+        const w = await sealReply(priv, t.ephPub, t.replyText);
+        const r = await appFetch('/api/demo/reply', {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ tipKey: t.key, wireB64: Buffer.from(w).toString('base64') }),
+          body: JSON.stringify({ tipKey: t.key, wireB64: bytesToB64(w) }),
         });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j?.message ?? j?.error ?? 'failed');
-        setTx(j.txHash);
+        const j = (await r.json()) as { message?: string; error?: string; txHash?: Hex };
+        if (!r.ok) throw new Error(j.message ?? j.error ?? 'failed');
+        if (j.txHash) setTx(j.txHash);
       } else {
         if (!connected) await connect();
-        const w = createWalletClient({ chain: tiramisu, transport: custom(window.ethereum) });
-        const wire = await sealReply(priv!, t.ephPub, t.replyText);
-        const out = await reply(w as any, t.key, wire);
+        const provider = getInjectedProvider();
+        if (!provider) throw new Error('No wallet found. Install MetaMask, or use Demo mode on the desk.');
+        const w = walletFromProvider(provider);
+        const wire = await sealReply(priv, t.ephPub, t.replyText);
+        const out = await reply(w, t.key, wire, deskKey);
         setTx(out.txHash);
       }
       setTips((arr) => arr.map((x) => (x.key === t.key ? { ...x, replyText: '' } : x)));
       push({ kind: 'success', text: 'Reply sent.' });
-    } catch (e: any) {
-      push({ kind: 'error', text: String(e?.message ?? e) });
+    } catch (e: unknown) {
+      push({ kind: 'error', text: uiError(e) });
     }
   }
 
@@ -304,6 +397,17 @@ export default function DeskPage() {
       </header>
       <main className="section" style={{ paddingTop: 'var(--space-2)' }}>
         <div className="wrap">
+          {demo && (
+            <div className="page-note" style={{ marginBottom: 16 }}>
+              Demo mode is on. This browser loads a shared testnet desk key so a judge can open tips without the original laptop. Do not use this for a real newsroom.
+              {pubMatch === false && (
+                <div style={{ marginTop: 8 }}>
+                  The live desk still has an older public key. Create the desk again from the Keys tab so new tips match this browser.
+                </div>
+              )}
+              {pubMatch === true && <div style={{ marginTop: 8 }}>The live desk matches the shared demo key. New tips will open here.</div>}
+            </div>
+          )}
           {!demo && !connected && (
             <div className="card" style={{ textAlign: 'center', padding: '32px', marginBottom: 16 }}>
               <h2 className="h2">Choose how to run the desk</h2>
@@ -337,7 +441,7 @@ export default function DeskPage() {
             <div className="card">
               <strong>Next steps</strong>
               <ol className="muted" style={{ marginTop: 6, paddingLeft: 16 }}>
-                <li>Generate your desk keys</li>
+                <li>Generate your desk keys, or turn on Demo mode</li>
                 <li>Create your desk and first canary</li>
                 <li>Share your public tip link</li>
               </ol>
@@ -364,8 +468,11 @@ export default function DeskPage() {
             {tab === 'inbox' && (
               <div className="card">
                 <strong>Inbox</strong>
+                <p className="muted" style={{ marginTop: 8 }}>
+                  Older tips load from Arkiv. New tips arrive live. {skippedTips > 0 ? `${skippedTips} sealed tips could not be opened with this key.` : ''}
+                </p>
                 {tips.length === 0 ? (
-                  <p className="muted" style={{ marginTop: 8 }}>No tips yet. This view updates live.</p>
+                  <p className="muted" style={{ marginTop: 8 }}>{loadingInbox ? 'Loading tips…' : 'No tips yet. This view updates live.'}</p>
                 ) : (
                   <ul style={{ padding: 0, marginTop: 12 }}>
                     {tips.map((t) => (
@@ -390,6 +497,16 @@ export default function DeskPage() {
                     ))}
                   </ul>
                 )}
+                <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 12 }}>
+                  <button
+                    className="btn"
+                    type="button"
+                    disabled={!inboxCursor || !deskKey || !priv || loadingInbox}
+                    onClick={() => deskKey && priv && loadHistory(deskKey, priv, inboxCursor, inboxBlock)}
+                  >
+                    {loadingInbox ? 'Loading' : 'Load older tips'}
+                  </button>
+                </div>
               </div>
             )}
 
@@ -411,22 +528,28 @@ export default function DeskPage() {
             {tab === 'keys' && (
               <div className="card">
                 <strong>Keys</strong>
-                <p className="muted" style={{ marginTop: 6 }}>Generate or import the desk P256 key. The private key stays in your browser. Back it up.</p>
-                <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 8 }}>
-                  <button className="btn primary" onClick={generateDeskKey}>Generate desk key <span className="arrow" aria-hidden="true" /></button>
-                  <label className="btn" style={{ cursor: 'pointer' }}>
-                    Import key
-                    <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && importDeskKey(e.target.files[0])} style={{ display: 'none' }} />
-                  </label>
-                  <button className="btn" onClick={downloadDeskKey} disabled={!priv}>Download backup</button>
-                  <button className="btn" onClick={() => setConfirm('clear')} disabled={!priv}>Clear keys</button>
-                </div>
+                <p className="muted" style={{ marginTop: 6 }}>
+                  {demo
+                    ? 'Demo mode uses the shared testnet desk key. Create the desk so the public key on Arkiv matches it.'
+                    : 'Generate or import the desk key. The private key stays in your browser. Back it up.'}
+                </p>
+                {!demo && (
+                  <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 8 }}>
+                    <button className="btn primary" onClick={generateDeskKey}>Generate desk key <span className="arrow" aria-hidden="true" /></button>
+                    <label className="btn" style={{ cursor: 'pointer' }}>
+                      Import key
+                      <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && importDeskKey(e.target.files[0])} style={{ display: 'none' }} />
+                    </label>
+                    <button className="btn" onClick={downloadDeskKey} disabled={!priv}>Download backup</button>
+                    <button className="btn" onClick={() => setConfirm('clear')} disabled={!priv}>Clear keys</button>
+                  </div>
+                )}
                 <div style={{ marginTop: 12 }}>
                   <label className="small">Desk name</label>
                   <input value={deskName} onChange={(e) => setDeskName(e.target.value)} />
                 </div>
                 <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 12 }}>
-                  <button className="btn primary" onClick={() => createDeskFlow(false)} disabled={busy || !priv}>
+                  <button className="btn primary" onClick={() => createDeskFlow(false)} disabled={busy || (!priv && !demo)}>
                     {busy ? 'Working' : 'Create desk + canary'} <span className="arrow" aria-hidden="true" />
                   </button>
                   <button className="btn" onClick={() => createDeskFlow(true)} disabled={busy}>Dry run</button>
@@ -438,7 +561,7 @@ export default function DeskPage() {
               <div className="card">
                 <strong>Settings</strong>
                 <p className="muted" style={{ marginTop: 6 }}>Demo mode signs transactions on the server with testnet keys. Never enable it on a real desk.</p>
-                <p className="muted" style={{ marginTop: 8 }}>Judges without a wallet should leave Demo mode on.</p>
+                <p className="muted" style={{ marginTop: 8 }}>Judges without a wallet should leave Demo mode on. A fresh browser can still open demo tips.</p>
               </div>
             )}
 
@@ -475,3 +598,4 @@ export default function DeskPage() {
     </>
   );
 }
+

@@ -2,6 +2,7 @@ export const TIRAMISU_CHAIN_ID = 7738577;
 export const TIRAMISU_CHAIN_ID_HEX = '0x7614d1';
 export const TIRAMISU_RPC = 'https://rpc.tiramisu.db-chain.testnet.arkiv.network';
 export const TIRAMISU_EXPLORER = 'https://tiramisu.explorer.arkiv.network';
+export const TIRAMISU_HUB = 'https://hub.arkiv.network/tiramisu';
 
 export const TIRAMISU_CHAIN = {
   chainId: TIRAMISU_CHAIN_ID_HEX,

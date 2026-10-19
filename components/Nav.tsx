@@ -57,6 +57,9 @@ export default function Nav() {
       <Link href="/explorer" onClick={() => setOpen(false)}>
         Explorer
       </Link>
+      <Link href="/verify" onClick={() => setOpen(false)}>
+        Verify
+      </Link>
       <Link href="/docs" onClick={() => setOpen(false)}>
         Docs
       </Link>

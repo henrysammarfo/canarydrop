@@ -20,17 +20,22 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
+    "lint": "node scripts/lint.mjs",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test --reporter=line",
+    "friction": "node arkiv/repro/run-all.mjs",
     "seed:testnet": "tsx scripts/seed-testnet.mjs",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
     "@arkiv-network/sdk": "^0.8.1",
     "next": "^14.2.35",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "viem": "^2.57.7"
+    "viem": "^2.57.7",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
@@ -41,8 +46,7 @@
     "eslint": "^10.13.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
-    "vitest": "^1.6.0",
-    "zod": "^4.6.7"
+    "vitest": "^1.6.0"
   },
   "engines": {
     "node": ">=20"

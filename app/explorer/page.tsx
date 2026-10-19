@@ -2,33 +2,47 @@
 
 import { useEffect, useState } from 'react';
 import type { Hex } from 'viem';
-import { eq } from '@arkiv-network/sdk/query';
-import { pub, PROJECT } from '@/lib/arkiv';
+import { DEFAULT_DESK, DEFAULT_IMPOSTOR } from '@/lib/constants';
+import { explorerPage } from '@/lib/arkiv';
+import { attrStr } from '@/lib/attr';
 import { addressUrl, entityUrl, isSealedOwner, shortHex } from '@/lib/chain';
 import { useToast } from '@/components/Toast';
+import { uiError } from '@/lib/ui-error';
 
 type Item = {
   key: Hex;
   type: string;
   creator: Hex;
   owner: Hex;
-  expires?: string;
+  expires: string;
+  impostor: boolean;
 };
 
 export default function ExplorerPage() {
   const push = useToast();
   const [items, setItems] = useState<Item[]>([]);
   const [err, setErr] = useState<string | null>(null);
-  const [cursor, setCursor] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [atBlock, setAtBlock] = useState<bigint | undefined>(undefined);
   const [loading, setLoading] = useState(false);
 
-  function mapRow(e: any): Item {
+  function mapRow(e: {
+    key?: Hex;
+    creator?: Hex;
+    owner?: Hex;
+    expiresAt?: bigint;
+    attributes?: Parameters<typeof attrStr>[0];
+  }): Item | null {
+    if (!e.key) return null;
+    const creator = e.creator ?? ('0x' as Hex);
     return {
-      key: e.key as Hex,
-      type: String(e.attributes?.type?.value ?? 'unknown'),
-      creator: (e.creator as Hex) || ('0x' as Hex),
-      owner: (e.owner as Hex) || (e.creator as Hex) || ('0x' as Hex),
+      key: e.key,
+      type: attrStr(e.attributes, 'type') ?? 'unknown',
+      creator,
+      owner: e.owner ?? creator,
       expires: e.expiresAt != null ? String(e.expiresAt) : 'n/a',
+      impostor: creator.toLowerCase() === DEFAULT_IMPOSTOR.toLowerCase() ||
+        (creator.toLowerCase() !== DEFAULT_DESK.toLowerCase() && attrStr(e.attributes, 'type') === 'desk'),
     };
   }
 
@@ -36,17 +50,17 @@ export default function ExplorerPage() {
     (async () => {
       try {
         setLoading(true);
-        const r = await pub
-          .select({ key: true, attributes: true, creator: true, owner: true, expiresAt: true, createdAt: true })
-          .where(eq('project', PROJECT))
-          .limit(20)
-          .fetch()
-          .catch(() => ({ entities: [], nextCursor: null } as any));
-        const rows = (r.entities ?? []).map(mapRow);
+        const r = await explorerPage();
+        const rows: Item[] = [];
+        for (const entity of r.entities) {
+          const mapped = mapRow(entity);
+          if (mapped) rows.push(mapped);
+        }
         setItems(rows);
-        setCursor(r.nextCursor ?? null);
-      } catch (e: any) {
-        const msg = String(e?.message ?? e);
+        setCursor(r.cursor);
+        setAtBlock(r.blockNumber);
+      } catch (e: unknown) {
+        const msg = uiError(e);
         setErr(msg);
         push({ kind: 'error', text: msg });
       } finally {
@@ -59,18 +73,17 @@ export default function ExplorerPage() {
     if (!cursor) return;
     try {
       setLoading(true);
-      const r = await pub
-        .select({ key: true, attributes: true, creator: true, owner: true, expiresAt: true, createdAt: true })
-        .where(eq('project', PROJECT))
-        .limit(20)
-        .cursor(cursor)
-        .fetch();
-      const more = (r.entities ?? []).map(mapRow);
+      const r = await explorerPage({ cursor, atBlock });
+      const more: Item[] = [];
+      for (const entity of r.entities) {
+        const mapped = mapRow(entity);
+        if (mapped) more.push(mapped);
+      }
       setItems((arr) => [...arr, ...more]);
-      setCursor((r as any).nextCursor ?? null);
+      setCursor(r.cursor);
       push({ kind: 'info', text: `Loaded ${more.length} more rows.` });
-    } catch (e: any) {
-      const msg = String(e?.message ?? e);
+    } catch (e: unknown) {
+      const msg = uiError(e);
       setErr(msg);
       push({ kind: 'error', text: msg });
     } finally {
@@ -84,7 +97,7 @@ export default function ExplorerPage() {
         <p className="kicker">Tiramisu</p>
         <h1 className="h2">Explorer</h1>
         <p className="lead" style={{ marginTop: 10 }}>
-          Live CanaryDrop entities. Impostor desks are ignored because the app only trusts the real desk wallet.
+          Live CanaryDrop entities. Impostor desks are marked. The app only trusts the real desk wallet.
         </p>
 
         <div className="table-wrap" style={{ marginTop: 18 }}>
@@ -101,7 +114,14 @@ export default function ExplorerPage() {
             <tbody>
               {items.map((it) => (
                 <tr key={it.key}>
-                  <td>{it.type}</td>
+                  <td>
+                    {it.type}
+                    {it.impostor && (
+                      <div>
+                        <span className="pill" style={{ marginTop: 6 }}>Ignored impostor</span>
+                      </div>
+                    )}
+                  </td>
                   <td>
                     <a href={entityUrl(it.key)} target="_blank" rel="noreferrer">
                       {shortHex(it.key, 8, 6)}

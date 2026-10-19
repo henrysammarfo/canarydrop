@@ -1,92 +1,45 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import type { Hex } from 'viem';
+import { key, str } from '@arkiv-network/sdk/attr';
+import { LIFETIMES, PROJECT, pub, relayAddress, requireLiveDesk } from '@/lib/arkiv';
+import { b64ToBytes } from '@/lib/bytes';
+import { AppError } from '@/lib/errors';
+import { jsonFail, jsonOk } from '@/lib/http';
+import { assertWireB64, throwIfOversizedWire } from '@/lib/limits';
+import { isDryRun, protectWrite, readJson } from '@/lib/protect';
 import { postTip } from '@/lib/relay';
-import { createPublicClient } from '@arkiv-network/sdk';
-import { tiramisu } from '@arkiv-network/sdk/chains';
-import { http } from 'viem';
-import { key } from '@arkiv-network/sdk/attr';
-import { PROJECT, LIFETIMES } from '@/lib/arkiv';
-import { z } from 'zod';
+import { tipBody } from '@/lib/schemas';
 
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 20; // per-IP per minute, in-memory
-const ipBuckets = new Map<string, { resetAt: number; count: number }>();
-let globalWrites = { count: 0, resetAt: Date.now() + 24 * 3600 * 1000 };
-const GLOBAL_DAILY_MAX = 500; // generous cap
-
-function rateLimit(ip: string | null) {
-  if (!ip) return true;
-  const now = Date.now();
-  const b = ipBuckets.get(ip);
-  if (!b || now >= b.resetAt) {
-    ipBuckets.set(ip, { resetAt: now + RATE_LIMIT_WINDOW_MS, count: 1 });
-    return true;
-  }
-  if (b.count >= RATE_LIMIT_MAX) return false;
-  b.count += 1;
-  return true;
-}
+export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
-    const url = new URL(req.url);
-    const dryRun = url.searchParams.get('dryRun') === '1' || req.headers.get('x-dry-run') === '1';
-    const origin = req.headers.get('origin') || '';
-    const referer = req.headers.get('referer') || '';
-    const host = req.nextUrl.host;
-    if ((origin && !origin.includes(host)) || (referer && !referer.includes(host))) {
-      return NextResponse.json({ error: 'bad_origin', message: 'Please use the site to submit tips.' }, { status: 400 });
+    const blocked = protectWrite(req, 'relay');
+    if (blocked) return blocked;
+    const dryRun = isDryRun(req);
+    const raw = await readJson(req);
+    if (raw === null) throw new AppError('bad_request');
+    throwIfOversizedWire(raw);
+    const parsed = tipBody.safeParse(raw);
+    if (!parsed.success) throw new AppError('bad_request', parsed.error.issues.map((i) => i.message).join('; '));
+    const { deskKey, wireB64, lifetime } = parsed.data;
+    assertWireB64(wireB64);
+    const wire = b64ToBytes(wireB64);
+    if (!dryRun) {
+      const out = await postTip(deskKey as Hex, wire, lifetime);
+      return jsonOk({ ok: true, ...out });
     }
-    const ip =
-      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-      req.ip ??
-      req.headers.get('cf-connecting-ip') ??
-      null;
-    if (!rateLimit(ip)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
-    const now = Date.now();
-    if (now > globalWrites.resetAt) { globalWrites = { count: 0, resetAt: now + 24 * 3600 * 1000 }; }
-    if (!dryRun && globalWrites.count >= GLOBAL_DAILY_MAX) {
-      return NextResponse.json({ error: 'try_later', message: 'We received many tips today. Please try again tomorrow.' }, { status: 429 });
-    }
-
-    const schema = z.object({
-      deskKey: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'deskKey must be 0x + 64 hex'),
-      wireB64: z.string().max(16 * 1024 * 4 / 3 + 200, 'ciphertext is too large'), // rough cap
-      lifetime: z.enum(['1h','24h','72h','7d']),
-    }).strict();
-    const body = schema.safeParse(await req.json());
-    if (!body.success) return NextResponse.json({ error: 'bad_request', message: body.error.issues.map(i=>i.message).join('; ') }, { status: 400 });
-    const { deskKey, wireB64, lifetime } = body.data;
-    const wire = Uint8Array.from(Buffer.from(wireB64, 'base64'));
-    if (!dryRun) globalWrites.count++;
-    if (dryRun) {
-      const pub = createPublicClient({ chain: tiramisu, transport: http() });
-      const relayRaw = process.env.NEXT_PUBLIC_RELAY_ADDRESS || '';
-      const relay = (/^0x[0-9a-fA-F]{40}$/.test(relayRaw)
-        ? relayRaw
-        : '0xa6Aa6a1409eb54028550466169A29EAfd8f7a442') as Hex;
-      const [pred] = await pub.predictEntityKeys({ owner: relay, count: 1 });
-      // Construct the attributes we would write
-      const attributes = { project: PROJECT, type: 'tip', desk: key(deskKey as any) } as any;
-      return NextResponse.json({
-        ok: true,
-        dryRun: true,
-        predictedTipKey: pred.key,
-        attributes,
-        expires: lifetime in LIFETIMES ? lifetime : 'unknown',
-      });
-    } else {
-      const out = await postTip(deskKey as any, wire, lifetime);
-      return NextResponse.json({ ok: true, ...out });
-    }
-  } catch (e: any) {
-    // Do not leak secrets
-    const msg = String(e?.message ?? e);
-    const friendly =
-      /insufficient funds|fund/.test(msg.toLowerCase())
-        ? "We couldn't send your tip right now because the network sponsor wallet is out of test tokens. Please try again later. Nothing was sent."
-        : msg;
-    return NextResponse.json({ error: 'server_error', message: friendly }, { status: 500 });
+    await requireLiveDesk(deskKey as Hex);
+    const relay = relayAddress();
+    const [pred] = await pub().predictEntityKeys({ owner: relay, count: 1 });
+    return jsonOk({
+      ok: true,
+      dryRun: true,
+      predictedTipKey: pred.key,
+      attributes: { project: str(PROJECT), type: str('tip'), desk: key(deskKey as Hex) },
+      expires: lifetime in LIFETIMES ? lifetime : 'unknown',
+    });
+  } catch (err: unknown) {
+    return jsonFail(err);
   }
 }
-

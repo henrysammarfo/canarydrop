@@ -3,13 +3,16 @@
 import { useState } from 'react';
 import type { Hex } from 'viem';
 import { pub, repliesFor } from '@/lib/arkiv';
+import { attrKey } from '@/lib/attr';
 import { importPrivJwk, importPub, openReply } from '@/lib/crypto';
+import { parseDeskPayload, deskPubBytes } from '@/lib/payload';
+import { uiError } from '@/lib/ui-error';
 import { useToast } from '@/components/Toast';
 
 export default function ReaderPage() {
   const push = useToast();
-  const [tipKey, setTipKey] = useState<Hex>('0x');
-  const [receipt, setReceipt] = useState<string>('');
+  const [tipKey, setTipKey] = useState('');
+  const [receipt, setReceipt] = useState('');
   const [reading, setReading] = useState(false);
   const [messages, setMessages] = useState<string[]>([]);
 
@@ -17,23 +20,27 @@ export default function ReaderPage() {
     setReading(true);
     setMessages([]);
     try {
-      const tip = await pub.getEntity(tipKey);
-      const deskKey = tip.attributes?.desk?.value as Hex | undefined;
+      const tip = await pub().getEntity(tipKey as Hex);
+      const deskKey = attrKey(tip.attributes, 'desk');
       if (!deskKey) throw new Error('This tip is missing its desk label.');
-      const desk = await pub.getEntity(deskKey);
-      const deskPubRaw = new Uint8Array(JSON.parse(new TextDecoder().decode(desk.payload)).pub as number[]);
-      const deskPub = await importPub(deskPubRaw);
-      const ephPriv = await importPrivJwk(JSON.parse(receipt));
-      const rs = await repliesFor(tipKey, tip.creator as Hex);
+      const desk = await pub().getEntity(deskKey);
+      if (!desk.payload) throw new Error('This desk has no public key on chain.');
+      const parsed = parseDeskPayload(desk.payload);
+      if (!parsed) throw new Error('This desk public key could not be read.');
+      const deskPub = await importPub(deskPubBytes(parsed));
+      const ephPriv = await importPrivJwk(JSON.parse(receipt) as JsonWebKey);
+      const creator = tip.creator;
+      if (!creator) throw new Error('This tip is missing its creator.');
+      const rs = await repliesFor(tipKey as Hex, creator);
       const outs: string[] = [];
       for (const r of rs) {
-        const text = await openReply(ephPriv, deskPub, new Uint8Array(r.payload!));
-        outs.push(text);
+        if (!r.payload) continue;
+        outs.push(await openReply(ephPriv, deskPub, new Uint8Array(r.payload)));
       }
       setMessages(outs);
       push({ kind: outs.length ? 'success' : 'info', text: outs.length ? `Found ${outs.length} replies.` : 'No replies yet.' });
-    } catch (e: any) {
-      push({ kind: 'error', text: String(e?.message ?? e) });
+    } catch (e: unknown) {
+      push({ kind: 'error', text: uiError(e) });
     } finally {
       setReading(false);
     }
@@ -50,7 +57,7 @@ export default function ReaderPage() {
 
         <div className="card" style={{ marginTop: 18 }}>
           <label className="small">Tip key</label>
-          <input value={tipKey} onChange={(e) => setTipKey(e.target.value as Hex)} />
+          <input value={tipKey} onChange={(e) => setTipKey(e.target.value)} />
           <div style={{ marginTop: 16 }}>
             <label className="small">Receipt code</label>
             <textarea

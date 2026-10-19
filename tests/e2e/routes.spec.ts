@@ -10,6 +10,7 @@ const routes = [
   '/r',
   '/explorer',
   '/docs',
+  '/verify',
   `/canary/${desk}`,
   `/d/${desk}`,
   '/__404__',
@@ -84,6 +85,7 @@ function lowerHalfNotFlat(png: Buffer) {
   let max = 0;
   for (let i = start; i < png.length; i += 31) {
     const v = png[i];
+    if (v === undefined) continue;
     if (v < min) min = v;
     if (v > max) max = v;
   }

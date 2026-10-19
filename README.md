@@ -7,6 +7,28 @@ Live demo: https://canarydrop.vercel.app
 
 Demo video: https://canarydrop.vercel.app/demo.mp4
 
+Verify in 60 seconds, no keys needed
+------------------------------------
+
+You do not need a wallet and you do not need to install anything.
+
+1. Open https://canarydrop.vercel.app/verify (or `/verify` on a preview of this branch).
+2. Open the public canary page. It should say ALIVE if the demo desk has been renewed.
+3. Open Submit. Write a fake sentence. Send it. The sponsor pays the fee.
+4. Open Explorer. Find a tip row. Sealed tips show the burn owner.
+5. Optional: open Desk, turn on Demo mode. On this branch a fresh browser loads a shared testnet desk key so you can read tips. Production on main still keeps that key in the creating browser until this branch is merged. Do not use Demo mode for a real newsroom.
+
+Local readback, still no private keys:
+
+```bash
+npm i
+NEXT_PUBLIC_DESK_ADDRESS=0x1da3c22c079c264536D831F6F1fCe638aB0b20B0 \
+NEXT_PUBLIC_RELAY_ADDRESS=0xa6Aa6a1409eb54028550466169A29EAfd8f7a442 \
+npm run verify
+```
+
+Threat model: `SECURITY.md`. Friction report: `arkiv/friction.md` (`npm run friction`).
+
 Why the Privacy pillar
 ----------------------
 Sources and whistleblowers are exposed when tip‑line databases are seized and when canary pages are quietly edited. CanaryDrop keeps plaintext off servers, locks every tip on the sender’s device, and makes canaries self‑expiring so the absence is the signal.
@@ -46,6 +68,7 @@ Live pages
 - `/explorer` : live feed of CanaryDrop entities on Tiramisu
 - `/canary/[creator]` : public canary status page
 - `/docs` : architecture, schema and friction report
+- `/verify` : sixty second judge path, no keys needed
 
 Design
 ------
@@ -178,15 +201,22 @@ Chain configuration
 Security notes
 --------------
 
-- Desk, canary and reply reads are all filtered with `.createdBy(deskWallet)`. The homepage also demonstrates an impersonator desk with the same “name” being ignored because it was created by a different wallet.
-- Tips are client‑side encrypted; the relay never sees plaintext.
-- The relay performs an in‑memory per‑IP rate limit. It keeps no application logs (platform logs are a residual risk).
-- Synthetic data only; never store personal data or private keys on Arkiv.
+Full threat model: `SECURITY.md`. Short version:
+
+- Write APIs require an allowed Origin. A missing Origin is 403. Host checks are exact hostname matches, not `includes()`.
+- CSRF cookie `cd_csrf` must match header `x-csrf-token`. `Sec-Fetch-Site: cross-site` and `same-site` are rejected.
+- The relay calls `getEntity` and refuses to pay if the target is not a live CanaryDrop desk.
+- Concurrent tips use a per process queue, a pending nonce, and backoff. A mutation error with a tx hash is not retried.
+- Durable spend caps live on Arkiv: `slot` is the UTC day on new tips, replies, and desks. GLM below 0.02 stops writes. Per IP windows are still in memory; that limit is honest in SECURITY.md.
+- Ciphertext cap is 8192 bytes after base64 decode. Zod and the relay share that constant.
+- Route handlers map failures to public codes. RPC text and stacks are not returned.
+- CSP drops `unsafe-eval`, uses a per request script nonce with `strict-dynamic`, and allowlists Tiramisu RPC on `connect-src`. `style-src` still has `unsafe-inline` because React sets element styles.
+- Demo mode on this branch fetches a shared testnet P-256 key derived from `DESK_PRIVATE_KEY` so a fresh browser can open demo tips. That key is not committed.
 
 Friction and SDK notes
 ----------------------
 
-See `arkiv/friction.md` with exact versions and a runnable repro in `arkiv/repro/friction-repro.mjs`. Only issues reproduced in this repo are listed.
+See `arkiv/friction.md` (F1 to F19, live error text from Tiramisu). Repro: `npm run friction` runs `arkiv/repro/run-all.mjs`. Only issues reproduced in this repo are listed.
 
 AI usage
 --------
@@ -201,10 +231,20 @@ On Tiramisu the relay `0xa6Aa6a1409eb54028550466169A29EAfd8f7a442` and desk `0x1
 Tests
 -----
 
-- Unit: WebCrypto ECIES round trip (vitest): PASS
-- Read‑only integration: block timing from Arkiv SDK: PASS
-- E2E (desktop and mobile widths): Playwright visits `/, /submit, /desk, /r, /explorer, /docs`, asserts no console errors and saves screenshots: PASS
-- Screenshots: saved in `shots/` (generated via Playwright)
+GitHub Actions CI runs lint, typecheck, vitest, production build, and Playwright on every push.
+
+- Unit: crypto, origin, CSRF, rate limit, retry, CSP, schemas, errors, spend caps, chain helpers
+- API: tip and demo routes, missing Origin, CSRF mismatch, size caps, missing desk, demo key
+- Integration: live Tiramisu reads, inbox pagination mock, dry run against a live desk
+- E2E: routes, mobile overflow, dry run toast, desk Demo mode, CSP header, verify page, CSRF cookie
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run test:e2e
+npm run build
+```
 
 Load test (autocannon, production)
 ----------------------------------
@@ -252,20 +292,11 @@ Submission checklist (Arkiv Global Tour Stop)
 - Demo-mode toggle and no keys shipped to client by default: Yes
 - Tests and load checks included, results in README: Yes
 - Pre‑existing work: none, built Oct 9–18, 2026
-- Demo video: (link coming)
+- Demo video: https://canarydrop.vercel.app/demo.mp4
 
 How judges can reproduce
 ------------------------
-1) Visit the live site and submit a synthetic tip to the demo desk.  
-2) Read replies with `/r`.  
-3) Run a readback locally:
-```bash
-npm i
-NEXT_PUBLIC_DESK_ADDRESS=0x1da3c22c079c264536D831F6F1fCe638aB0b20B0 \
-NEXT_PUBLIC_RELAY_ADDRESS=0xa6Aa6a1409eb54028550466169A29EAfd8f7a442 \
-npm run verify
-```
-4) (After we seed) Browse the on‑chain evidence in `arkiv/evidence.json` and click the explorer links.
+Start at `/verify`. That is the sixty second path. Then use the explorer links in `arkiv/evidence.json` if you want the older on chain seed.
 
 On‑chain evidence (Tiramisu)
 ----------------------------

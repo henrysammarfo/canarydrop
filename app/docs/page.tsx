@@ -31,11 +31,16 @@ export default function DocsPage() {
           <div className="card">
             <strong>Live pages</strong>
             <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 10 }}>
+              <Link className="btn" href="/verify">Verify <span className="arrow" aria-hidden="true" /></Link>
               <Link className="btn" href="/submit">Submit <span className="arrow" aria-hidden="true" /></Link>
               <Link className="btn" href="/desk">Desk <span className="arrow" aria-hidden="true" /></Link>
               <Link className="btn" href="/explorer">Explorer <span className="arrow" aria-hidden="true" /></Link>
             </div>
           </div>
+        </div>
+        <div className="card" style={{ marginTop: 16 }}>
+          <strong>Threat model</strong>
+          <p className="muted" style={{ marginTop: 8 }}>Read SECURITY.md in the repo for attacks we block, residual risk, and why Demo mode exists.</p>
         </div>
         <div className="card" style={{ marginTop: 16 }}>
           <strong>Arkiv schema</strong>

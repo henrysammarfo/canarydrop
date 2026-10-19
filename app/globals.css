@@ -398,3 +398,32 @@ label.small { display:block; font-size:12px; color:var(--muted); margin-bottom:6
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
 }
+.query-box {
+  margin-top: 10px;
+  padding: 12px;
+  overflow: auto;
+  max-height: 220px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgba(5,8,14,.55);
+  border: 1px solid rgba(170,200,222,.18);
+  border-radius: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--sub);
+}
+.verify-steps {
+  margin: 22px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.verify-steps li {
+  list-style: none;
+  border: 1px solid rgba(170,200,222,.18);
+  border-radius: 14px;
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+}
+.verify-steps li strong { display: block; margin-bottom: 6px; }
+.verify-steps li .btn { margin-top: 10px; }

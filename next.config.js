@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 export default {
+  poweredByHeader: false,
   headers: async () => {
     return [
       {
@@ -10,10 +11,8 @@ export default {
           { key: 'Referrer-Policy', value: 'no-referrer' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
           { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains; preload' },
-          { key: 'Content-Security-Policy', value: "default-src 'self'; img-src 'self' data: https:; media-src https: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' https: wss:;" },
         ],
       },
     ];
   },
 };
-
