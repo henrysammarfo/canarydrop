@@ -38,12 +38,20 @@ function active(pathname: string, href: string, exact?: boolean) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function crumbFor(pathname: string) {
+  const deskHit = DESK.find((item) => active(pathname, item.href, item.exact));
+  if (deskHit) return deskHit;
+  const workHit = WORK.find((item) => active(pathname, item.href));
+  return workHit ?? { href: '/', label: 'CanaryDrop', icon: IcoOverview, exact: true };
+}
+
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const push = useToast();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [addr, setAddr] = useState<string | null>(null);
+  const crumb = crumbFor(pathname);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -73,10 +81,20 @@ export default function AppShell({ children }: { children: ReactNode }) {
     <div className={shellClass}>
       <div className="app-scrim" onClick={() => setMobileOpen(false)} aria-hidden="true" />
       <aside className="app-sidebar" aria-label="Desk navigation">
-        <Link href="/" className="brand">
-          <span className="pill">CD</span>
-          <span className="brand-name">CanaryDrop</span>
-        </Link>
+        <div className="brand-row">
+          <Link href="/" className="brand">
+            <span className="pill brand-mark">CD</span>
+            <span className="brand-name">CanaryDrop</span>
+          </Link>
+          <button
+            type="button"
+            className="btn ghost icon-btn desk-collapse"
+            onClick={() => setCollapsed((v) => !v)}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <IcoCollapse flipped={collapsed} />
+          </button>
+        </div>
         <div className="side-label">Desk</div>
         {DESK.map((item) => (
           <Link
@@ -105,12 +123,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
         ))}
         <div className="side-spacer" />
         <div className="side-foot">
-          <span className="pill">Tiramisu</span>
+          <span className="pill network-pill">Tiramisu</span>
         </div>
       </aside>
       <div className="app-main">
         <header className="app-top">
-          <div className="ctaRow">
+          <div className="app-crumb">
             <button
               type="button"
               className="btn ghost icon-btn side-toggle"
@@ -119,18 +137,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
             >
               <IcoMenu />
             </button>
-            <button
-              type="button"
-              className="btn ghost icon-btn desk-collapse"
-              onClick={() => setCollapsed((v) => !v)}
-              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              <IcoCollapse flipped={collapsed} />
-            </button>
-            <span className="app-top-title">{titleFor(pathname)}</span>
+            <crumb.icon />
+            <span className="app-top-title">{crumb.label}</span>
           </div>
           <div className="ctaRow">
-            <span className="pill">Testnet</span>
+            <span className="pill network-pill">Testnet</span>
             <button type="button" className="btn connect" onClick={() => void connect()}>
               {addr ? `Wallet ${shortHex(addr)}` : 'Connect wallet'}
             </button>
@@ -145,11 +156,4 @@ export default function AppShell({ children }: { children: ReactNode }) {
       </div>
     </div>
   );
-}
-
-function titleFor(pathname: string) {
-  const deskHit = DESK.find((item) => active(pathname, item.href, item.exact));
-  if (deskHit) return deskHit.label;
-  const workHit = WORK.find((item) => active(pathname, item.href));
-  return workHit?.label ?? 'CanaryDrop';
 }

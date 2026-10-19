@@ -28,6 +28,11 @@ export const MIN_WALLET_WEI = 20n * 10n ** 15n;
 export const IP_RATE_WINDOW_MS = 60_000;
 export const IP_RATE_MAX_RELAY = 8;
 export const IP_RATE_MAX_DESK = 8;
+/** Same-origin chain snapshots. Higher than writes so Overview, Explorer, and Inbox can retry. */
+export const IP_RATE_MAX_READ = 40;
+
+/** Coalesce first-visit reads from Overview, Submit, and Explorer. */
+export const LIVE_CACHE_MS = 20_000;
 
 /** Shared Redis key prefixes. Rest tokens never go in these names. */
 export const REDIS_RL_PREFIX = 'cd:rl';

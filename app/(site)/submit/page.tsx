@@ -1,16 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Hex } from 'viem';
 import { canaryAlive, getDesk } from '@/lib/arkiv';
 import { preferPubForCreatorClient } from '@/lib/demo-pub-client';
-import type { DeskRow } from '@/lib/arkiv';
 import { bytesToB64 } from '@/lib/bytes';
 import { appFetch } from '@/lib/client-fetch';
 import { CHAIN_READ_FAILED, DEFAULT_DESK, LIFETIME_KEYS, type Lifetime } from '@/lib/constants';
 import { sealTo } from '@/lib/crypto';
 import { asAddress } from '@/lib/hex';
 import { deskPubBytes, parseDeskPayload } from '@/lib/payload';
+import { fetchDeskLive } from '@/lib/live-client';
 import { uiError } from '@/lib/ui-error';
 import { sleep, withBackoff } from '@/lib/retry';
 import Link from 'next/link';
@@ -23,8 +23,9 @@ import { IcoVerify } from '@/components/ui/icons';
 export default function SubmitPage() {
   const push = useToast();
   const [creator, setCreator] = useState<Hex>(() => asAddress(process.env.NEXT_PUBLIC_DESK_ADDRESS || '', DEFAULT_DESK));
-  const [desk, setDesk] = useState<DeskRow | null>(null);
+  const [deskName, setDeskName] = useState('CanaryDrop desk');
   const [deskKey, setDeskKey] = useState<Hex | null>(null);
+  const [deskPubRaw, setDeskPubRaw] = useState<Uint8Array | null>(null);
   const [alive, setAlive] = useState<boolean | null>(null);
   const [text, setText] = useState('');
   const [life, setLife] = useState<Lifetime>('24h');
@@ -35,45 +36,81 @@ export default function SubmitPage() {
   const [looking, setLooking] = useState(true);
   const [lookupError, setLookupError] = useState<string | null>(null);
 
-  const deskName = useMemo(() => {
-    if (!desk?.payload) return 'CanaryDrop desk';
-    return parseDeskPayload(desk.payload)?.name ?? 'CanaryDrop desk';
-  }, [desk]);
-
   useEffect(() => {
-    (async () => {
-      setDesk(null);
-      setDeskKey(null);
-      setAlive(null);
-      setLooking(true);
-      setLookupError(null);
-      try {
-        const prefer = await preferPubForCreatorClient(creator);
-        const d = await withBackoff(() => getDesk(creator, prefer), 8, (ms) => sleep(Math.max(400, ms)));
-        setDesk(d ?? null);
-        if (d) {
-          setDeskKey(d.key);
-          const isAlive = await canaryAlive(creator, d.key);
-          setAlive(!!isAlive);
-        }
-      } catch {
-        setLookupError(CHAIN_READ_FAILED);
-      } finally {
-        setLooking(false);
-      }
-    })();
-  }, [creator]);
+    let cancelled = false;
+    let timer: number | undefined;
+    const deadline = Date.now() + 28_000;
+    setDeskKey(null);
+    setDeskPubRaw(null);
+    setAlive(null);
+    setLooking(true);
+    setLookupError(null);
 
-  const deskPubRaw = useMemo(() => {
-    if (!desk?.payload) return null;
-    const parsed = parseDeskPayload(desk.payload);
-    return parsed ? deskPubBytes(parsed) : null;
-  }, [desk]);
+    async function fromChain() {
+      const prefer = await preferPubForCreatorClient(creator);
+      const d = await withBackoff(() => getDesk(creator, prefer), 8, (ms) => sleep(Math.max(400, ms)));
+      if (cancelled) return false;
+      if (d) {
+        setDeskKey(d.key);
+        const parsed = d.payload ? parseDeskPayload(d.payload) : null;
+        if (parsed?.name) setDeskName(parsed.name);
+        setDeskPubRaw(parsed ? deskPubBytes(parsed) : null);
+        const isAlive = await canaryAlive(creator, d.key);
+        if (!cancelled) setAlive(!!isAlive);
+      }
+      return true;
+    }
+
+    async function attempt() {
+      try {
+        const live = await fetchDeskLive(creator);
+        if (cancelled) return;
+        setDeskName(live.name);
+        setDeskKey(live.deskKey);
+        setDeskPubRaw(live.deskPub);
+        setAlive(live.deskKey ? live.alive : null);
+        setLookupError(null);
+        setLooking(false);
+        return;
+      } catch {
+        try {
+          const ok = await fromChain();
+          if (ok && !cancelled) {
+            setLookupError(null);
+            setLooking(false);
+            return;
+          }
+        } catch {
+          // Keep retrying quietly on a first visit.
+        }
+      }
+      if (cancelled) return;
+      if (Date.now() < deadline) {
+        setLooking(true);
+        timer = window.setTimeout(() => {
+          void attempt();
+        }, 2500);
+        return;
+      }
+      setLookupError(CHAIN_READ_FAILED);
+      setLooking(false);
+      timer = window.setTimeout(() => {
+        void attempt();
+      }, 5000);
+    }
+
+    void attempt();
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [creator]);
 
   const valid = !!deskKey && !!deskPubRaw && !!text.trim() && !sending;
   const step1 = deskKey ? 'done' : looking ? 'on' : 'on';
   const step2 = deskKey && text.trim() ? 'done' : deskKey ? 'on' : '';
   const step3 = valid ? 'on' : '';
+  const verified = !!deskKey && !lookupError;
 
   async function send(dryRun: boolean) {
     if (!deskKey || !deskPubRaw || !text.trim()) return;
@@ -117,33 +154,33 @@ export default function SubmitPage() {
 
         <div className="steps" style={{ marginTop: 20 }}>
           <div className={`step ${step1}`}>
-            <div className="n">01</div>
-            <div>{deskKey ? 'Desk verified' : 'Find desk'}</div>
+            <div className="n">{deskKey ? 'Done' : '1'}</div>
+            <div>{deskKey ? 'Desk verified' : looking ? 'Finding desk' : 'Find desk'}</div>
           </div>
           <div className={`step ${step2}`}>
-            <div className="n">02</div>
+            <div className="n">{text.trim() ? 'Done' : '2'}</div>
             <div>{text.trim() ? 'Tip written' : 'Write tip'}</div>
           </div>
           <div className={`step ${step3}`}>
-            <div className="n">03</div>
+            <div className="n">{valid ? 'Go' : '3'}</div>
             <div>{valid ? 'Ready to send' : 'Send'}</div>
           </div>
         </div>
 
-        <div className="card" style={{ marginTop: 22 }}>
+        <div className={`card${verified ? ' verified-card' : ''}`} style={{ marginTop: 22 }}>
           <div className="verified-desk">
-            <div className={`verified-mark${deskKey ? '' : ' muted'}`} aria-hidden="true">
+            <div className={`verified-mark${verified ? '' : ' muted'}`} aria-hidden="true">
               <IcoVerify />
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <p className="eyebrow">{looking ? 'Checking Arkiv' : deskKey ? 'Verified desk' : lookupError ? 'Desk lookup' : 'Desk not found'}</p>
+              <p className="eyebrow">{looking ? 'Checking Arkiv' : verified ? 'Verified desk' : lookupError ? 'Desk lookup' : 'Desk not found'}</p>
               <h2 className="h3" style={{ marginTop: 4 }}>{deskName}</h2>
               <p className="muted" style={{ marginTop: 6 }} role="status">
                 {looking
                   ? 'Looking up this desk on Arkiv…'
                   : lookupError
                     ? lookupError
-                    : `Canary ${alive === null ? 'unknown' : alive ? 'ALIVE' : 'GONE'}${deskKey ? `. Desk ${shortHex(deskKey)}.` : ''}`}
+                    : `Canary ${alive === null ? 'unknown' : alive ? 'alive' : 'gone'}${deskKey ? `. Desk ${shortHex(deskKey)}.` : ''}`}
               </p>
               <div className="ctaRow" style={{ marginTop: 12 }}>
                 <Link className="btn" href={`/canary/${creator}`}>

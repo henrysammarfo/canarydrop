@@ -21,7 +21,8 @@ export default function DeskCanaryPage() {
     d.currentBlock != null
       ? lastRenewedPhrase(d.canaryExpiresAt, d.canaryCreatedAt, d.currentBlock, d.blockDuration)
       : null;
-  const status = d.loadingDesk ? '…' : d.alive === null ? 'NONE' : d.alive ? 'ALIVE' : 'GONE';
+  const waiting = d.loadingDesk || (!!d.loadError && !d.deskKey);
+  const status = waiting ? 'Checking' : d.alive === null ? 'None' : d.alive ? 'Alive' : 'Gone';
 
   return (
     <>
@@ -32,19 +33,22 @@ export default function DeskCanaryPage() {
         actions={<DemoSwitch />}
       />
       <DemoBanner />
-      {d.loadError && (
-        <div className="page-note" role="alert" style={{ marginBottom: 16 }}>
-          {d.loadError}
-        </div>
-      )}
       <div className="grid cols-2">
-        <Card className="stat-hero" style={{ textAlign: 'left' }}>
-          <p className="eyebrow">Live status</p>
+        <Card className={`stat-hero${d.alive ? ' alive' : ''}`} style={{ textAlign: 'left' }}>
+          <div className="stat-hero-top">
+            <p className="eyebrow">Live status</p>
+            {d.alive ? (
+              <span className="live-pill">
+                <span className="dot live" />
+                Live
+              </span>
+            ) : null}
+          </div>
           <div className={`stat-value ${d.alive ? 'status-alive' : d.alive === false ? 'status-gone' : ''}`}>
             {status}
           </div>
-          <p className="stat-meta">
-            {d.loadingDesk
+          <p className="stat-countdown">
+            {waiting
               ? 'Loading the live canary from Arkiv…'
               : d.alive
                 ? remaining
@@ -57,12 +61,17 @@ export default function DeskCanaryPage() {
               Last renewed {renewed}
             </p>
           )}
+          {d.loadError && !d.deskKey && (
+            <p className="muted" role="status" style={{ marginTop: 8, color: 'var(--warn)' }}>
+              {d.loadError}
+            </p>
+          )}
         </Card>
         <Card>
           <p className="eyebrow">Keys</p>
           <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
-            <CopyField label="Desk" value={d.deskKey ?? (d.loadingDesk ? 'Loading…' : 'Not set')} />
-            <CopyField label="Canary" value={d.canaryKey ?? (d.loadingDesk ? 'Loading…' : 'None yet')} />
+            <CopyField label="Desk" value={d.deskKey ?? (waiting ? 'Loading…' : 'Not set')} />
+            <CopyField label="Canary" value={d.canaryKey ?? (waiting ? 'Loading…' : 'None yet')} />
           </div>
           <div style={{ marginTop: 16 }}>
             <RenewAction

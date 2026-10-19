@@ -16,7 +16,9 @@ test('renew canary is hidden until a live canary exists', async ({ page }) => {
   if ((await renew.count()) > 0) {
     await expect(renew.first()).toBeEnabled();
   } else {
-    await expect(page.getByText(/no live canary to renew|no live canary yet/i)).toBeVisible();
+    await expect(
+      page.getByText(/no live canary to renew|no live canary yet|Checking the live canary|Still reading the live canary/i),
+    ).toBeVisible();
   }
 });
 

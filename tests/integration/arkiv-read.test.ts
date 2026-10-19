@@ -5,12 +5,12 @@ import { eq } from '@arkiv-network/sdk/query';
 
 async function retryRead<T>(fn: () => Promise<T>): Promise<T> {
   let last: unknown;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 8; i++) {
     try {
       return await fn();
     } catch (err) {
       last = err;
-      await new Promise((resolve) => setTimeout(resolve, 1200 * (i + 1)));
+      await new Promise((resolve) => setTimeout(resolve, Math.min(8000, 800 * 2 ** i)));
     }
   }
   throw last;
@@ -18,10 +18,10 @@ async function retryRead<T>(fn: () => Promise<T>): Promise<T> {
 
 describe('arkiv read-only against Tiramisu', () => {
   it('reads block timing', async () => {
-    const t = await pub().getBlockTiming();
+    const t = await retryRead(() => pub().getBlockTiming());
     expect(typeof t.currentBlock).toBe('bigint');
     expect(t.blockDuration).toBeGreaterThan(0);
-    const head = await headBlock();
+    const head = await retryRead(() => headBlock());
     const drift = head > t.currentBlock ? head - t.currentBlock : t.currentBlock - head;
     expect(Number(drift)).toBeLessThanOrEqual(2);
   });
@@ -38,7 +38,7 @@ describe('arkiv read-only against Tiramisu', () => {
       return;
     }
     expect(desk.key).toMatch(/^0x[0-9a-fA-F]{64}$/);
-    const canary = await canaryAlive(DEFAULT_DESK, desk.key);
+    const canary = await retryRead(() => canaryAlive(DEFAULT_DESK, desk.key));
     if (canary) expect(canary.key).toMatch(/^0x/);
   });
 

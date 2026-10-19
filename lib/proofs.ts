@@ -29,6 +29,7 @@ import { preferPubForCreator } from './demo-pub';
 import { eq, gt, or } from '@arkiv-network/sdk/query';
 import { key, u64 } from '@arkiv-network/sdk/attr';
 import { utcDaySlot } from './day';
+import { sleep, withBackoff } from './retry';
 
 export type ProofLink = { label: string; href: string };
 
@@ -102,7 +103,11 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
   const sealedQuery = sealedTipsQueryText();
 
   try {
-    const desk = await getDesk(DEFAULT_DESK, preferPubForCreator(DEFAULT_DESK));
+    const desk = await withBackoff(
+      () => getDesk(DEFAULT_DESK, preferPubForCreator(DEFAULT_DESK)),
+      8,
+      (ms) => sleep(Math.max(400, ms)),
+    );
     const q = pub()
       .select({ key: true })
       .where(eq('project', PROJECT), eq('type', 'desk'), gt('$expiresAt', u64(head)))
@@ -125,7 +130,7 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
     });
 
     if (desk) {
-      const canary = await canaryAlive(DEFAULT_DESK, desk.key);
+      const canary = await withBackoff(() => canaryAlive(DEFAULT_DESK, desk.key), 4, (ms) => sleep(Math.max(300, ms)));
       const cq = pub()
         .select({ key: true, expiresAt: true, creationFlags: true })
         .where(eq('project', PROJECT), eq('type', 'canary'), eq('desk', key(desk.key)), gt('$expiresAt', u64(head)))
@@ -151,7 +156,7 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
           : [{ label: 'Public canary page', href: `/canary/${DEFAULT_DESK}` }],
       });
 
-      const past = await canaryAtBlock(DEFAULT_DESK, desk.key, hourAgo);
+      const past = await withBackoff(() => canaryAtBlock(DEFAULT_DESK, desk.key, hourAgo), 4, (ms) => sleep(Math.max(300, ms)));
       const absence = atBlockAbsenceDetail({
         hourAgo,
         pastAlive: past !== null,
@@ -181,7 +186,7 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
   }
 
   try {
-    const page = await sealedTips();
+    const page = await withBackoff(() => sealedTips(), 4, (ms) => sleep(Math.max(400, ms)));
     const keys = page.entities.map((e) => e.key).filter((k): k is Hex => !!k);
     const allSealed = page.entities.every((e) => isSealedOwner(e.owner));
     const readonly = page.entities.filter((e) => e.creationFlags?.readonly).length;

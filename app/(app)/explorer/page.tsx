@@ -1,13 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Hex } from 'viem';
-import { CHAIN_READ_FAILED, DEFAULT_DESK, DEFAULT_IMPOSTOR, SEALED_TIPS_EMPTY } from '@/lib/constants';
-import { deskAddress, explorerPage, getDesk, pub, type ExplorerKind } from '@/lib/arkiv';
-import { attrKey, attrStr } from '@/lib/attr';
+import { CHAIN_READ_FAILED, SEALED_TIPS_EMPTY } from '@/lib/constants';
+import { explorerPage, pub, type ExplorerKind } from '@/lib/arkiv';
 import { addressUrl, entityUrl, isSealedOwner, shortHex } from '@/lib/chain';
-import { explorerRowFlags, explorerTypeBadges, olderDemoLabel, SEALED_BADGE } from '@/lib/explorer-label';
-import { fetchSharedDemoPub } from '@/lib/demo-pub-client';
+import { explorerTypeBadges, SEALED_BADGE } from '@/lib/explorer-label';
+import { mapExplorerEntity, type ExplorerItem } from '@/lib/explorer-map';
+import { fetchExplorerLive } from '@/lib/live-client';
 import { bumpGeneration, isStaleGeneration } from '@/lib/load-gen';
 import { sleep, withBackoff } from '@/lib/retry';
 import { remainingPhrase } from '@/lib/time';
@@ -16,18 +15,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import Button from '@/components/ui/Button';
 import Table from '@/components/ui/Table';
 
-type Item = {
-  key: Hex;
-  type: string;
-  creator: Hex;
-  owner: Hex;
-  expiresAt: bigint | null;
-  impostor: boolean;
-  canonicalDemo: boolean;
-  olderDemo: string | null;
-  readonly: boolean;
-  openExtend: boolean;
-};
+type Item = ExplorerItem;
 
 const KINDS: { id: 'all' | ExplorerKind | 'sealed'; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -90,57 +78,10 @@ export default function ExplorerPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<(typeof KINDS)[number]['id']>('all');
-  const [canonicalKey, setCanonicalKey] = useState<Hex | undefined>(undefined);
+  const [canonicalKey, setCanonicalKey] = useState<Item['key'] | undefined>(undefined);
   const [currentBlock, setCurrentBlock] = useState<bigint | null>(null);
   const [blockDuration, setBlockDuration] = useState(2);
   const gen = useRef({ current: 0 });
-
-  useEffect(() => {
-    void (async () => {
-      const shared = await fetchSharedDemoPub();
-      if (!shared) return;
-      try {
-        const desk = await getDesk(deskAddress(), shared);
-        if (desk?.key) setCanonicalKey(desk.key);
-      } catch {
-        // Labels still work from the known replaced keys.
-      }
-    })();
-  }, []);
-
-  function mapRow(e: {
-    key?: Hex;
-    creator?: Hex;
-    owner?: Hex;
-    expiresAt?: bigint;
-    attributes?: Parameters<typeof attrStr>[0];
-    creationFlags?: { readonly?: boolean; permissionlessExtension?: boolean };
-  }): Item | null {
-    if (!e.key) return null;
-    const creator = e.creator ?? ('0x' as Hex);
-    const type = attrStr(e.attributes, 'type') ?? 'unknown';
-    const flags = explorerRowFlags({
-      type,
-      key: e.key,
-      creator,
-      deskAttr: attrKey(e.attributes, 'desk'),
-      canonicalDeskKey: canonicalKey,
-      demoCreator: DEFAULT_DESK,
-      impostorCreator: DEFAULT_IMPOSTOR,
-    });
-    return {
-      key: e.key,
-      type,
-      creator,
-      owner: e.owner ?? creator,
-      expiresAt: e.expiresAt ?? null,
-      impostor: flags.impostor,
-      canonicalDemo: flags.canonicalDemo,
-      olderDemo: olderDemoLabel(flags),
-      readonly: e.creationFlags?.readonly === true,
-      openExtend: e.creationFlags?.permissionlessExtension === true,
-    };
-  }
 
   const load = useCallback(
     async (mode: 'replace' | 'append', nextCursor?: string, nextBlock?: bigint) => {
@@ -148,6 +89,23 @@ export default function ExplorerPage() {
       try {
         setLoading(true);
         setErr(null);
+        try {
+          const liveOpts: { cursor?: string; atBlock?: bigint } = {};
+          if (nextCursor) liveOpts.cursor = nextCursor;
+          if (nextBlock !== undefined) liveOpts.atBlock = nextBlock;
+          const live = await fetchExplorerLive(filter, liveOpts);
+          if (isStaleGeneration(started, gen.current.current)) return;
+          setItems((arr) => (mode === 'append' ? [...arr, ...live.items] : live.items));
+          setCursor(live.cursor);
+          setAtBlock(live.atBlock);
+          setHasMore(live.hasMore);
+          if (live.currentBlock != null) setCurrentBlock(live.currentBlock);
+          setBlockDuration(live.blockDuration);
+          if (live.canonicalDeskKey) setCanonicalKey(live.canonicalDeskKey);
+          return;
+        } catch {
+          // Fall through to a direct chain read from this browser.
+        }
         const opts: Parameters<typeof explorerPage>[0] = {};
         if (filter === 'sealed') {
           opts.sealed = true;
@@ -168,7 +126,7 @@ export default function ExplorerPage() {
         }
         const rows: Item[] = [];
         for (const entity of r.entities) {
-          const mapped = mapRow(entity);
+          const mapped = mapExplorerEntity(entity, canonicalKey);
           if (mapped) rows.push(mapped);
         }
         setItems((arr) => (mode === 'append' ? [...arr, ...rows] : rows));
@@ -241,12 +199,12 @@ export default function ExplorerPage() {
           <Table caption="CanaryDrop entities on Tiramisu">
             <thead>
               <tr>
-                <th scope="col" style={{ width: '28%' }}>Type</th>
-                <th scope="col" style={{ width: '22%' }}>Key</th>
+                <th scope="col" style={{ width: '24%' }}>Type</th>
+                <th scope="col" style={{ width: '18%' }}>Key</th>
                 <th scope="col" style={{ width: '14%' }}>Creator</th>
                 <th scope="col" style={{ width: '16%' }}>Owner</th>
-                <th scope="col" style={{ width: '10%' }}>Expires</th>
-                <th scope="col" style={{ width: '10%' }}>Actions</th>
+                <th scope="col" style={{ width: '12%' }}>Expires</th>
+                <th scope="col" style={{ width: '16%' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -284,7 +242,11 @@ export default function ExplorerPage() {
                 <tr>
                   <td colSpan={6} className="muted" style={{ whiteSpace: 'normal', height: 'auto' }}>
                     <span role="status">
-                      {filter === 'sealed' ? SEALED_TIPS_EMPTY : 'No rows for this filter.'}
+                      {err
+                        ? 'Still reading Tiramisu…'
+                        : filter === 'sealed'
+                          ? SEALED_TIPS_EMPTY
+                          : 'No rows for this filter.'}
                     </span>
                   </td>
                 </tr>
@@ -329,7 +291,11 @@ export default function ExplorerPage() {
           })}
           {items.length === 0 && !loading && (
             <p className="muted" role="status">
-              {filter === 'sealed' ? SEALED_TIPS_EMPTY : 'No rows for this filter.'}
+              {err
+                ? 'Still reading Tiramisu…'
+                : filter === 'sealed'
+                  ? SEALED_TIPS_EMPTY
+                  : 'No rows for this filter.'}
             </p>
           )}
         </div>

@@ -1,11 +1,11 @@
 'use client';
 
 import Card from '@/components/ui/Card';
-import CopyField from '@/components/ui/CopyField';
 import EmptyState from '@/components/ui/EmptyState';
 import PageHeader from '@/components/ui/PageHeader';
 import DemoBanner, { DemoSwitch } from '@/components/desk/DemoBanner';
 import { useDesk } from '@/components/desk/DeskProvider';
+import { shortHex } from '@/lib/chain';
 
 export default function InboxPage() {
   const d = useDesk();
@@ -43,11 +43,16 @@ export default function InboxPage() {
         {d.tips.length === 0 ? (
           <EmptyState title={emptyTitle} body={emptyBody} />
         ) : (
-          <ul style={{ padding: 0, margin: 0, display: 'grid', gap: 12 }}>
+          <ul className="tip-list">
             {d.tips.map((t) => (
-              <li key={t.key} style={{ listStyle: 'none' }}>
-                <div className="card tip-card">
-                  <CopyField label="Tip" value={t.key} />
+              <li key={t.key}>
+                <article className="card tip-card">
+                  <header className="tip-head">
+                    <span className="eyebrow">Open tip</span>
+                    <code className="key-mono" title={t.key}>
+                      {shortHex(t.key, 8, 6)}
+                    </code>
+                  </header>
                   <div className="body">{t.text}</div>
                   <div className="reply-row">
                     <input
@@ -56,12 +61,13 @@ export default function InboxPage() {
                         d.setTips((arr) => arr.map((x) => (x.key === t.key ? { ...x, replyText: e.target.value } : x)))
                       }
                       placeholder="Write a reply"
+                      aria-label={`Reply to tip ${shortHex(t.key, 4, 4)}`}
                     />
-                    <button type="button" className="btn primary" onClick={() => void d.sendReply(t)}>
+                    <button type="button" className="btn primary" onClick={() => void d.sendReply(t)} disabled={!t.replyText?.trim()}>
                       Send reply
                     </button>
                   </div>
-                </div>
+                </article>
               </li>
             ))}
           </ul>

@@ -18,7 +18,8 @@ export default function DeskOverviewPage() {
     d.currentBlock != null
       ? lastRenewedPhrase(d.canaryExpiresAt, d.canaryCreatedAt, d.currentBlock, d.blockDuration)
       : null;
-  const status = d.loadingDesk ? 'Loading' : d.alive === null ? 'None yet' : d.alive ? 'ALIVE' : 'GONE';
+  const waiting = d.loadingDesk || (!!d.loadError && !d.deskKey);
+  const status = waiting ? 'Checking' : d.alive === null ? 'None yet' : d.alive ? 'Alive' : 'Gone';
   const statusClass = d.alive ? 'status-alive' : d.alive === false ? 'status-gone' : '';
 
   return (
@@ -30,29 +31,37 @@ export default function DeskOverviewPage() {
         actions={<DemoSwitch />}
       />
       <DemoBanner />
-      {d.loadError && (
-        <div className="page-note" role="alert" style={{ marginBottom: 16 }}>
-          {d.loadError}
-        </div>
-      )}
       <div className="stat-grid" style={{ marginBottom: 16 }}>
-        <Card className="stat-hero">
-          <p className="eyebrow">Canary status</p>
+        <Card className={`stat-hero${d.alive ? ' alive' : ''}`}>
+          <div className="stat-hero-top">
+            <p className="eyebrow">Canary</p>
+            {d.alive ? (
+              <span className="live-pill">
+                <span className="dot live" />
+                Live
+              </span>
+            ) : null}
+          </div>
           <div className={`stat-value ${statusClass}`}>{status}</div>
-          <p className="stat-meta">
-            {d.loadingDesk
+          <p className="stat-countdown">
+            {waiting
               ? 'Loading the live desk from Arkiv…'
-              : d.alive
-                ? remaining
-                  ? `Expires ${remaining}.`
-                  : 'The newsroom canary is live.'
-                : d.alive === false
-                  ? 'The canary is missing. That is the signal.'
-                  : 'No canary is published for this desk yet.'}
+              : d.alive && remaining
+                ? `Expires ${remaining}`
+                : d.alive
+                  ? 'The newsroom canary is live.'
+                  : d.alive === false
+                    ? 'The canary is missing. That is the signal.'
+                    : 'No canary is published for this desk yet.'}
           </p>
           {d.alive && renewed && (
             <p className="muted" style={{ marginTop: 6 }} title={d.canaryExpiresAt ? `Expires at block ${d.canaryExpiresAt.toString()}` : undefined}>
               Last renewed {renewed}
+            </p>
+          )}
+          {d.loadError && !d.deskKey && (
+            <p className="muted" role="status" style={{ marginTop: 8, color: 'var(--warn)' }}>
+              {d.loadError}
             </p>
           )}
           <div style={{ marginTop: 'auto', paddingTop: 20 }}>
@@ -74,7 +83,11 @@ export default function DeskOverviewPage() {
                 ? 'Tips cannot be opened on this server.'
                 : d.loadingInbox
                   ? 'Loading tips from Arkiv…'
-                  : 'Open tips stay on this device.'}
+                  : d.tips.length === 1
+                    ? 'One open tip is on this device.'
+                    : d.tips.length > 1
+                      ? `${d.tips.length} open tips are on this device.`
+                      : 'Open tips stay on this device.'}
             </p>
             <div className="ctaRow" style={{ marginTop: 'auto', paddingTop: 12 }}>
               <Link className="btn" href="/desk/inbox">
@@ -85,10 +98,10 @@ export default function DeskOverviewPage() {
           <Card className="stat-card">
             <p className="eyebrow">Desk</p>
             <div className="stat-value" style={{ fontSize: 22, lineHeight: '28px' }}>
-              {d.loadingDesk ? 'Loading' : d.chainName || d.deskName}
+              {waiting ? 'Loading' : d.chainName || d.deskName}
             </div>
-            <p className="muted stat-meta">
-              {d.deskKey ? shortHex(d.deskKey) : d.loadingDesk ? 'Looking up the public desk…' : 'Not published yet'}
+            <p className="muted stat-meta" title={d.deskKey ?? undefined}>
+              {d.deskKey ? shortHex(d.deskKey, 8, 6) : waiting ? 'Looking up the public desk…' : 'Not published yet'}
             </p>
             <div className="ctaRow" style={{ marginTop: 'auto', paddingTop: 12 }}>
               <Link className="btn" href="/desk/settings">
@@ -102,8 +115,8 @@ export default function DeskOverviewPage() {
         <p className="eyebrow">Desk identity</p>
         <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
           <CopyField label="Creator" value={d.creator ?? 'Not set'} />
-          <CopyField label="Desk" value={d.deskKey ?? (d.loadingDesk ? 'Loading…' : 'Not set')} />
-          <CopyField label="Canary" value={d.canaryKey ?? (d.loadingDesk ? 'Loading…' : 'None yet')} />
+          <CopyField label="Desk" value={d.deskKey ?? (waiting ? 'Loading…' : 'Not set')} />
+          <CopyField label="Canary" value={d.canaryKey ?? (waiting ? 'Loading…' : 'None yet')} />
           {d.tx ? (
             <a className="btn" href={txUrl(d.tx)} target="_blank" rel="noreferrer">
               Last tx {shortHex(d.tx, 6, 4)}

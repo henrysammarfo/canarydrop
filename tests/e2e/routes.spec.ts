@@ -129,11 +129,11 @@ test('dry run tip submit shows a toast', async ({ page }) => {
   if ((await creator.inputValue()) !== desk) await creator.fill(desk);
   const status = page.locator('p[role="status"]');
   try {
-    await expect(status).toContainText(/Canary/i, { timeout: 25_000 });
+    await expect(status).toContainText(/Canary (alive|gone|unknown)/i, { timeout: 35_000 });
   } catch {
     await page.waitForTimeout(8_000);
     await page.reload({ waitUntil: 'load' });
-    await expect(status).toContainText(/Canary/i, { timeout: 45_000 });
+    await expect(status).toContainText(/Canary (alive|gone|unknown)/i, { timeout: 45_000 });
   }
   await page.locator('textarea').first().fill('Synthetic judge dry run tip.');
   const dry = page.getByRole('button', { name: 'Dry run' });

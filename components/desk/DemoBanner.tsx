@@ -5,6 +5,9 @@ import { useDesk } from './DeskProvider';
 
 export default function DemoBanner() {
   const d = useDesk();
+  const showMissingDesk =
+    d.demo && d.demoKey && !d.deskKey && !d.loadingDesk && !d.loadError && !d.createdNotice;
+
   return (
     <>
       {d.createdNotice && !d.demo && (
@@ -13,7 +16,7 @@ export default function DemoBanner() {
         </div>
       )}
       {d.demo && (
-        <div className="page-note" style={{ marginBottom: 16 }}>
+        <div className="page-note compact" style={{ marginBottom: 16 }}>
           Demo mode is on. This browser loads a shared testnet desk key so a judge can open tips without the original laptop. Do not use this for a real newsroom.
           {d.createdNotice && (
             <div style={{ marginTop: 8 }} role="status">
@@ -36,7 +39,7 @@ export default function DemoBanner() {
             </div>
           )}
           {d.pubMatch === true && <div style={{ marginTop: 8 }}>The live desk matches the shared demo key. New tips will open here.</div>}
-          {d.demo && !d.deskKey && d.demoKey && !d.loadingDesk && (
+          {showMissingDesk && (
             <div style={{ marginTop: 8 }}>
               No live demo desk yet. Open Desk settings and press Create demo desk. The server wallet publishes the shared public key.
               <div className="ctaRow" style={{ marginTop: 10 }}>
@@ -46,19 +49,6 @@ export default function DemoBanner() {
               </div>
             </div>
           )}
-        </div>
-      )}
-      {!d.demo && !d.connected && (
-        <div className="page-note" style={{ marginBottom: 16 }}>
-          Connect a wallet to own this desk, or use Demo mode to open tips without a wallet.
-          <div className="ctaRow" style={{ marginTop: 10 }}>
-            <button type="button" className="btn primary" onClick={() => void d.connect()}>
-              Connect wallet
-            </button>
-            <button type="button" className="btn" onClick={() => d.setDemo(true)}>
-              Use Demo mode
-            </button>
-          </div>
         </div>
       )}
     </>

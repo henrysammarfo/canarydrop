@@ -47,6 +47,7 @@ import {
 } from '@/lib/desk-pick';
 import { fetchSharedDemoPub } from '@/lib/demo-pub-client';
 import { bumpGeneration, isStaleGeneration } from '@/lib/load-gen';
+import { fetchDeskLive, fetchInboxLive, type DeskLiveView } from '@/lib/live-client';
 import { deskPubBytes, parseDeskPayload } from '@/lib/payload';
 import { sleep, withBackoff } from '@/lib/retry';
 import { uiError } from '@/lib/ui-error';
@@ -150,6 +151,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
   const [canaryCreatedAt, setCanaryCreatedAt] = useState<bigint | null>(null);
   const [currentBlock, setCurrentBlock] = useState<bigint | null>(null);
   const [blockDuration, setBlockDuration] = useState(2);
+  const [deskPubRaw, setDeskPubRaw] = useState<Uint8Array | null>(null);
   const seenTips = useRef(new Set<string>());
   const deskLoad = useRef({ current: 0 });
   const privRef = useRef<CryptoKey | null>(null);
@@ -248,6 +250,20 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
   async function loadHistory(key: Hex, deskPriv: CryptoKey, cursor?: string, atBlock?: bigint) {
     setLoadingInbox(true);
     try {
+      try {
+        const liveOpts: { cursor?: string; atBlock?: bigint } = {};
+        if (cursor) liveOpts.cursor = cursor;
+        if (atBlock !== undefined) liveOpts.atBlock = atBlock;
+        const page = await fetchInboxLive(key, liveOpts);
+        for (const row of page.tips) {
+          await ingestTip(row.key, row.payload, row.createdAt, deskPriv);
+        }
+        setInboxCursor(page.hasMore ? page.cursor : undefined);
+        setInboxBlock(page.atBlock);
+        return;
+      } catch {
+        // Fall through to a direct chain read from this browser.
+      }
       const opts: { cursor?: string; atBlock?: bigint } = {};
       if (cursor) opts.cursor = cursor;
       if (atBlock !== undefined) opts.atBlock = atBlock;
@@ -296,12 +312,21 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     setCanaryCreatedAt(c?.createdAt ?? null);
     const payload = d.payload ? parseDeskPayload(d.payload) : null;
     if (payload?.name) setChainName(payload.name);
-    if (demoKey) {
-      setPubMatch(payload ? bytesEqual(deskPubBytes(payload), demoKey.pub) : false);
-    } else {
-      setPubMatch(null);
-    }
+    setDeskPubRaw(payload ? deskPubBytes(payload) : null);
     if (d.key) startWatch(d.key, c?.key ?? null);
+  }
+
+  function applyLive(live: DeskLiveView) {
+    setDeskKey(live.deskKey);
+    setCanaryKey(live.canaryKey);
+    setAlive(live.deskKey ? live.alive : null);
+    setCanaryExpiresAt(live.expiresAt);
+    setCanaryCreatedAt(live.createdAt);
+    if (live.currentBlock != null) setCurrentBlock(live.currentBlock);
+    setBlockDuration(live.blockDuration || 2);
+    if (live.name) setChainName(live.name);
+    setDeskPubRaw(live.deskPub);
+    if (live.deskKey) startWatch(live.deskKey, live.canaryKey);
   }
 
   async function refreshDeskFromChain(preferPub?: Uint8Array, expectedKey?: Hex) {
@@ -329,52 +354,98 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    if (!deskPubRaw || !demoKey) {
+      setPubMatch(demoKey ? false : null);
+      return;
+    }
+    setPubMatch(bytesEqual(deskPubRaw, demoKey.pub));
+  }, [deskPubRaw, demoKey]);
+
+  useEffect(() => {
     const started = bumpGeneration(deskLoad.current);
+    if (!creator) {
+      setLoadingDesk(false);
+      return;
+    }
     if (!deskKeyRef.current) setLoadingDesk(true);
     setLoadError(null);
-    (async () => {
-      if (!creator) {
-        setLoadingDesk(false);
-        return;
-      }
+    let cancelled = false;
+    let timer: number | undefined;
+    const deadline = Date.now() + 28_000;
+
+    async function fromChain() {
+      let preferPub = demoKey?.pub;
+      if (demo && !preferPub) preferPub = await fetchSharedDemoPub();
+      const d = await withBackoff(() => getDesk(creator!, preferPub), 6, (ms) => sleep(Math.max(300, ms)));
+      if (cancelled || isStaleGeneration(started, deskLoad.current.current)) return false;
       try {
-        let preferPub = demoKey?.pub;
-        if (demo && !preferPub) preferPub = await fetchSharedDemoPub();
-        const d = await withBackoff(() => getDesk(creator, preferPub), 6, (ms) => sleep(Math.max(300, ms)));
-        if (isStaleGeneration(started, deskLoad.current.current)) return;
-        try {
-          const timing = await pub().getBlockTiming();
-          if (!isStaleGeneration(started, deskLoad.current.current)) {
-            setCurrentBlock(timing.currentBlock);
-            setBlockDuration(timing.blockDuration || 2);
-          }
-        } catch {
-          // Countdown can wait. Desk identity still loads.
-        }
-        if (d) {
-          const c = await withBackoff(() => canaryAlive(creator, d.key), 4, (ms) => sleep(Math.max(300, ms)));
-          if (isStaleGeneration(started, deskLoad.current.current)) return;
-          applyFetchedDesk(d, c);
-        } else {
-          setDeskKey(null);
-          setCanaryKey(null);
-          setAlive(null);
-          setCanaryExpiresAt(null);
-          setCanaryCreatedAt(null);
-          setPubMatch(demoKey ? false : null);
+        const timing = await pub().getBlockTiming();
+        if (!cancelled && !isStaleGeneration(started, deskLoad.current.current)) {
+          setCurrentBlock(timing.currentBlock);
+          setBlockDuration(timing.blockDuration || 2);
         }
       } catch {
-        if (isStaleGeneration(started, deskLoad.current.current)) return;
-        setLoadError(CHAIN_READ_FAILED);
-      } finally {
-        if (!isStaleGeneration(started, deskLoad.current.current)) setLoadingDesk(false);
+        // Countdown can wait. Desk identity still loads.
       }
-    })();
+      if (d) {
+        const c = await withBackoff(() => canaryAlive(creator!, d.key), 4, (ms) => sleep(Math.max(300, ms)));
+        if (cancelled || isStaleGeneration(started, deskLoad.current.current)) return false;
+        applyFetchedDesk(d, c);
+      } else {
+        setDeskKey(null);
+        setCanaryKey(null);
+        setAlive(null);
+        setCanaryExpiresAt(null);
+        setCanaryCreatedAt(null);
+        setDeskPubRaw(null);
+      }
+      return true;
+    }
+
+    async function attempt() {
+      if (cancelled || isStaleGeneration(started, deskLoad.current.current)) return;
+      try {
+        const live = await withBackoff(() => fetchDeskLive(creator!), 6, (ms) => sleep(Math.max(400, ms)));
+        if (cancelled || isStaleGeneration(started, deskLoad.current.current)) return;
+        applyLive(live);
+        setLoadError(null);
+        setLoadingDesk(false);
+        return;
+      } catch {
+        try {
+          const ok = await fromChain();
+          if (ok) {
+            setLoadError(null);
+            setLoadingDesk(false);
+            return;
+          }
+        } catch {
+          // Keep retrying quietly on a first visit.
+        }
+      }
+      if (cancelled || isStaleGeneration(started, deskLoad.current.current)) return;
+      if (Date.now() < deadline) {
+        if (!deskKeyRef.current) setLoadingDesk(true);
+        timer = window.setTimeout(() => {
+          void attempt();
+        }, 2500);
+        return;
+      }
+      setLoadError(CHAIN_READ_FAILED);
+      setLoadingDesk(false);
+      timer = window.setTimeout(() => {
+        void attempt();
+      }, 5000);
+    }
+
+    void attempt();
     return () => {
+      cancelled = true;
       bumpGeneration(deskLoad.current);
+      if (timer) window.clearTimeout(timer);
       if (unwatchRef.current) unwatchRef.current();
     };
-  }, [creator, demo, demoKey]);
+  }, [creator, demo]);
 
   useEffect(() => {
     if (!deskKey || !priv) return;
@@ -469,7 +540,13 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
           setCreatedNotice(DESK_CREATED_NOTICE);
           push({ kind: 'success', text: DESK_CREATED_TOAST });
           try {
-            if (creator) await refreshDeskFromChain(demoKey?.pub, hinted.deskKey);
+            if (creator) {
+              try {
+                applyLive(await fetchDeskLive(creator, true));
+              } catch {
+                await refreshDeskFromChain(demoKey?.pub, hinted.deskKey);
+              }
+            }
           } catch {
             // Keep the receipt keys.
           }
@@ -495,7 +572,13 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
         setCreatedNotice(DESK_CREATED_NOTICE);
         push({ kind: 'success', text: DESK_CREATED_TOAST });
         try {
-          if (creator) await refreshDeskFromChain(undefined, hinted.deskKey);
+          if (creator) {
+            try {
+              applyLive(await fetchDeskLive(creator, true));
+            } catch {
+              await refreshDeskFromChain(undefined, hinted.deskKey);
+            }
+          }
         } catch {
           // Keep the receipt keys.
         }
@@ -534,7 +617,13 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
         setTx(out.txHash);
         push({ kind: 'success', text: 'Canary renewed.' });
       }
-      if (creator && !dryRun) setAlive(!!(await canaryAlive(creator, deskKey)));
+      if (creator && !dryRun) {
+        try {
+          applyLive(await fetchDeskLive(creator, true));
+        } catch {
+          setAlive(!!(await canaryAlive(creator, deskKey)));
+        }
+      }
     } catch (e: unknown) {
       push({ kind: 'error', text: uiError(e) });
     } finally {

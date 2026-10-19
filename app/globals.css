@@ -306,20 +306,27 @@ code, .kbd {
 .pill {
   display: inline-flex;
   align-items: center;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: -0.01em;
   font-weight: 650;
   padding: 4px 8px;
   border-radius: var(--r-full);
   border: 1px solid var(--line-gold);
   color: var(--gold);
   background: var(--gold-dim);
-  font-family: var(--font-mono);
   white-space: nowrap;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.network-pill,
+.testnet-pill,
+.brand-mark,
+.side-foot .pill {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-family: var(--font-mono);
 }
 .pill-ok { border-color: rgba(61, 214, 140, 0.4); color: var(--live); background: rgba(61, 214, 140, 0.1); }
 .pill-wait { border-color: rgba(240, 160, 75, 0.45); color: var(--warn); background: rgba(240, 160, 75, 0.1); }
@@ -404,12 +411,21 @@ code, .kbd {
   overflow: auto;
   min-width: 0;
 }
+.brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 4px 12px;
+  min-width: 0;
+}
 .app-sidebar .brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 8px 16px;
+  padding: 4px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 .app-sidebar .brand .pill {
   width: 32px;
@@ -492,6 +508,18 @@ code, .kbd {
   overflow-x: clip;
   overflow-y: auto;
 }
+.app-crumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.app-crumb > .ico {
+  width: 18px;
+  height: 18px;
+  color: var(--text-2);
+  flex: 0 0 auto;
+}
 .app-top-title {
   font-size: 14px;
   font-weight: 600;
@@ -501,7 +529,7 @@ code, .kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 280px;
-  line-height: 32px;
+  line-height: 1;
 }
 .app-scrim {
   display: none;
@@ -517,10 +545,15 @@ code, .kbd {
 .app-shell.collapsed .side-foot { display: none; }
 .app-shell.collapsed .side-link { justify-content: center; padding: 0; }
 .app-shell.collapsed .app-sidebar { padding: 14px 8px; }
-.app-shell.collapsed .app-sidebar .brand { justify-content: center; padding-left: 0; padding-right: 0; }
+.app-shell.collapsed .brand-row {
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0 8px;
+}
+.app-shell.collapsed .app-sidebar .brand { justify-content: center; padding: 0; flex: 0 0 auto; }
 .btn.icon-btn {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border-radius: 8px;
 }
@@ -836,7 +869,7 @@ label.small {
 }
 .data-table {
   width: 100%;
-  min-width: 880px;
+  min-width: 980px;
   border-collapse: collapse;
   font-size: 13px;
   table-layout: fixed;
@@ -976,6 +1009,11 @@ label.small {
   color: var(--text);
   overflow-wrap: anywhere;
 }
+.page-note.compact {
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+}
 .steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -988,7 +1026,7 @@ label.small {
 .steps .step:last-child { border-right: none; }
 .steps .step.on { background: var(--gold-dim); }
 .steps .step.done { background: rgba(61, 214, 140, 0.08); }
-.steps .n { color: var(--gold); font-size: 11px; letter-spacing: 0.12em; font-family: var(--font-mono); }
+.steps .n { color: var(--gold); font-size: 12px; letter-spacing: -0.01em; font-weight: 650; }
 .steps .step.done .n { color: var(--live); }
 @media (max-width: 700px) {
   .steps { grid-template-columns: 1fr; }
@@ -1026,11 +1064,26 @@ label.small {
 .verify-steps { margin: 22px 0 0; padding: 0; display: grid; gap: 12px; }
 .verify-steps li {
   list-style: none;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   padding: var(--space-5);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
   min-width: 0;
+}
+.verify-n {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--gold-dim);
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 650;
 }
 .verify-steps li strong { display: block; margin-bottom: 6px; }
 .verify-steps li .btn { margin-top: 10px; }
@@ -1046,6 +1099,37 @@ label.small {
   display: flex;
   flex-direction: column;
   padding: var(--space-6);
+}
+.stat-hero.alive {
+  border-color: var(--line-gold);
+  background: linear-gradient(180deg, rgba(232, 196, 88, 0.1), rgba(255, 255, 255, 0.02));
+}
+.stat-hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.stat-countdown {
+  margin-top: 10px;
+  font-size: 18px;
+  line-height: 26px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  font-weight: 500;
+}
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--r-full);
+  border: 1px solid rgba(61, 214, 140, 0.35);
+  color: var(--live);
+  background: rgba(61, 214, 140, 0.1);
+  font-size: 12px;
+  font-weight: 600;
 }
 .stat-hero .stat-value {
   margin-top: 10px;
@@ -1092,6 +1176,7 @@ label.small {
 }
 .verified-mark .ico { width: 20px; height: 20px; }
 .verified-mark.muted { background: rgba(255, 255, 255, 0.04); color: var(--text-3); }
+.verified-card { border-color: rgba(61, 214, 140, 0.35); }
 .advanced {
   margin-top: 16px;
   border-top: 1px solid var(--line);
@@ -1109,14 +1194,18 @@ label.small {
 .submit-panel { max-width: 880px; }
 .btn.primary:not(:disabled) { opacity: 1; }
 
+.tip-list { padding: 0; margin: 0; display: grid; gap: 12px; }
+.tip-list li { list-style: none; }
 .tip-card { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: var(--space-5); }
-.tip-card .body { white-space: pre-wrap; overflow-wrap: anywhere; }
+.tip-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.tip-card .body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; line-height: 1.55; color: var(--text); }
 .reply-row { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .reply-row input { flex: 1 1 auto; height: 36px; }
 .reply-row .btn { height: 36px; }
 
 .app-top .ctaRow { align-items: center; }
 .app-top .pill { height: 28px; }
+.app-crumb, .brand-row { align-items: center; }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }

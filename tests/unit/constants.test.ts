@@ -8,6 +8,7 @@ import {
   DEFAULT_RELAY,
   ENTITY_KEY_RE,
   IP_RATE_MAX_DESK,
+  IP_RATE_MAX_READ,
   IP_RATE_MAX_RELAY,
   REDIS_LOCK_PREFIX,
   REDIS_RL_PREFIX,
@@ -60,6 +61,7 @@ describe('constants', () => {
     expect(CSRF_HEADER).toBe('x-csrf-token');
     expect(IP_RATE_MAX_RELAY).toBe(8);
     expect(IP_RATE_MAX_DESK).toBe(8);
+    expect(IP_RATE_MAX_READ).toBe(40);
     expect(REDIS_RL_PREFIX).toBe('cd:rl');
     expect(REDIS_LOCK_PREFIX).toBe('cd:lock');
     expect(WALLET_LOCK_TTL_MS).toBe(12_000);

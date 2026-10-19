@@ -2,12 +2,19 @@ import { test, expect } from '@playwright/test';
 
 test('how page shows live Arkiv claims', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/how', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: /how canarydrop uses arkiv/i })).toBeVisible();
-  await expect(page.getByRole('status').filter({ hasText: /Latest block/i })).toBeVisible({ timeout: 45_000 });
+  async function loadHow() {
+    await page.goto('/how', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: /how canarydrop uses arkiv/i })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: /Latest block/i })).toBeVisible({ timeout: 45_000 });
+  }
+  await loadHow();
+  if ((await page.locator('#atBlock').count()) === 0) {
+    await page.waitForTimeout(4000);
+    await loadHow();
+  }
   await expect(page.locator('#ownedBy')).toBeVisible();
   await expect(page.locator('#createdBy')).toBeVisible();
-  await expect(page.locator('#atBlock .proof-title')).toContainText('Was this canary alive about an hour ago?');
+  await expect(page.locator('#atBlock .proof-title')).toContainText('Was this canary alive about an hour ago?', { timeout: 20_000 });
   const atBlock = await page.locator('#atBlock').innerText();
   expect(atBlock).toMatch(/ALIVE at block|did not exist yet about an hour ago/i);
   expect(atBlock).not.toMatch(/GONE at block/);
