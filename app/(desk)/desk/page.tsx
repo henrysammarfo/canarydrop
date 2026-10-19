@@ -7,6 +7,8 @@ import {
   createDesk,
   getDesk,
   inboxPage,
+  type CanaryRow,
+  type DeskRow,
   pub,
   renew,
   reply,
@@ -27,6 +29,13 @@ import {
 } from '@/lib/crypto';
 import { asAddress } from '@/lib/hex';
 import { getInjectedProvider } from '@/lib/injected';
+import {
+  createdDeskAndCanary,
+  DESK_CREATED_NOTICE,
+  DESK_CREATED_TOAST,
+  fetchedDeskIsReady,
+} from '@/lib/desk-pick';
+import { bumpGeneration, isStaleGeneration } from '@/lib/load-gen';
 import { deskPubBytes, parseDeskPayload } from '@/lib/payload';
 import { uiError } from '@/lib/ui-error';
 import { connectTiramisu } from '@/lib/wallet';
@@ -71,7 +80,9 @@ export default function DeskPage() {
   const [skippedTips, setSkippedTips] = useState(0);
   const [demoKey, setDemoKey] = useState<DemoKey | null>(null);
   const [pubMatch, setPubMatch] = useState<boolean | null>(null);
+  const [createdNotice, setCreatedNotice] = useState<string | null>(null);
   const seenTips = useRef(new Set<string>());
+  const deskLoad = useRef({ current: 0 });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -156,44 +167,80 @@ export default function DeskPage() {
     }
   }
 
+  function startWatch(dKey: Hex, cKey: Hex | null) {
+    if (unwatchRef.current) unwatchRef.current();
+    unwatchRef.current = watchInbox(dKey, {
+      onTip: (k) => {
+        void loadTip(k);
+      },
+      onExpiry: (k) => {
+        if (cKey && k === cKey) setAlive(true);
+      },
+      onSealed: () => {
+        push({ kind: 'info', text: 'A tip for this desk was sealed to the burn address.' });
+      },
+      onPatched: () => {
+        push({ kind: 'info', text: 'A tip for this desk was patched. Sealed tips should never patch.' });
+      },
+      onDeleted: (k) => {
+        push({ kind: 'info', text: `A tip for this desk was deleted ${shortHex(k)}.` });
+      },
+      onError: () => {
+        if (priv) void loadHistory(dKey, priv);
+      },
+    });
+  }
+
+  function applyFetchedDesk(d: DeskRow, c: CanaryRow | null) {
+    setDeskKey(d.key);
+    setCanaryKey(c?.key ?? null);
+    setAlive(!!c);
+    const payload = d.payload ? parseDeskPayload(d.payload) : null;
+    if (demoKey) {
+      setPubMatch(payload ? bytesEqual(deskPubBytes(payload), demoKey.pub) : false);
+    } else {
+      setPubMatch(null);
+    }
+    if (d.key) startWatch(d.key, c?.key ?? null);
+  }
+
+  async function refreshDeskFromChain(preferPub?: Uint8Array, expectedKey?: Hex) {
+    if (!creator) return;
+    const started = bumpGeneration(deskLoad.current);
+    for (let i = 0; i < 8; i++) {
+      if (isStaleGeneration(started, deskLoad.current.current)) return;
+      const d = await getDesk(creator, preferPub);
+      if (d && fetchedDeskIsReady(d, preferPub, expectedKey)) {
+        if (isStaleGeneration(started, deskLoad.current.current)) return;
+        const c = await canaryAlive(creator, d.key);
+        if (isStaleGeneration(started, deskLoad.current.current)) return;
+        applyFetchedDesk(d, c);
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+    // Keep keys adopted from the create receipt. A lagging index must not restore the old desk.
+    if (expectedKey) return;
+    if (isStaleGeneration(started, deskLoad.current.current)) return;
+    const d = await getDesk(creator, preferPub);
+    if (!d || isStaleGeneration(started, deskLoad.current.current)) return;
+    const c = await canaryAlive(creator, d.key);
+    if (isStaleGeneration(started, deskLoad.current.current)) return;
+    applyFetchedDesk(d, c);
+  }
+
   useEffect(() => {
+    const started = bumpGeneration(deskLoad.current);
     (async () => {
       if (!creator) return;
       if (demo && !demoKey) return;
       try {
         const d = await getDesk(creator, demoKey?.pub);
+        if (isStaleGeneration(started, deskLoad.current.current)) return;
         if (d) {
-          setDeskKey(d.key);
           const c = await canaryAlive(creator, d.key);
-          if (c) setCanaryKey(c.key);
-          setAlive(!!c);
-          const payload = d.payload ? parseDeskPayload(d.payload) : null;
-          if (demoKey) {
-            setPubMatch(payload ? bytesEqual(deskPubBytes(payload), demoKey.pub) : false);
-          } else {
-            setPubMatch(null);
-          }
-          if (unwatchRef.current) unwatchRef.current();
-          unwatchRef.current = watchInbox(d.key, {
-            onTip: (k) => {
-              void loadTip(k);
-            },
-            onExpiry: (k) => {
-              if (k === c?.key) setAlive(true);
-            },
-            onSealed: () => {
-              push({ kind: 'info', text: 'A tip for this desk was sealed to the burn address.' });
-            },
-            onPatched: () => {
-              push({ kind: 'info', text: 'A tip for this desk was patched. Sealed tips should never patch.' });
-            },
-            onDeleted: (k) => {
-              push({ kind: 'info', text: `A tip for this desk was deleted ${shortHex(k)}.` });
-            },
-            onError: () => {
-              if (d.key && priv) void loadHistory(d.key, priv);
-            },
-          });
+          if (isStaleGeneration(started, deskLoad.current.current)) return;
+          applyFetchedDesk(d, c);
         } else {
           setDeskKey(null);
           setCanaryKey(null);
@@ -201,10 +248,12 @@ export default function DeskPage() {
           setPubMatch(demoKey ? false : null);
         }
       } catch (e: unknown) {
+        if (isStaleGeneration(started, deskLoad.current.current)) return;
         push({ kind: 'error', text: uiError(e) });
       }
     })();
     return () => {
+      bumpGeneration(deskLoad.current);
       if (unwatchRef.current) unwatchRef.current();
     };
   }, [creator, demo, demoKey, push, priv]);
@@ -278,13 +327,34 @@ export default function DeskPage() {
           method: 'POST',
           body: JSON.stringify({ name: deskName, deskPubRawB64: bytesToB64(pubRaw) }),
         });
-        const j = (await r.json()) as { message?: string; error?: string; predicted?: string[]; txHash?: Hex };
+        const j = (await r.json()) as {
+          message?: string;
+          error?: string;
+          predicted?: string[];
+          txHash?: Hex;
+          created?: unknown;
+        };
         if (!r.ok) throw new Error(j.message ?? j.error ?? 'failed');
         if (dryRun) {
           push({ kind: 'info', text: `Dry run ok. Predicted keys ${Array.isArray(j.predicted) ? j.predicted.join(', ') : 'ready'}.` });
         } else {
           if (j.txHash) setTx(j.txHash);
-          push({ kind: 'success', text: 'Desk and canary created.' });
+          const hinted = createdDeskAndCanary(j.created);
+          bumpGeneration(deskLoad.current);
+          if (hinted.deskKey) {
+            setDeskKey(hinted.deskKey);
+            setCanaryKey(hinted.canaryKey ?? null);
+            setAlive(true);
+            startWatch(hinted.deskKey, hinted.canaryKey ?? null);
+          }
+          if (demoKey) setPubMatch(true);
+          setCreatedNotice(DESK_CREATED_NOTICE);
+          push({ kind: 'success', text: DESK_CREATED_TOAST });
+          try {
+            if (creator) await refreshDeskFromChain(demoKey?.pub, hinted.deskKey);
+          } catch {
+            // Keep the receipt keys. The index can catch up on the next load.
+          }
         }
       } else {
         if (!connected) await connect();
@@ -296,15 +366,20 @@ export default function DeskPage() {
         if (!owner) throw new Error('No account returned by the wallet.');
         const out = await createDesk(w, owner, deskName, pubRaw);
         setTx(out.txHash);
-        push({ kind: 'success', text: 'Desk and canary created.' });
-      }
-      if (creator && !dryRun) {
-        const d = await getDesk(creator, demoKey?.pub);
-        if (d) {
-          setDeskKey(d.key);
-          const c = await canaryAlive(creator, d.key);
-          setCanaryKey(c?.key ?? null);
-          setAlive(!!c);
+        const hinted = createdDeskAndCanary(out.createdEntities);
+        bumpGeneration(deskLoad.current);
+        if (hinted.deskKey) {
+          setDeskKey(hinted.deskKey);
+          setCanaryKey(hinted.canaryKey ?? null);
+          setAlive(true);
+          startWatch(hinted.deskKey, hinted.canaryKey ?? null);
+        }
+        setCreatedNotice(DESK_CREATED_NOTICE);
+        push({ kind: 'success', text: DESK_CREATED_TOAST });
+        try {
+          if (creator) await refreshDeskFromChain(undefined, hinted.deskKey);
+        } catch {
+          // Keep the receipt keys. The index can catch up on the next load.
         }
       }
     } catch (e: unknown) {
@@ -412,10 +487,20 @@ export default function DeskPage() {
       </header>
       <div className="section" style={{ paddingTop: 'var(--space-2)' }}>
         <div className="wrap">
+          {createdNotice && !demo && (
+            <div className="page-note" role="status" style={{ marginBottom: 16 }}>
+              {createdNotice}
+            </div>
+          )}
           {demo && (
             <div className="page-note" style={{ marginBottom: 16 }}>
               Demo mode is on. This browser loads a shared testnet desk key so a judge can open tips without the original laptop. Do not use this for a real newsroom.
-              {deskKey && pubMatch === false && (
+              {createdNotice && (
+                <div style={{ marginTop: 8 }} role="status">
+                  {createdNotice}
+                </div>
+              )}
+              {deskKey && pubMatch === false && !createdNotice && (
                 <div style={{ marginTop: 8 }}>
                   The live desk still has an older public key. Press Create demo desk so new tips match this browser.
                   <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 10 }}>

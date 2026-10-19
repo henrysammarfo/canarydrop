@@ -5,8 +5,9 @@ import Link from 'next/link';
 import type { Hex } from 'viem';
 import { DEFAULT_DESK, DEFAULT_IMPOSTOR, SEALED_TIPS_EMPTY } from '@/lib/constants';
 import { deskAddress, explorerPage, getDesk, type ExplorerKind } from '@/lib/arkiv';
-import { attrStr } from '@/lib/attr';
+import { attrKey, attrStr } from '@/lib/attr';
 import { addressUrl, entityUrl, isSealedOwner, shortHex } from '@/lib/chain';
+import { explorerRowFlags, olderDemoLabel } from '@/lib/explorer-label';
 import { fetchSharedDemoPub } from '@/lib/demo-pub-client';
 import { bumpGeneration, isStaleGeneration } from '@/lib/load-gen';
 import { useToast } from '@/components/Toast';
@@ -20,6 +21,7 @@ type Item = {
   expires: string;
   impostor: boolean;
   canonicalDemo: boolean;
+  olderDemo: string | null;
   readonly: boolean;
   openExtend: boolean;
 };
@@ -65,16 +67,24 @@ export default function ExplorerPage() {
     if (!e.key) return null;
     const creator = e.creator ?? ('0x' as Hex);
     const type = attrStr(e.attributes, 'type') ?? 'unknown';
+    const flags = explorerRowFlags({
+      type,
+      key: e.key,
+      creator,
+      deskAttr: attrKey(e.attributes, 'desk'),
+      canonicalDeskKey: canonicalKey,
+      demoCreator: DEFAULT_DESK,
+      impostorCreator: DEFAULT_IMPOSTOR,
+    });
     return {
       key: e.key,
       type,
       creator,
       owner: e.owner ?? creator,
       expires: e.expiresAt != null ? String(e.expiresAt) : 'n/a',
-      impostor:
-        creator.toLowerCase() === DEFAULT_IMPOSTOR.toLowerCase() ||
-        (creator.toLowerCase() !== DEFAULT_DESK.toLowerCase() && type === 'desk'),
-      canonicalDemo: type === 'desk' && !!canonicalKey && e.key?.toLowerCase() === canonicalKey.toLowerCase(),
+      impostor: flags.impostor,
+      canonicalDemo: flags.canonicalDemo,
+      olderDemo: olderDemoLabel(flags),
       readonly: e.creationFlags?.readonly === true,
       openExtend: e.creationFlags?.permissionlessExtension === true,
     };
@@ -175,6 +185,11 @@ export default function ExplorerPage() {
                     {it.canonicalDemo && (
                       <div>
                         <span className="pill" style={{ marginTop: 6 }}>Canonical demo desk</span>
+                      </div>
+                    )}
+                    {it.olderDemo && (
+                      <div>
+                        <span className="pill" style={{ marginTop: 6 }}>{it.olderDemo}</span>
                       </div>
                     )}
                     {it.readonly && (
