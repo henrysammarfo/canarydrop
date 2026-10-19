@@ -1,17 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Hex } from 'viem';
 import { canaryAlive, getDesk } from '@/lib/arkiv';
 import { preferPubForCreatorClient } from '@/lib/demo-pub-client';
-import type { DeskRow } from '@/lib/arkiv';
 import { bytesToB64 } from '@/lib/bytes';
 import { appFetch } from '@/lib/client-fetch';
-import { LIFETIME_KEYS, type Lifetime } from '@/lib/constants';
+import { CHAIN_READ_FAILED, LIFETIME_KEYS, type Lifetime } from '@/lib/constants';
 import { sealTo } from '@/lib/crypto';
+import { fetchDeskLive } from '@/lib/live-client';
 import { deskPubBytes, parseDeskPayload } from '@/lib/payload';
+import { sleep, withBackoff } from '@/lib/retry';
 import { uiError } from '@/lib/ui-error';
 import Modal from '@/components/Modal';
 import { useToast } from '@/components/Toast';
@@ -21,35 +22,81 @@ import CopyField from '@/components/ui/CopyField';
 export default function SourceDeskPage() {
   const push = useToast();
   const { creator } = useParams<{ creator: Hex }>();
-  const [desk, setDesk] = useState<DeskRow | null>(null);
+  const [deskName, setDeskName] = useState('CanaryDrop desk');
   const [deskKey, setDeskKey] = useState<Hex | null>(null);
+  const [deskPubRaw, setDeskPubRaw] = useState<Uint8Array | null>(null);
   const [alive, setAlive] = useState<boolean | null>(null);
   const [text, setText] = useState('');
   const [life, setLife] = useState<Lifetime>('24h');
   const [sending, setSending] = useState(false);
   const [ok, setOk] = useState<{ tipKey: Hex; txHash: Hex; receipt: JsonWebKey } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const d = await getDesk(creator, await preferPubForCreatorClient(creator));
-        setDesk(d ?? null);
-        if (d) {
-          setDeskKey(d.key);
-          setAlive(!!(await canaryAlive(creator, d.key)));
-        }
-      } catch (e: unknown) {
-        push({ kind: 'error', text: uiError(e) });
-      }
-    })();
-  }, [creator, push]);
+    let cancelled = false;
+    let timer: number | undefined;
+    const deadline = Date.now() + 28_000;
+    setDeskKey(null);
+    setDeskPubRaw(null);
+    setAlive(null);
+    setLookupError(null);
 
-  const deskPubRaw = useMemo(() => {
-    if (!desk?.payload) return null;
-    const parsed = parseDeskPayload(desk.payload);
-    return parsed ? deskPubBytes(parsed) : null;
-  }, [desk]);
+    async function fromChain() {
+      const prefer = await preferPubForCreatorClient(creator);
+      const d = await withBackoff(() => getDesk(creator, prefer), 8, (ms) => sleep(Math.max(400, ms)));
+      if (cancelled) return false;
+      if (d) {
+        setDeskKey(d.key);
+        const parsed = d.payload ? parseDeskPayload(d.payload) : null;
+        if (parsed?.name) setDeskName(parsed.name);
+        setDeskPubRaw(parsed ? deskPubBytes(parsed) : null);
+        const isAlive = await canaryAlive(creator, d.key);
+        if (!cancelled) setAlive(!!isAlive);
+      }
+      return true;
+    }
+
+    async function attempt() {
+      try {
+        const live = await fetchDeskLive(creator);
+        if (cancelled) return;
+        setDeskName(live.name);
+        setDeskKey(live.deskKey);
+        setDeskPubRaw(live.deskPub);
+        setAlive(live.deskKey ? live.alive : null);
+        setLookupError(null);
+        return;
+      } catch {
+        try {
+          const ok = await fromChain();
+          if (ok && !cancelled) {
+            setLookupError(null);
+            return;
+          }
+        } catch {
+          // Keep retrying quietly on a first visit.
+        }
+      }
+      if (cancelled) return;
+      if (Date.now() < deadline) {
+        timer = window.setTimeout(() => {
+          void attempt();
+        }, 2500);
+        return;
+      }
+      setLookupError(CHAIN_READ_FAILED);
+      timer = window.setTimeout(() => {
+        void attempt();
+      }, 5000);
+    }
+
+    void attempt();
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [creator]);
 
   async function send() {
     if (!deskKey || !deskPubRaw || !text.trim()) return;
@@ -82,16 +129,22 @@ export default function SourceDeskPage() {
     <section className="section">
       <div className="wrap" style={{ maxWidth: 760 }}>
         <p className="kicker">Public desk</p>
-        <h1 className="h2">Send a tip</h1>
+        <h1 className="h2">{deskName}</h1>
         <p className="lead" style={{ marginTop: 10 }}>
           Synthetic data only. Your tip is locked on your device before you send it. Only the newsroom can open it.
         </p>
         <div className="page-note" style={{ marginTop: 16 }}>
           You do not need a wallet. We pay the fee.
         </div>
-        <p className="muted" style={{ marginTop: 14 }}>
+        <p className="muted" style={{ marginTop: 14 }} role="status">
           Canary status:{' '}
-          {alive === null ? 'unknown' : alive ? <span className="status-alive">ALIVE</span> : <span className="status-gone">GONE</span>}
+          {lookupError
+            ? lookupError
+            : alive === null
+              ? 'unknown'
+              : alive
+                ? <span className="status-alive">ALIVE</span>
+                : <span className="status-gone">GONE</span>}
         </p>
         <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 8 }}>
           <Link className="btn" href={`/canary/${creator}`}>

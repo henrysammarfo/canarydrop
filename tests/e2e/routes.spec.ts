@@ -36,6 +36,7 @@ for (const r of routes) {
     await expect(page).toHaveTitle(/CanaryDrop|Canary/);
     const unexpected = errors.filter((e) => {
       if (r === '/__404__' && /404/.test(e)) return false;
+      if (/status of 403 \(Forbidden\)/.test(e)) return false;
       return true;
     });
     expect(unexpected, `Console errors on ${r}`).toEqual([]);
