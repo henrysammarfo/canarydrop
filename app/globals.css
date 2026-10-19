@@ -874,12 +874,12 @@ label.small {
   font-size: 13px;
   table-layout: fixed;
 }
-.data-table .col-type { width: 26%; }
-.data-table .col-key { width: 14%; }
+.data-table .col-type { width: 30%; }
+.data-table .col-key { width: 12%; }
 .data-table .col-creator { width: 12%; }
 .data-table .col-owner { width: 14%; }
 .data-table .col-expires { width: 12%; }
-.data-table .col-actions { width: 22%; }
+.data-table .col-actions { width: 20%; }
 .data-table th, .data-table td {
   padding: 8px 12px;
   text-align: left;
