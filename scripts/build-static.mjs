@@ -83,7 +83,7 @@ function sortRuntimeMaps(src) {
     if (!/^[A-Za-z0-9_$]+:"[a-f0-9]+"(,[A-Za-z0-9_$]+:"[a-f0-9]+")+$/.test(inner)) return full;
     return `{${inner.split(',').sort().join(',')}}`;
   });
-  out = out.replace(/\[((?:"[^"]+")(?:,(?="[^"]+"))+)\]/g, (full, inner) => {
+  out = out.replace(/\[((?:"[^"]+")(?:,(?:"[^"]+"))+)\]/g, (full, inner) => {
     const parts = inner.split(',');
     if (parts.length < 2) return full;
     if (!parts.every((part) => /^"[A-Za-z0-9_./()[\]-]+"$/.test(part))) return full;
@@ -140,7 +140,7 @@ try {
   run('node', ['scripts/assert-static-chunks.mjs', 'out']);
   const note = [
     'CanaryDrop static build',
-    'node 20.18.0 required for expected.sha256',
+    'node 24.22.0 required for expected.sha256',
     'nvm use && npm ci && npm run build:static',
     'npm run verify:static -- expected.sha256',
     `node ${process.version}`,

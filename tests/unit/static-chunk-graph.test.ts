@@ -31,9 +31,9 @@ describe('static export chunk graph', () => {
     expect(src).toContain('CanarydropRelIdent');
   });
 
-  it('pins Node 20.18.0', () => {
-    expect(read('.nvmrc').trim()).toBe('20.18.0');
-    expect(JSON.parse(read('package.json')).engines.node).toBe('20.18.0');
+  it('pins Node 24.22.0', () => {
+    expect(read('.nvmrc').trim()).toBe('24.22.0');
+    expect(JSON.parse(read('package.json')).engines.node).toBe('24.x');
   });
 
   it('rejects (app) layout chunks in site HTML after a static build', () => {

@@ -26,11 +26,11 @@ describe('reproducible static hash', () => {
     expect(src).toContain("npm', ['run', 'build:static']");
     expect(src.match(/runBuild\(\)/g)?.length).toBeGreaterThanOrEqual(2);
     expect(src).toContain('Two full out/ builds hashed differently');
-    expect(src).toContain('v20.18.0');
+    expect(src).toContain('v24.22.0');
   });
 
   it('pins Node and a stable build id', () => {
-    expect(fs.readFileSync(path.resolve('.nvmrc'), 'utf8').trim()).toBe('20.18.0');
+    expect(fs.readFileSync(path.resolve('.nvmrc'), 'utf8').trim()).toBe('24.22.0');
     expect(fs.readFileSync(path.resolve('next.config.js'), 'utf8')).toContain('generateBuildId');
   });
 

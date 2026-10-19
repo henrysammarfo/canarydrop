@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const ROOT = process.cwd();
-const PINNED_NODE = 'v20.18.0';
+const PINNED_NODE = 'v24.22.0';
 const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID || 'canarydrop-v7';
 const EPOCH = process.env.SOURCE_DATE_EPOCH || '0';
 

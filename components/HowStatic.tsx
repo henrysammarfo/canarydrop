@@ -21,7 +21,7 @@ nvm use
 npm ci
 npm run build:static
 npm run verify:static -- expected.sha256
-# nvm use reads .nvmrc (20.18.0)
+# nvm use reads .nvmrc (24.22.0)
 # out/build.sha256 lists
 # sha256 of each file
 # self host: npx serve out
