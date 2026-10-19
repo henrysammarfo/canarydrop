@@ -24,6 +24,7 @@ import {
   SEALED_TIPS_EMPTY,
 } from './constants';
 import { addressUrl, entityUrl, isSealedOwner, txUrl } from './chain';
+import { preferPubForCreator } from './demo-pub';
 import { eq, gt, or } from '@arkiv-network/sdk/query';
 import { key, u64 } from '@arkiv-network/sdk/attr';
 import { utcDaySlot } from './day';
@@ -100,7 +101,7 @@ async function gatherArkivProofsUncached(): Promise<ArkivProofs> {
   const sealedQuery = sealedTipsQueryText();
 
   try {
-    const desk = await getDesk(DEFAULT_DESK);
+    const desk = await getDesk(DEFAULT_DESK, preferPubForCreator(DEFAULT_DESK));
     const q = pub()
       .select({ key: true })
       .where(eq('project', PROJECT), eq('type', 'desk'), gt('$expiresAt', u64(head)))

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { NextRequest } from 'next/server';
 import { generatePrivateKey } from 'viem/accounts';
 import { GET } from '@/app/api/demo/desk/key/route';
 import { getJson } from '../helpers/request';
@@ -11,6 +12,30 @@ describe('demo desk key route', () => {
   it('rejects a missing origin', async () => {
     const r = await GET(
       getJson('http://localhost:3000/api/demo/desk/key', { origin: '' }),
+    );
+    expect(r.status).toBe(403);
+    expect((await r.json()).error).toBe('bad_origin');
+  });
+
+  it('allows a real-browser same-origin GET with no Origin header', async () => {
+    process.env.DESK_PRIVATE_KEY = generatePrivateKey();
+    const r = await GET(
+      new NextRequest('http://localhost:3000/api/demo/desk/key', {
+        method: 'GET',
+        headers: { 'sec-fetch-site': 'same-origin' },
+      }),
+    );
+    expect(r.status).toBe(200);
+    const j = await r.json();
+    expect(j.jwk.crv).toBe('P-256');
+  });
+
+  it('rejects a same-origin GET whose host is not ours', async () => {
+    const r = await GET(
+      new NextRequest('http://evil.example/api/demo/desk/key', {
+        method: 'GET',
+        headers: { 'sec-fetch-site': 'same-origin' },
+      }),
     );
     expect(r.status).toBe(403);
     expect((await r.json()).error).toBe('bad_origin');

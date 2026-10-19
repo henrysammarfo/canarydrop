@@ -1,6 +1,7 @@
 import { eq } from '@arkiv-network/sdk/query';
-import { PROJECT, canaryAlive, pub } from '@/lib/arkiv';
+import { PROJECT, canaryAlive, getDesk, listDesks, pub } from '@/lib/arkiv';
 import { DEFAULT_DESK } from '@/lib/constants';
+import { preferPubForCreator } from '@/lib/demo-pub';
 import { asAddress } from '@/lib/hex';
 
 export default async function NetworkStrip() {
@@ -14,11 +15,11 @@ export default async function NetworkStrip() {
       let desks = 0;
       let canariesAlive = 0;
       try {
-        const d = await pub().select({ key: true }).where(eq('project', PROJECT), eq('type', 'desk')).createdBy(deskAddr).limit(1).fetch();
-        desks = d.entities.length;
-        const first = d.entities[0];
-        if (first) {
-          const c = await canaryAlive(deskAddr, first.key);
+        const listed = await listDesks(deskAddr);
+        desks = listed.length;
+        const canonical = await getDesk(deskAddr, preferPubForCreator(deskAddr));
+        if (canonical) {
+          const c = await canaryAlive(deskAddr, canonical.key);
           if (c) {
             canariesAlive = 1;
             lastCanary = c.expiresAt?.toString() ?? null;

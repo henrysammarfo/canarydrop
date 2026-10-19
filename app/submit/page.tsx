@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Hex } from 'viem';
 import { canaryAlive, getDesk } from '@/lib/arkiv';
+import { preferPubForCreatorClient } from '@/lib/demo-pub-client';
 import type { DeskRow } from '@/lib/arkiv';
 import { bytesToB64 } from '@/lib/bytes';
 import { appFetch } from '@/lib/client-fetch';
@@ -37,7 +38,7 @@ export default function SubmitPage() {
       setDeskKey(null);
       setAlive(null);
       try {
-        const d = await getDesk(creator);
+        const d = await getDesk(creator, await preferPubForCreatorClient(creator));
         setDesk(d ?? null);
         if (d) {
           setDeskKey(d.key);

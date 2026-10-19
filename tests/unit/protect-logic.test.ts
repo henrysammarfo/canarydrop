@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NextRequest } from 'next/server';
-import { clientIp, isDryRun, protectRead, protectWrite } from '@/lib/protect';
+import { clientIp, isDryRun, protectRead, protectWrite, readFromSiteAllowed } from '@/lib/protect';
 import { isLifetime } from '@/lib/arkiv';
 import { CSRF, postJson } from '../helpers/request';
 import { setIpLimiterForTests } from '@/lib/rate-limit';
@@ -47,7 +47,7 @@ describe('protect helpers', () => {
     expect((await blocked?.json())?.error).toBe('rate_limited');
   });
 
-  it('protectRead is async and still requires origin', async () => {
+  it('protectRead rejects a GET with no Origin and no fetch metadata', async () => {
     const blocked = await protectRead(
       new NextRequest('http://localhost:3000/api/demo/desk/key', {
         method: 'GET',
@@ -56,5 +56,34 @@ describe('protect helpers', () => {
       'desk',
     );
     expect(blocked?.status).toBe(403);
+    expect(readFromSiteAllowed(
+      new NextRequest('http://localhost:3000/api/demo/desk/key', { method: 'GET' }),
+    )).toBe(false);
+  });
+
+  it('protectRead allows a same-origin GET with no Origin', async () => {
+    const req = new NextRequest('http://localhost:3000/api/demo/desk/key', {
+      method: 'GET',
+      headers: { 'sec-fetch-site': 'same-origin' },
+    });
+    expect(readFromSiteAllowed(req)).toBe(true);
+    expect(await protectRead(req, 'desk')).toBeNull();
+  });
+
+  it('protectRead rejects same-origin metadata on a foreign host', async () => {
+    const req = new NextRequest('http://evil.example/api/demo/desk/key', {
+      method: 'GET',
+      headers: { 'sec-fetch-site': 'same-origin' },
+    });
+    expect(readFromSiteAllowed(req)).toBe(false);
+    expect((await protectRead(req, 'desk'))?.status).toBe(403);
+  });
+
+  it('protectRead still rejects a forged Origin', async () => {
+    const req = new NextRequest('http://localhost:3000/api/demo/desk/key', {
+      method: 'GET',
+      headers: { origin: 'https://canarydrop.vercel.app.evil.com', 'sec-fetch-site': 'same-origin' },
+    });
+    expect(readFromSiteAllowed(req)).toBe(false);
   });
 });

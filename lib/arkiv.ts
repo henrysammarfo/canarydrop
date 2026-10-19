@@ -33,6 +33,7 @@ import {
   type Lifetime,
 } from './constants';
 import { utcDaySlot } from './day';
+import { pickLiveDesk } from './desk-pick';
 import { AppError } from './errors';
 import { envAddress } from './hex';
 import type { InjectedProvider } from './injected';
@@ -143,16 +144,14 @@ export const renew = (w: Wallet, deskKey: Hex, canaryKey: Hex, txParams?: TxPara
     txParams,
   );
 
-export async function getDesk(deskCreator: Hex): Promise<DeskRow | undefined> {
+export async function getDesk(deskCreator: Hex, preferPub?: Uint8Array): Promise<DeskRow | undefined> {
   const r = await pub()
     .select(DESK_SELECT)
     .where(eq('project', PROJECT), eq('type', 'desk'), await aliveHead())
     .createdBy(deskCreator)
     .limit(20)
     .fetch();
-  const rows = [...r.entities];
-  rows.sort((a, b) => Number((b.createdAt ?? 0n) - (a.createdAt ?? 0n)));
-  return rows[0];
+  return pickLiveDesk([...r.entities], preferPub);
 }
 
 export async function listDesks(deskCreator: Hex): Promise<readonly DeskRow[]> {

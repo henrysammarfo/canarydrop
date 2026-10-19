@@ -10,7 +10,7 @@ The newsroom canary is not `permissionlessExtension`. Only the desk wallet can r
 
 ## Attacks we block
 
-1. **Scripted drain of the demo wallets with a missing Origin.** Write APIs now require an allowed Origin. A request with no Origin is rejected. The old `includes()` host check is gone, so `https://canarydrop.vercel.app.evil.com` is not treated as our site.
+1. **Scripted drain of the demo wallets with a missing Origin.** Write APIs still require an allowed Origin. A request with no Origin is rejected. Same-origin GET reads (the demo key) omit Origin in real browsers, so those are allowed when `Sec-Fetch-Site` is `same-origin` and the request host is on our allow list. Curl and other tools that send neither stay 403. The old `includes()` host check is gone, so `https://canarydrop.vercel.app.evil.com` is not treated as our site.
 
 2. **Cross site posts.** `Sec-Fetch-Site: cross-site` and `same-site` are rejected. A CSRF cookie must match the `x-csrf-token` header. SameSite=Lax stops ordinary cross site cookie use.
 
@@ -35,11 +35,11 @@ The newsroom canary is not `permissionlessExtension`. Only the desk wallet can r
 - The relay still sees ciphertext, size, and the chosen lifetime. A seized Vercel account can still post junk tips until spend caps bite.
 - Platform logs may record IPs. We do not write IPs to Arkiv.
 - Anonymous Tiramisu RPC can return 429. Reads then fail until the budget recovers.
-- Demo mode trust is weaker than a wallet owned desk. Anyone who can call the demo key route from an allowed Origin can open demo tips.
+- Demo mode trust is weaker than a wallet owned desk. Anyone who can call the demo key route from the live site can open demo tips.
 - `style-src` still allows `unsafe-inline` because React sets element styles. Script eval is the part we tightened.
 - Without Redis REST env vars, per IP limits and wallet locks stay in this process. The Arkiv daily cap and the GLM floor remain the spend brakes either way.
 - If Redis is configured but a call fails, that request falls back to the in process window or queue. Contention on a live lock returns `try_later` instead of signing a second nonce.
-- Historical tips sealed to an older desk public key cannot be opened with the shared demo key. Create the desk again in Demo mode so the on-chain public key matches.
+- Historical tips sealed to an older desk public key cannot be opened with the shared demo key. Press Create demo desk so the on-chain public key matches, then send new tips to that desk. Reads prefer the newest live desk whose payload pub is the shared key. The impostor desk is a different wallet and is not selected.
 
 ## Trust boundaries
 
@@ -54,4 +54,4 @@ The newsroom canary is not `permissionlessExtension`. Only the desk wallet can r
 
 ## Keys and secrets
 
-Never commit, print, or log Ethereum private keys, seed phrases, RPC URLs with credentials, or Redis REST tokens. Integration tests generate throwaway keys in memory and mock Redis. The demo P-256 key is derived at runtime from `DESK_PRIVATE_KEY` and returned only to allowed Origins.
+Never commit, print, or log Ethereum private keys, seed phrases, RPC URLs with credentials, or Redis REST tokens. Integration tests generate throwaway keys in memory and mock Redis. The demo P-256 key is derived at runtime from `DESK_PRIVATE_KEY`. The private JWK is returned only to same-origin desk reads. `/api/demo/desk/pub` returns public bytes only.

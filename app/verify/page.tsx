@@ -37,7 +37,7 @@ export default function VerifyPage() {
           </li>
           <li>
             <strong>Open the desk in a fresh browser.</strong>
-            <p className="muted">Turn on Demo mode. This site loads a shared testnet desk key so you can read tips without the original laptop.</p>
+            <p className="muted">Turn on Demo mode. This site loads a shared testnet desk key so you can read tips without the original laptop. You should not see a request blocked or tips that this key cannot open.</p>
             <Link className="btn primary" href="/desk">
               Open the desk <span className="arrow" aria-hidden="true" />
             </Link>

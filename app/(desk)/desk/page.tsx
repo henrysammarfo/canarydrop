@@ -159,16 +159,19 @@ export default function DeskPage() {
   useEffect(() => {
     (async () => {
       if (!creator) return;
+      if (demo && !demoKey) return;
       try {
-        const d = await getDesk(creator);
+        const d = await getDesk(creator, demoKey?.pub);
         if (d) {
           setDeskKey(d.key);
           const c = await canaryAlive(creator, d.key);
           if (c) setCanaryKey(c.key);
           setAlive(!!c);
           const payload = d.payload ? parseDeskPayload(d.payload) : null;
-          if (payload && demoKey) {
-            setPubMatch(bytesEqual(deskPubBytes(payload), demoKey.pub));
+          if (demoKey) {
+            setPubMatch(payload ? bytesEqual(deskPubBytes(payload), demoKey.pub) : false);
+          } else {
+            setPubMatch(null);
           }
           if (unwatchRef.current) unwatchRef.current();
           unwatchRef.current = watchInbox(d.key, {
@@ -193,7 +196,9 @@ export default function DeskPage() {
           });
         } else {
           setDeskKey(null);
+          setCanaryKey(null);
           setAlive(null);
+          setPubMatch(demoKey ? false : null);
         }
       } catch (e: unknown) {
         push({ kind: 'error', text: uiError(e) });
@@ -202,7 +207,7 @@ export default function DeskPage() {
     return () => {
       if (unwatchRef.current) unwatchRef.current();
     };
-  }, [creator, demoKey, push, priv]);
+  }, [creator, demo, demoKey, push, priv]);
 
   useEffect(() => {
     if (!deskKey || !priv) return;
@@ -254,6 +259,7 @@ export default function DeskPage() {
     setTx(null);
     try {
       if (!priv && !dryRun && !demo) throw new Error('Generate or import a desk key first');
+      if (demo && !demoKey) throw new Error('Demo mode is still loading the shared desk key.');
       let pubRaw: Uint8Array;
       if (demo && demoKey) {
         pubRaw = demoKey.pub;
@@ -293,7 +299,7 @@ export default function DeskPage() {
         push({ kind: 'success', text: 'Desk and canary created.' });
       }
       if (creator && !dryRun) {
-        const d = await getDesk(creator);
+        const d = await getDesk(creator, demoKey?.pub);
         if (d) {
           setDeskKey(d.key);
           const c = await canaryAlive(creator, d.key);
@@ -409,12 +415,27 @@ export default function DeskPage() {
           {demo && (
             <div className="page-note" style={{ marginBottom: 16 }}>
               Demo mode is on. This browser loads a shared testnet desk key so a judge can open tips without the original laptop. Do not use this for a real newsroom.
-              {pubMatch === false && (
+              {deskKey && pubMatch === false && (
                 <div style={{ marginTop: 8 }}>
-                  The live desk still has an older public key. Create the desk again from the Keys tab so new tips match this browser.
+                  The live desk still has an older public key. Press Create demo desk so new tips match this browser.
+                  <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 10 }}>
+                    <button className="btn primary" type="button" onClick={() => void createDeskFlow(false)} disabled={busy || !demoKey}>
+                      {busy ? 'Working' : 'Create demo desk'} <span className="arrow" aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
               )}
               {pubMatch === true && <div style={{ marginTop: 8 }}>The live desk matches the shared demo key. New tips will open here.</div>}
+              {demo && !deskKey && demoKey && (
+                <div style={{ marginTop: 8 }}>
+                  No live demo desk yet. Press Create demo desk. The server wallet publishes the shared public key.
+                  <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 10 }}>
+                    <button className="btn primary" type="button" onClick={() => void createDeskFlow(false)} disabled={busy}>
+                      {busy ? 'Working' : 'Create demo desk'} <span className="arrow" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {!demo && !connected && (
@@ -547,7 +568,7 @@ export default function DeskPage() {
                 <strong>Keys</strong>
                 <p className="muted" style={{ marginTop: 6 }}>
                   {demo
-                    ? 'Demo mode uses the shared testnet desk key. Create the desk so the public key on Arkiv matches it.'
+                    ? 'Demo mode uses the shared testnet desk key. Press Create demo desk so the public key on Arkiv matches it.'
                     : 'Generate or import the desk key. The private key stays in your browser. Back it up.'}
                 </p>
                 {!demo && (
@@ -566,8 +587,8 @@ export default function DeskPage() {
                   <input value={deskName} onChange={(e) => setDeskName(e.target.value)} />
                 </div>
                 <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 12 }}>
-                  <button className="btn primary" onClick={() => createDeskFlow(false)} disabled={busy || (!priv && !demo)}>
-                    {busy ? 'Working' : 'Create desk + canary'} <span className="arrow" aria-hidden="true" />
+                  <button className="btn primary" onClick={() => createDeskFlow(false)} disabled={busy || (demo ? !demoKey : !priv)}>
+                    {busy ? 'Working' : demo ? 'Create demo desk' : 'Create desk + canary'} <span className="arrow" aria-hidden="true" />
                   </button>
                   <button className="btn" onClick={() => createDeskFlow(true)} disabled={busy}>Dry run</button>
                 </div>

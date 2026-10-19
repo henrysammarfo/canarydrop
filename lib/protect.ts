@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CSRF_COOKIE, CSRF_HEADER } from './constants';
 import { tokensMatch } from './csrf';
-import { originAllowed } from './origin';
+import { isAllowedHostname, originAllowed } from './origin';
 import { allowIp, type WriteKind } from './rate-limit';
 
 export type { WriteKind };
@@ -42,8 +42,22 @@ export async function protectWrite(req: NextRequest, kind: WriteKind): Promise<N
   return null;
 }
 
+/**
+ * Writes still require Origin. Same-origin GET from a real browser omits Origin, so a read is
+ * allowed when Sec-Fetch-Site is same-origin and the request host is on our allow list.
+ * Curl and Playwright's APIRequestContext send neither, so they stay 403.
+ */
+export function readFromSiteAllowed(req: NextRequest): boolean {
+  const origin = req.headers.get('origin');
+  if (originAllowed(origin)) return true;
+  if (origin && origin.trim() !== '') return false;
+  const site = (req.headers.get('sec-fetch-site') ?? '').toLowerCase();
+  if (site !== 'same-origin') return false;
+  return isAllowedHostname(req.nextUrl.hostname);
+}
+
 export async function protectRead(req: NextRequest, kind: WriteKind): Promise<NextResponse | null> {
-  if (!originAllowed(req.headers.get('origin'))) {
+  if (!readFromSiteAllowed(req)) {
     return json('bad_origin', 'Please use the site to send this request.', 403);
   }
   const bucket = kind === 'relay' ? 'relay-read' : 'desk-read';

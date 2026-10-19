@@ -1,6 +1,7 @@
 import type { Hex } from 'viem';
 import Link from 'next/link';
 import { canaryAlive, canaryAtBlock, getDesk, pub } from '@/lib/arkiv';
+import { preferPubForCreator } from '@/lib/demo-pub';
 import type { CanaryRow } from '@/lib/arkiv';
 import { PROJECT } from '@/lib/constants';
 import { addressUrl, entityUrl, shortHex, TIRAMISU_EXPLORER } from '@/lib/chain';
@@ -31,7 +32,7 @@ export default async function CanaryStatus({ params }: { params: { creator: stri
   try {
     timing = await pub().getBlockTiming();
     head = timing.currentBlock;
-    desk = (await getDesk(creator)) ?? null;
+    desk = (await getDesk(creator, preferPubForCreator(creator))) ?? null;
     if (desk) {
       canary = await canaryAlive(creator, desk.key);
       const hourAgo = head > 1800n ? head - 1800n : 0n;
