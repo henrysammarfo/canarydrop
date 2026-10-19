@@ -20,6 +20,17 @@ const pages = [
   '/r',
 ];
 
+const appShell = new Set([
+  '/desk',
+  '/desk/inbox',
+  '/desk/canary',
+  '/desk/replies',
+  '/desk/settings',
+  '/explorer',
+  '/how',
+  '/verify',
+]);
+
 const outDir = '/opt/cursor/artifacts';
 
 function slug(route: string) {
@@ -40,9 +51,18 @@ test.describe('visual screenshots and overflow', () => {
         if (route === '/submit') {
           await page.getByText('Looking up this desk on Arkiv…').waitFor({ state: 'hidden', timeout: 25_000 }).catch(() => undefined);
         }
+        if (route === '/desk') {
+          await page.getByText('Loading the live desk from Arkiv…').waitFor({ state: 'hidden', timeout: 25_000 }).catch(() => undefined);
+        }
+        if (route === '/desk/canary') {
+          await page.getByText('Loading the live canary from Arkiv…').waitFor({ state: 'hidden', timeout: 25_000 }).catch(() => undefined);
+        }
+        if (route === '/desk/inbox') {
+          await page.getByText('Loading tips from Arkiv…').waitFor({ state: 'hidden', timeout: 25_000 }).catch(() => undefined);
+        }
         await page.waitForTimeout(400);
         const file = path.join(outDir, `${slug(route)}_${width}.png`);
-        await page.screenshot({ path: file, fullPage: true });
+        await page.screenshot({ path: file, fullPage: !appShell.has(route) });
         const box = await page.evaluate(() => ({
           sw: document.documentElement.scrollWidth,
           iw: window.innerWidth,
@@ -61,8 +81,10 @@ test.describe('visual screenshots and overflow', () => {
       const box = demo.locator('input[type="checkbox"]');
       if (!(await box.isChecked())) await box.check();
       await expect(page.getByText(/Demo mode is on/i)).toBeVisible({ timeout: 15_000 });
-      await page.waitForTimeout(400);
-      await page.screenshot({ path: path.join(outDir, `desk_demo_${width}.png`), fullPage: true });
+      await expect(page.getByText('Demo mode is off.')).toHaveCount(0);
+      await page.getByText('Loading the live desk from Arkiv…').waitFor({ state: 'hidden', timeout: 45_000 }).catch(() => undefined);
+      await page.waitForTimeout(600);
+      await page.screenshot({ path: path.join(outDir, `desk_demo_${width}.png`), fullPage: false });
       const measure = await page.evaluate(() => ({
         sw: document.documentElement.scrollWidth,
         iw: window.innerWidth,

@@ -3,7 +3,9 @@ import type { Hex } from 'viem';
 import { DEFAULT_DESK, DEFAULT_IMPOSTOR } from '@/lib/constants';
 import {
   explorerRowFlags,
+  explorerTypeBadges,
   olderDemoLabel,
+  SEALED_BADGE,
   REPLACED_DEMO_CANARY_KEYS,
   REPLACED_DEMO_DESK_KEYS,
 } from '@/lib/explorer-label';
@@ -91,6 +93,20 @@ describe('explorer row flags', () => {
     expect(olderDemoLabel(row)).toBe('Older demo desk, replaced');
     expect(row.canonicalDemo).toBe(false);
     expect(row.impostor).toBe(false);
+  });
+
+  it('short explorer badges keep the full meaning for tooltips', () => {
+    const canonical = explorerTypeBadges(flags({ type: 'desk', key: CANONICAL }));
+    expect(canonical).toEqual([{ short: 'Canonical', full: 'Canonical demo desk' }]);
+    const replaced = explorerTypeBadges(
+      flags({ type: 'desk', key: REPLACED_DEMO_DESK_KEYS[0] as Hex, canonicalDeskKey: undefined }),
+    );
+    expect(replaced).toEqual([{ short: 'Replaced', full: 'Older demo desk, replaced' }]);
+    const impostor = explorerTypeBadges(
+      flags({ type: 'desk', key: IMPOSTOR_DESK, creator: DEFAULT_IMPOSTOR }),
+    );
+    expect(impostor).toEqual([{ short: 'Impostor', full: 'Ignored impostor' }]);
+    expect(SEALED_BADGE).toEqual({ short: 'Sealed', full: 'Sealed: nobody can change it' });
   });
 
   it('labels the known superseded canary even before canonical is loaded', () => {

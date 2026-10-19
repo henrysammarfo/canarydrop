@@ -1,5 +1,25 @@
 import { test, expect } from '@playwright/test';
 
+test('desk first visit does not toast a generic error', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/desk', { waitUntil: 'load' });
+  await page.getByText('Loading the live desk from Arkiv…').waitFor({ state: 'hidden', timeout: 45_000 }).catch(() => undefined);
+  await expect(page.getByText('Something went wrong. Please try again.')).toHaveCount(0);
+  await expect(page.getByText('Demo mode is off.')).toHaveCount(0);
+});
+
+test('renew canary is hidden until a live canary exists', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/desk', { waitUntil: 'load' });
+  await page.getByText('Loading the live desk from Arkiv…').waitFor({ state: 'hidden', timeout: 45_000 }).catch(() => undefined);
+  const renew = page.getByRole('button', { name: /^Renew canary$/ });
+  if ((await renew.count()) > 0) {
+    await expect(renew.first()).toBeEnabled();
+  } else {
+    await expect(page.getByText(/no live canary to renew|no live canary yet/i)).toBeVisible();
+  }
+});
+
 test('desk page has a single main landmark', async ({ page }) => {
   await page.goto('/desk', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('main')).toHaveCount(1);
@@ -94,6 +114,8 @@ test('desk demo mode toggle is usable without a wallet', async ({ page }) => {
   const box = demo.locator('input[type="checkbox"]');
   if (!(await box.isChecked())) await box.check();
   await expect(page.getByText(/Demo mode is on/i)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Demo mode is off.')).toHaveCount(0);
+  await expect(page.getByText('Something went wrong. Please try again.')).toHaveCount(0);
   await expect(page.getByText(/Please use the site to send this request/i)).toHaveCount(0);
   await page.locator('aside').getByRole('link', { name: 'Inbox', exact: true }).click();
   await expect(page).toHaveURL(/\/desk\/inbox/);

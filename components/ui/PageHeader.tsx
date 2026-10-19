@@ -14,7 +14,7 @@ export default function PageHeader({
   return (
     <header className="page-header">
       <div style={{ minWidth: 0 }}>
-        {kicker ? <p className="kicker">{kicker}</p> : null}
+        {kicker ? <p className="eyebrow">{kicker}</p> : null}
         <h1>{title}</h1>
         {description ? <p>{description}</p> : null}
       </div>

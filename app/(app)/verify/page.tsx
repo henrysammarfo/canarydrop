@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { DEFAULT_DESK } from '@/lib/constants';
 import { asAddress } from '@/lib/hex';
 import PageHeader from '@/components/ui/PageHeader';
@@ -45,9 +44,9 @@ export default function VerifyPage() {
         <li>
           <strong>See how each Arkiv feature is used.</strong>
           <p className="muted">The How page runs live queries and links every claim to Tiramisu explorer.</p>
-          <Link className="btn primary" href="/how">
+          <Button href="/how" variant="primary">
             How we use Arkiv
-          </Link>
+          </Button>
         </li>
       </ol>
       <div className="card" style={{ marginTop: 18 }}>

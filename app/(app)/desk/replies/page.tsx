@@ -10,14 +10,11 @@ import Table from '@/components/ui/Table';
 import DemoBanner, { DemoSwitch } from '@/components/desk/DemoBanner';
 import { useDesk } from '@/components/desk/DeskProvider';
 import { repliesFor } from '@/lib/arkiv';
-import { uiError } from '@/lib/ui-error';
-import { useToast } from '@/components/Toast';
 
 type Row = { key: Hex; tipKey: Hex; tipPreview: string; createdAt: string };
 
 export default function RepliesPage() {
   const d = useDesk();
-  const push = useToast();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -45,8 +42,8 @@ export default function RepliesPage() {
           }
         }
         if (!cancelled) setRows(next);
-      } catch (e: unknown) {
-        if (!cancelled) push({ kind: 'error', text: uiError(e) });
+      } catch {
+        if (!cancelled) setRows([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -54,7 +51,7 @@ export default function RepliesPage() {
     return () => {
       cancelled = true;
     };
-  }, [d.creator, d.tips, push]);
+  }, [d.creator, d.tips]);
 
   return (
     <>

@@ -9,6 +9,22 @@ import { useDesk } from '@/components/desk/DeskProvider';
 
 export default function InboxPage() {
   const d = useDesk();
+  const waiting = d.loadingDesk || d.loadingInbox || (d.demo && !d.demoKey && !d.demoKeyError);
+  const emptyTitle = waiting
+    ? 'Loading tips from Arkiv…'
+    : d.demo && d.demoKeyError
+      ? 'Tips cannot be opened here'
+      : !d.priv
+        ? 'Load a desk key to open tips'
+        : 'No tips yet';
+  const emptyBody = waiting
+    ? 'Older tips load first. New tips arrive live.'
+    : d.demo && d.demoKeyError
+      ? d.demoKeyError
+      : !d.priv
+        ? 'Generate or import a desk key in Desk settings, or turn on Demo mode.'
+        : 'This view updates live when a source sends one.';
+
   return (
     <>
       <PageHeader
@@ -25,15 +41,12 @@ export default function InboxPage() {
           </p>
         )}
         {d.tips.length === 0 ? (
-          <EmptyState
-            title={d.loadingInbox ? 'Loading tips from Arkiv…' : 'No tips yet'}
-            body="This view updates live when a source sends one."
-          />
+          <EmptyState title={emptyTitle} body={emptyBody} />
         ) : (
           <ul style={{ padding: 0, margin: 0, display: 'grid', gap: 12 }}>
             {d.tips.map((t) => (
               <li key={t.key} style={{ listStyle: 'none' }}>
-                <div className="card tip-card" style={{ padding: 14 }}>
+                <div className="card tip-card">
                   <CopyField label="Tip" value={t.key} />
                   <div className="body">{t.text}</div>
                   <div className="reply-row">
@@ -44,7 +57,7 @@ export default function InboxPage() {
                       }
                       placeholder="Write a reply"
                     />
-                    <button type="button" className="btn primary sm" onClick={() => void d.sendReply(t)}>
+                    <button type="button" className="btn primary" onClick={() => void d.sendReply(t)}>
                       Send reply
                     </button>
                   </div>

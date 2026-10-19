@@ -86,7 +86,7 @@ export default function Nav() {
           </button>
           <button
             type="button"
-            className="btn hamburger sm"
+            className="btn hamburger icon-btn"
             aria-label={open ? 'Close menu' : 'Open menu'}
             aria-expanded={open}
             aria-controls="mobile-menu"

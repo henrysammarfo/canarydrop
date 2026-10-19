@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Card from '@/components/ui/Card';
 import { useDesk } from './DeskProvider';
 
 export default function DemoBanner() {
@@ -21,22 +20,27 @@ export default function DemoBanner() {
               {d.createdNotice}
             </div>
           )}
-          {d.deskKey && d.pubMatch === false && !d.createdNotice && (
+          {d.demoKeyError && (
+            <div style={{ marginTop: 8 }} role="status">
+              {d.demoKeyError}
+            </div>
+          )}
+          {d.deskKey && d.pubMatch === false && !d.createdNotice && !d.loadingDesk && (
             <div style={{ marginTop: 8 }}>
               The live desk still has an older public key. Open Desk settings and press Create demo desk so new tips match this browser.
               <div className="ctaRow" style={{ marginTop: 10 }}>
-                <Link className="btn primary sm" href="/desk/settings">
+                <Link className="btn primary" href="/desk/settings">
                   Desk settings
                 </Link>
               </div>
             </div>
           )}
           {d.pubMatch === true && <div style={{ marginTop: 8 }}>The live desk matches the shared demo key. New tips will open here.</div>}
-          {d.demo && !d.deskKey && d.demoKey && (
+          {d.demo && !d.deskKey && d.demoKey && !d.loadingDesk && (
             <div style={{ marginTop: 8 }}>
               No live demo desk yet. Open Desk settings and press Create demo desk. The server wallet publishes the shared public key.
               <div className="ctaRow" style={{ marginTop: 10 }}>
-                <Link className="btn primary sm" href="/desk/settings">
+                <Link className="btn primary" href="/desk/settings">
                   Create demo desk
                 </Link>
               </div>
@@ -45,12 +49,9 @@ export default function DemoBanner() {
         </div>
       )}
       {!d.demo && !d.connected && (
-        <Card style={{ textAlign: 'center', padding: 28, marginBottom: 16 }}>
-          <h2 className="h3">Choose how to run the desk</h2>
-          <p className="lead" style={{ margin: '8px auto 0', maxWidth: 420 }}>
-            Connect a wallet to own your entities, or use Demo mode for judges without a wallet.
-          </p>
-          <div className="ctaRow" style={{ justifyContent: 'center', marginTop: 16 }}>
+        <div className="page-note" style={{ marginBottom: 16 }}>
+          Connect a wallet to own this desk, or use Demo mode to open tips without a wallet.
+          <div className="ctaRow" style={{ marginTop: 10 }}>
             <button type="button" className="btn primary" onClick={() => void d.connect()}>
               Connect wallet
             </button>
@@ -58,7 +59,7 @@ export default function DemoBanner() {
               Use Demo mode
             </button>
           </div>
-        </Card>
+        </div>
       )}
     </>
   );

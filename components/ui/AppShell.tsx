@@ -113,7 +113,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <div className="ctaRow">
             <button
               type="button"
-              className="btn sm ghost side-toggle"
+              className="btn ghost icon-btn side-toggle"
               aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
               onClick={() => setMobileOpen((v) => !v)}
             >
@@ -121,7 +121,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             </button>
             <button
               type="button"
-              className="btn sm ghost desk-collapse"
+              className="btn ghost icon-btn desk-collapse"
               onClick={() => setCollapsed((v) => !v)}
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
@@ -131,10 +131,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </div>
           <div className="ctaRow">
             <span className="pill">Testnet</span>
-            <button type="button" className="btn sm connect" onClick={() => void connect()}>
+            <button type="button" className="btn connect" onClick={() => void connect()}>
               {addr ? `Wallet ${shortHex(addr)}` : 'Connect wallet'}
             </button>
-            <Link className="btn sm" href="/">
+            <Link className="btn" href="/">
               Site
             </Link>
           </div>

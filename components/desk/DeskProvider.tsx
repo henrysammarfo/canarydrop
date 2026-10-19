@@ -27,7 +27,7 @@ import {
 } from '@/lib/arkiv';
 import { bytesEqual, bytesToB64 } from '@/lib/bytes';
 import { appFetch } from '@/lib/client-fetch';
-import { DEFAULT_DESK } from '@/lib/constants';
+import { CHAIN_READ_FAILED, DEFAULT_DESK } from '@/lib/constants';
 import {
   exportPrivJwk,
   exportPub,
@@ -45,8 +45,10 @@ import {
   DESK_CREATED_TOAST,
   fetchedDeskIsReady,
 } from '@/lib/desk-pick';
+import { fetchSharedDemoPub } from '@/lib/demo-pub-client';
 import { bumpGeneration, isStaleGeneration } from '@/lib/load-gen';
 import { deskPubBytes, parseDeskPayload } from '@/lib/payload';
+import { sleep, withBackoff } from '@/lib/retry';
 import { uiError } from '@/lib/ui-error';
 import { connectTiramisu, existingAccount } from '@/lib/wallet';
 import { shortHex } from '@/lib/chain';
@@ -86,8 +88,16 @@ export type DeskContextValue = {
   loadingInbox: boolean;
   skippedTips: number;
   demoKey: DemoKey | null;
+  demoKeyError: string | null;
   pubMatch: boolean | null;
   createdNotice: string | null;
+  loadingDesk: boolean;
+  loadError: string | null;
+  chainName: string;
+  canaryExpiresAt: bigint | null;
+  canaryCreatedAt: bigint | null;
+  currentBlock: bigint | null;
+  blockDuration: number;
   connect: () => Promise<void>;
   loadHistory: (key: Hex, deskPriv: CryptoKey, cursor?: string, atBlock?: bigint) => Promise<void>;
   generateDeskKey: () => Promise<void>;
@@ -130,10 +140,22 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
   const [loadingInbox, setLoadingInbox] = useState(false);
   const [skippedTips, setSkippedTips] = useState(0);
   const [demoKey, setDemoKey] = useState<DemoKey | null>(null);
+  const [demoKeyError, setDemoKeyError] = useState<string | null>(null);
   const [pubMatch, setPubMatch] = useState<boolean | null>(null);
   const [createdNotice, setCreatedNotice] = useState<string | null>(null);
+  const [loadingDesk, setLoadingDesk] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [chainName, setChainName] = useState('CanaryDrop Demo Desk');
+  const [canaryExpiresAt, setCanaryExpiresAt] = useState<bigint | null>(null);
+  const [canaryCreatedAt, setCanaryCreatedAt] = useState<bigint | null>(null);
+  const [currentBlock, setCurrentBlock] = useState<bigint | null>(null);
+  const [blockDuration, setBlockDuration] = useState(2);
   const seenTips = useRef(new Set<string>());
   const deskLoad = useRef({ current: 0 });
+  const privRef = useRef<CryptoKey | null>(null);
+  const deskKeyRef = useRef<Hex | null>(null);
+  privRef.current = priv;
+  deskKeyRef.current = deskKey;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -170,23 +192,32 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!demo) {
       setDemoKey(null);
+      setDemoKeyError(null);
       return;
     }
     (async () => {
+      setDemoKeyError(null);
       try {
         const r = await appFetch('/api/demo/desk/key');
-        const j = (await r.json()) as { jwk?: JsonWebKey; pubB64?: string; message?: string };
-        if (!r.ok || !j.jwk) throw new Error(j.message ?? 'Demo mode could not load the shared desk key.');
+        const j = (await r.json()) as { jwk?: JsonWebKey; pubB64?: string; message?: string; error?: string };
+        if (!r.ok || !j.jwk) {
+          if (j.error === 'demo_disabled' || j.error === 'rate_limited' || j.error === 'try_later') {
+            setDemoKeyError(
+              'The shared desk key is not available right now. Live canary status still loads. Tips cannot be opened here.',
+            );
+            return;
+          }
+          throw new Error(j.message ?? 'Demo mode could not load the shared desk key.');
+        }
         const k = await importPrivJwk(j.jwk);
         setPriv(k);
         setDemoKey({ jwk: j.jwk, pub: jwkToUncompressed(j.jwk) });
         setCreator(asAddress(process.env.NEXT_PUBLIC_DESK_ADDRESS || '', DEFAULT_DESK));
-        push({ kind: 'success', text: 'Demo mode loaded the shared desk key for this browser.' });
       } catch (e: unknown) {
-        push({ kind: 'error', text: uiError(e) });
+        setDemoKeyError(uiError(e));
       }
     })();
-  }, [demo, push]);
+  }, [demo]);
 
   const connect = useCallback(async () => {
     const result = await connectTiramisu();
@@ -226,8 +257,8 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
       }
       setInboxCursor(page.hasNextPage() ? page.cursor : undefined);
       setInboxBlock(page.blockNumber);
-    } catch (e: unknown) {
-      push({ kind: 'error', text: uiError(e) });
+    } catch {
+      // Keep the inbox quiet. A later watch or retry can fill it.
     } finally {
       setLoadingInbox(false);
     }
@@ -252,7 +283,7 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
         push({ kind: 'info', text: `A tip for this desk was deleted ${shortHex(k)}.` });
       },
       onError: () => {
-        if (priv) void loadHistory(dKey, priv);
+        if (privRef.current) void loadHistory(dKey, privRef.current);
       },
     });
   }
@@ -261,7 +292,10 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     setDeskKey(d.key);
     setCanaryKey(c?.key ?? null);
     setAlive(!!c);
+    setCanaryExpiresAt(c?.expiresAt ?? null);
+    setCanaryCreatedAt(c?.createdAt ?? null);
     const payload = d.payload ? parseDeskPayload(d.payload) : null;
+    if (payload?.name) setChainName(payload.name);
     if (demoKey) {
       setPubMatch(payload ? bytesEqual(deskPubBytes(payload), demoKey.pub) : false);
     } else {
@@ -296,32 +330,51 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const started = bumpGeneration(deskLoad.current);
+    if (!deskKeyRef.current) setLoadingDesk(true);
+    setLoadError(null);
     (async () => {
-      if (!creator) return;
-      if (demo && !demoKey) return;
+      if (!creator) {
+        setLoadingDesk(false);
+        return;
+      }
       try {
-        const d = await getDesk(creator, demoKey?.pub);
+        let preferPub = demoKey?.pub;
+        if (demo && !preferPub) preferPub = await fetchSharedDemoPub();
+        const d = await withBackoff(() => getDesk(creator, preferPub), 6, (ms) => sleep(Math.max(300, ms)));
         if (isStaleGeneration(started, deskLoad.current.current)) return;
+        try {
+          const timing = await pub().getBlockTiming();
+          if (!isStaleGeneration(started, deskLoad.current.current)) {
+            setCurrentBlock(timing.currentBlock);
+            setBlockDuration(timing.blockDuration || 2);
+          }
+        } catch {
+          // Countdown can wait. Desk identity still loads.
+        }
         if (d) {
-          const c = await canaryAlive(creator, d.key);
+          const c = await withBackoff(() => canaryAlive(creator, d.key), 4, (ms) => sleep(Math.max(300, ms)));
           if (isStaleGeneration(started, deskLoad.current.current)) return;
           applyFetchedDesk(d, c);
         } else {
           setDeskKey(null);
           setCanaryKey(null);
           setAlive(null);
+          setCanaryExpiresAt(null);
+          setCanaryCreatedAt(null);
           setPubMatch(demoKey ? false : null);
         }
-      } catch (e: unknown) {
+      } catch {
         if (isStaleGeneration(started, deskLoad.current.current)) return;
-        push({ kind: 'error', text: uiError(e) });
+        setLoadError(CHAIN_READ_FAILED);
+      } finally {
+        if (!isStaleGeneration(started, deskLoad.current.current)) setLoadingDesk(false);
       }
     })();
     return () => {
       bumpGeneration(deskLoad.current);
       if (unwatchRef.current) unwatchRef.current();
     };
-  }, [creator, demo, demoKey, push, priv]);
+  }, [creator, demo, demoKey]);
 
   useEffect(() => {
     if (!deskKey || !priv) return;
@@ -552,8 +605,16 @@ export default function DeskProvider({ children }: { children: ReactNode }) {
     loadingInbox,
     skippedTips,
     demoKey,
+    demoKeyError,
     pubMatch,
     createdNotice,
+    loadingDesk,
+    loadError,
+    chainName,
+    canaryExpiresAt,
+    canaryCreatedAt,
+    currentBlock,
+    blockDuration,
     connect,
     loadHistory,
     generateDeskKey,

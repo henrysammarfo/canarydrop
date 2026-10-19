@@ -65,7 +65,7 @@ export function IcoVerify() {
 }
 export function IcoMenu() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <svg className="ico" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" stroke="currentColor" strokeWidth="1.4" />
     </svg>
   );

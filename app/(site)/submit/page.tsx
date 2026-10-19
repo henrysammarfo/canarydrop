@@ -7,16 +7,18 @@ import { preferPubForCreatorClient } from '@/lib/demo-pub-client';
 import type { DeskRow } from '@/lib/arkiv';
 import { bytesToB64 } from '@/lib/bytes';
 import { appFetch } from '@/lib/client-fetch';
-import { DEFAULT_DESK, LIFETIME_KEYS, type Lifetime } from '@/lib/constants';
+import { CHAIN_READ_FAILED, DEFAULT_DESK, LIFETIME_KEYS, type Lifetime } from '@/lib/constants';
 import { sealTo } from '@/lib/crypto';
 import { asAddress } from '@/lib/hex';
 import { deskPubBytes, parseDeskPayload } from '@/lib/payload';
 import { uiError } from '@/lib/ui-error';
+import { sleep, withBackoff } from '@/lib/retry';
 import Link from 'next/link';
 import Modal from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { entityUrl, shortHex, txUrl } from '@/lib/chain';
 import CopyField from '@/components/ui/CopyField';
+import { IcoVerify } from '@/components/ui/icons';
 
 export default function SubmitPage() {
   const push = useToast();
@@ -31,8 +33,12 @@ export default function SubmitPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [looking, setLooking] = useState(true);
+  const [lookupError, setLookupError] = useState<string | null>(null);
 
-  const step = !deskKey ? 1 : !text.trim() ? 2 : 3;
+  const deskName = useMemo(() => {
+    if (!desk?.payload) return 'CanaryDrop desk';
+    return parseDeskPayload(desk.payload)?.name ?? 'CanaryDrop desk';
+  }, [desk]);
 
   useEffect(() => {
     (async () => {
@@ -40,27 +46,34 @@ export default function SubmitPage() {
       setDeskKey(null);
       setAlive(null);
       setLooking(true);
+      setLookupError(null);
       try {
-        const d = await getDesk(creator, await preferPubForCreatorClient(creator));
+        const prefer = await preferPubForCreatorClient(creator);
+        const d = await withBackoff(() => getDesk(creator, prefer), 8, (ms) => sleep(Math.max(400, ms)));
         setDesk(d ?? null);
         if (d) {
           setDeskKey(d.key);
           const isAlive = await canaryAlive(creator, d.key);
           setAlive(!!isAlive);
         }
-      } catch (e: unknown) {
-        push({ kind: 'error', text: uiError(e) });
+      } catch {
+        setLookupError(CHAIN_READ_FAILED);
       } finally {
         setLooking(false);
       }
     })();
-  }, [creator, push]);
+  }, [creator]);
 
   const deskPubRaw = useMemo(() => {
     if (!desk?.payload) return null;
     const parsed = parseDeskPayload(desk.payload);
     return parsed ? deskPubBytes(parsed) : null;
   }, [desk]);
+
+  const valid = !!deskKey && !!deskPubRaw && !!text.trim() && !sending;
+  const step1 = deskKey ? 'done' : looking ? 'on' : 'on';
+  const step2 = deskKey && text.trim() ? 'done' : deskKey ? 'on' : '';
+  const step3 = valid ? 'on' : '';
 
   async function send(dryRun: boolean) {
     if (!deskKey || !deskPubRaw || !text.trim()) return;
@@ -95,93 +108,104 @@ export default function SubmitPage() {
 
   return (
     <section className="section">
-      <div className="wrap">
-        <p className="kicker">Anonymous tip</p>
+      <div className="wrap submit-panel">
+        <p className="eyebrow">Anonymous tip</p>
         <h1 className="h2">Submit a tip</h1>
         <p className="lead" style={{ marginTop: 10 }}>
           Synthetic data only. Your words are locked on this device, then posted by a sponsor wallet.
         </p>
 
         <div className="steps" style={{ marginTop: 20 }}>
-          <div className={`step ${step === 1 ? 'on' : ''}`}>
+          <div className={`step ${step1}`}>
             <div className="n">01</div>
-            <div>Choose desk</div>
+            <div>{deskKey ? 'Desk verified' : 'Find desk'}</div>
           </div>
-          <div className={`step ${step === 2 ? 'on' : ''}`}>
+          <div className={`step ${step2}`}>
             <div className="n">02</div>
-            <div>Write tip</div>
+            <div>{text.trim() ? 'Tip written' : 'Write tip'}</div>
           </div>
-          <div className={`step ${step === 3 ? 'on' : ''}`}>
+          <div className={`step ${step3}`}>
             <div className="n">03</div>
-            <div>Send</div>
+            <div>{valid ? 'Ready to send' : 'Send'}</div>
           </div>
         </div>
 
-        <div className="grid cols-2" style={{ marginTop: 22 }}>
-          <div>
-            <div className="page-note">
-              You do not need a wallet. We pay the fee.
+        <div className="card" style={{ marginTop: 22 }}>
+          <div className="verified-desk">
+            <div className={`verified-mark${deskKey ? '' : ' muted'}`} aria-hidden="true">
+              <IcoVerify />
             </div>
-            <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 12 }}>
-              <button type="button" className="btn" onClick={() => setInfoOpen(true)}>
-                How sending works
-              </button>
-            </div>
-            <div className="card" style={{ marginTop: 14 }}>
-              <div className="kicker">Desk</div>
-              <p className="muted" style={{ marginTop: 8 }} role="status">
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <p className="eyebrow">{looking ? 'Checking Arkiv' : deskKey ? 'Verified desk' : lookupError ? 'Desk lookup' : 'Desk not found'}</p>
+              <h2 className="h3" style={{ marginTop: 4 }}>{deskName}</h2>
+              <p className="muted" style={{ marginTop: 6 }} role="status">
                 {looking
                   ? 'Looking up this desk on Arkiv…'
-                  : `Canary: ${alive === null ? 'unknown' : alive ? 'ALIVE' : 'GONE'}`}
+                  : lookupError
+                    ? lookupError
+                    : `Canary ${alive === null ? 'unknown' : alive ? 'ALIVE' : 'GONE'}${deskKey ? `. Desk ${shortHex(deskKey)}.` : ''}`}
               </p>
-              <div style={{ marginTop: 8 }}>
-                {deskKey ? (
-                  <CopyField label="Desk" value={deskKey} />
-                ) : (
-                  <p className="muted">{looking ? 'Checking the public desk key…' : 'Desk not found'}</p>
-                )}
-              </div>
-              <div className="ctaRow" style={{ justifyContent: 'flex-start', marginTop: 10 }}>
+              <div className="ctaRow" style={{ marginTop: 12 }}>
                 <Link className="btn" href={`/canary/${creator}`}>
-                  View canary <span className="arrow" aria-hidden="true" />
+                  View canary
                 </Link>
+                <button type="button" className="btn" onClick={() => setInfoOpen(true)}>
+                  How sending works
+                </button>
               </div>
             </div>
           </div>
+          <p className="muted" style={{ marginTop: 14 }}>
+            You do not need a wallet. We pay the fee.
+          </p>
+          <details className="advanced">
+            <summary>Use a different desk</summary>
+            <label className="small" htmlFor="desk-creator">Desk creator address</label>
+            <input
+              id="desk-creator"
+              value={creator}
+              onChange={(e) => setCreator(e.target.value as Hex)}
+              placeholder="0x…"
+            />
+          </details>
+        </div>
 
-          <div className="card">
-            <label className="small">Desk creator address</label>
-            <input value={creator} onChange={(e) => setCreator(e.target.value as Hex)} placeholder="0x…" />
-            <div style={{ marginTop: 14 }}>
-              <label className="small">Your tip</label>
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Write your tip here (synthetic data only)."
-                style={{ height: 200, resize: 'vertical' }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 }}>
-              <label className="badge" style={{ background: 'rgba(10,16,24,.45)' }}>
-                Lifetime:&nbsp;
-                <select value={life} onChange={(e) => onLife(e.target.value)} style={{ background: 'transparent', color: 'inherit', border: 'none', outline: 'none' }}>
-                  <option value="1h">1 hour</option>
-                  <option value="24h">24 hours</option>
-                  <option value="72h">72 hours</option>
-                  <option value="7d">7 days</option>
-                </select>
-              </label>
-              <button className="btn" type="button" onClick={() => send(true)} disabled={!deskKey || !deskPubRaw || sending || !text.trim()}>
+        <div className="card" style={{ marginTop: 16 }}>
+          <label className="small" htmlFor="tip-body">Your tip</label>
+          <textarea
+            id="tip-body"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Write your tip here (synthetic data only)."
+            style={{ height: 200, resize: 'vertical' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 14 }}>
+            <label className="badge">
+              Lifetime
+              <select value={life} onChange={(e) => onLife(e.target.value)} style={{ background: 'transparent', color: 'inherit', border: 'none', outline: 'none', marginLeft: 6 }}>
+                <option value="1h">1 hour</option>
+                <option value="24h">24 hours</option>
+                <option value="72h">72 hours</option>
+                <option value="7d">7 days</option>
+              </select>
+            </label>
+            <div className="ctaRow">
+              <button className="btn lg" type="button" onClick={() => send(true)} disabled={!valid}>
                 Dry run
               </button>
-              <button className="btn primary" type="button" onClick={() => setConfirmOpen(true)} disabled={!deskKey || !deskPubRaw || sending || !text.trim()}>
+              <button
+                className={`btn lg${valid ? ' primary' : ''}`}
+                type="button"
+                onClick={() => setConfirmOpen(true)}
+                disabled={!valid}
+              >
                 Submit tip <span className="arrow" aria-hidden="true" />
               </button>
             </div>
-            <p className="muted" style={{ marginTop: 8 }}>
-              New tips stay live at least until 27 Oct 2026.
-            </p>
           </div>
+          <p className="muted" style={{ marginTop: 10 }}>
+            New tips stay live at least until 27 Oct 2026.
+          </p>
         </div>
 
         {ok && (

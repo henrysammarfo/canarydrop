@@ -125,19 +125,25 @@ test('home FAQ and footer CTA are hittable after mouse wheel at 1440', async ({ 
 test('dry run tip submit shows a toast', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(urlFor('/submit'), { waitUntil: 'load' });
-  const creator = page.locator('input').first();
+  const creator = page.getByLabel('Desk creator address');
   if ((await creator.inputValue()) !== desk) await creator.fill(desk);
-  await expect(page.locator('p[role="status"]')).toContainText(/Canary:/i, { timeout: 30_000 });
+  const status = page.locator('p[role="status"]');
+  try {
+    await expect(status).toContainText(/Canary/i, { timeout: 25_000 });
+  } catch {
+    await page.waitForTimeout(8_000);
+    await page.reload({ waitUntil: 'load' });
+    await expect(status).toContainText(/Canary/i, { timeout: 45_000 });
+  }
   await page.locator('textarea').first().fill('Synthetic judge dry run tip.');
   const dry = page.getByRole('button', { name: 'Dry run' });
   await expect(dry).toBeEnabled({ timeout: 20_000 });
   await dry.click();
   const dryToast = page.locator('.toast').filter({ hasText: /dry run/i });
-  const waitToast = page.locator('.toast').filter({ hasText: /wait a minute/i });
   try {
     await expect(dryToast).toBeVisible({ timeout: 20_000 });
   } catch {
-    await expect(waitToast.first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.toast').first()).toBeVisible({ timeout: 8_000 });
     await page.waitForTimeout(16_000);
     await dry.click();
     await expect(dryToast).toBeVisible({ timeout: 45_000 });

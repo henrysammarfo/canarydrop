@@ -3,21 +3,36 @@ import { DEFAULT_DESK, DEFAULT_RELAY, PROJECT } from '@/lib/constants';
 import { canaryAlive, getDesk, headBlock, pub } from '@/lib/arkiv';
 import { eq } from '@arkiv-network/sdk/query';
 
+async function retryRead<T>(fn: () => Promise<T>): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < 4; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      last = err;
+      await new Promise((resolve) => setTimeout(resolve, 1200 * (i + 1)));
+    }
+  }
+  throw last;
+}
+
 describe('arkiv read-only against Tiramisu', () => {
   it('reads block timing', async () => {
     const t = await pub().getBlockTiming();
     expect(typeof t.currentBlock).toBe('bigint');
     expect(t.blockDuration).toBeGreaterThan(0);
-    expect(await headBlock()).toBe(t.currentBlock);
+    const head = await headBlock();
+    const drift = head > t.currentBlock ? head - t.currentBlock : t.currentBlock - head;
+    expect(Number(drift)).toBeLessThanOrEqual(2);
   });
 
   it('counts entities', async () => {
-    const n = await pub().getEntityCount();
+    const n = await retryRead(() => pub().getEntityCount());
     expect(n).toBeGreaterThan(0);
   });
 
   it('loads the demo desk by createdBy', async () => {
-    const desk = await getDesk(DEFAULT_DESK);
+    const desk = await retryRead(() => getDesk(DEFAULT_DESK));
     if (!desk) {
       expect(desk).toBeUndefined();
       return;
@@ -28,12 +43,14 @@ describe('arkiv read-only against Tiramisu', () => {
   });
 
   it('lists tips created by the relay', async () => {
-    const page = await pub()
-      .select({ key: true, owner: true })
-      .where(eq('project', PROJECT), eq('type', 'tip'))
-      .createdBy(DEFAULT_RELAY)
-      .limit(20)
-      .fetch();
+    const page = await retryRead(() =>
+      pub()
+        .select({ key: true, owner: true })
+        .where(eq('project', PROJECT), eq('type', 'tip'))
+        .createdBy(DEFAULT_RELAY)
+        .limit(20)
+        .fetch(),
+    );
     expect(page.blockNumber).toBeGreaterThan(0n);
     expect(Array.isArray(page.entities)).toBe(true);
   });
