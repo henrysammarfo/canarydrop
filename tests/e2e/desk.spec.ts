@@ -1,4 +1,10 @@
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const deskLiveFixture = JSON.parse(
+  fs.readFileSync(path.resolve('tests/e2e/fixtures/desk-live.json'), 'utf8'),
+) as Record<string, unknown>;
 
 test('overview keeps keys in one compact row', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -149,4 +155,44 @@ test('desk demo mode toggle is usable without a wallet', async ({ page }) => {
   await expect(page).toHaveURL(/\/desk\/inbox/);
   await expect(page.getByText(/Older tips load from Arkiv/i)).toBeVisible();
   await expect(page.getByRole('button', { name: /load older tips/i })).toBeVisible();
+});
+
+test('renew receipt still confirming is shown with the last tx', async ({ page }) => {
+  const hash = `0x${'ab'.repeat(32)}`;
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.route('**/api/desk/live**', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(deskLiveFixture),
+    });
+  });
+  await page.route('**/api/demo/desk/renew**', async (route) => {
+    const req = route.request();
+    if (req.method() !== 'POST' || new URL(req.url()).searchParams.get('dryRun') === '1') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, txHash: hash, confirming: true, message: 'still confirming' }),
+    });
+  });
+  await page.goto('/desk', { waitUntil: 'load' });
+  const demo = page.locator('label.badge', { hasText: 'Demo mode' });
+  await expect(demo).toBeVisible();
+  const box = demo.locator('input[type="checkbox"]');
+  if (!(await box.isChecked())) await box.check();
+  await expect(page.getByText(/Demo mode is on/i)).toBeVisible({ timeout: 15_000 });
+  const renew = page.getByRole('button', { name: /^Renew canary$/ });
+  await expect(renew.first()).toBeEnabled();
+  await renew.first().click();
+  await page.getByRole('dialog').getByRole('button', { name: /^Renew canary$/ }).click();
+  await expect(page.locator('.toast-stack .toast').filter({ hasText: /still confirming/i })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Last tx .* still confirming/i })).toBeVisible();
 });

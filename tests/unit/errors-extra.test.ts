@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EntityMutationError } from '@arkiv-network/sdk';
-import { AppError, errorBody, mapUnknownError, publicMessage } from '@/lib/errors';
+import type { Hex } from 'viem';
+import { AppError, errorBody, mapUnknownError, publicMessage, receiptTimeoutHash } from '@/lib/errors';
 
 describe('error mapping extra cases', () => {
   it('maps fetch failed and econnreset to try_later', () => {
@@ -45,5 +46,14 @@ describe('error mapping extra cases', () => {
     expect(body.error).toBe('server_error');
     expect(body.message).toMatch(/explorer/i);
     expect(body.message).not.toMatch(/ababab/);
+  });
+
+  it('reads a receipt timeout hash and ignores a revert with a hash', () => {
+    const hash = `0x${'cd'.repeat(32)}` as Hex;
+    const timeout = new EntityMutationError('Timed out while waiting for transaction receipt', { txHash: hash });
+    expect(receiptTimeoutHash(timeout)).toBe(hash);
+    const revert = new EntityMutationError('Transaction reverted. Reason: EntityNotFound', { txHash: hash });
+    expect(receiptTimeoutHash(revert)).toBeUndefined();
+    expect(receiptTimeoutHash(new Error('timeout of 20000ms exceeded'))).toBeUndefined();
   });
 });

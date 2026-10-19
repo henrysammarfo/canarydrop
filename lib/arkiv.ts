@@ -243,34 +243,61 @@ export async function createDesk(
   }, txParams);
 }
 
+/** Canary plus desk only. Holds go in a later batch so one bad hold cannot fail this write. */
+export function coreRenewExtensions(canaryKey: Hex, deskKey: Hex) {
+  return [
+    { entityKey: canaryKey, expires: ExpirationTime.fromHours(26) },
+    { entityKey: deskKey, expires: ExpirationTime.fromDays(30) },
+  ];
+}
+
+export function holdRenewExtensions(holdKeys: readonly Hex[]) {
+  return holdKeys.map((entityKey) => ({ entityKey, expires: ExpirationTime.fromHours(26) }));
+}
+
+function nextNonceParams(txParams?: TxParams): TxParams | undefined {
+  if (!txParams || txParams.nonce == null) return txParams;
+  return { ...txParams, nonce: txParams.nonce + 1 };
+}
+
 /** extendEntity SETS expiry from now. It does not add to the remaining lifetime. */
 export async function renew(w: Wallet, deskKey: Hex, canaryKey: Hex, txParams?: TxParams, opts?: RenewOpts) {
   const holdKeys = opts?.holdKeys ?? [];
-  const extensions = [
-    { entityKey: canaryKey, expires: ExpirationTime.fromHours(26) },
-    { entityKey: deskKey, expires: ExpirationTime.fromDays(30) },
-    ...holdKeys.map((entityKey) => ({ entityKey, expires: ExpirationTime.fromHours(26) })),
-  ];
-  if (!opts?.signed || !opts.owner) {
-    return w.executeBatch({ extensions }, txParams);
-  }
-  const [next] = await pub().predictEntityKeys({ owner: opts.owner, count: 1 });
-  return w.executeBatch(
-    {
-      creates: [
+  const extensions = coreRenewExtensions(canaryKey, deskKey);
+  // Extend the live canary and desk first. A new signed canary or a bad hold must not fail that.
+  const out = await w.executeBatch({ extensions }, txParams);
+  let nextParams = nextNonceParams(txParams);
+  if (opts?.signed && opts.owner) {
+    try {
+      const [next] = await pub().predictEntityKeys({ owner: opts.owner, count: 1 });
+      await w.executeBatch(
         {
-          salt: next.salt,
-          payload: canaryWritePayload(opts.signed),
-          contentType: 'application/json',
-          attributes: canaryWriteAttrs(deskKey, opts.signed),
-          expires: ExpirationTime.fromHours(26),
-          flags: { readonly: true },
+          creates: [
+            {
+              salt: next.salt,
+              payload: canaryWritePayload(opts.signed),
+              contentType: 'application/json',
+              attributes: canaryWriteAttrs(deskKey, opts.signed),
+              expires: ExpirationTime.fromHours(26),
+              flags: { readonly: true },
+            },
+          ],
         },
-      ],
-      extensions,
-    },
-    txParams,
-  );
+        nextParams,
+      );
+      nextParams = nextNonceParams(nextParams);
+    } catch {
+      // The existing canary was already extended.
+    }
+  }
+  if (holdKeys.length) {
+    try {
+      await w.executeBatch({ extensions: holdRenewExtensions(holdKeys) }, nextParams);
+    } catch {
+      // The canary write already landed. A missing or foreign hold must not fail it.
+    }
+  }
+  return out;
 }
 
 export async function getDesk(deskCreator: Hex, preferPub?: Uint8Array, head?: bigint): Promise<DeskRow | undefined> {

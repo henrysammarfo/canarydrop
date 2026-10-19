@@ -1,4 +1,5 @@
 import { EntityMutationError } from '@arkiv-network/sdk';
+import type { Hex } from 'viem';
 
 export type ErrorCode =
   | 'bad_origin'
@@ -60,6 +61,19 @@ export function publicMessage(code: ErrorCode): string {
 function messageOf(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+function causeMessage(err: unknown): string {
+  if (err instanceof Error && err.cause instanceof Error) return err.cause.message;
+  return '';
+}
+
+/** Hash from a write that landed but whose receipt wait timed out. */
+export function receiptTimeoutHash(err: unknown): Hex | undefined {
+  if (!(err instanceof EntityMutationError) || !err.txHash) return undefined;
+  const msg = `${err.message} ${causeMessage(err)}`.toLowerCase();
+  if (/timeout|timed out|waiting for transaction/.test(msg)) return err.txHash as Hex;
+  return undefined;
 }
 
 /** Map a chain or runtime failure to a public error. Never returns raw RPC text. */
