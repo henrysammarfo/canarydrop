@@ -869,11 +869,17 @@ label.small {
 }
 .data-table {
   width: 100%;
-  min-width: 980px;
+  min-width: 1080px;
   border-collapse: collapse;
   font-size: 13px;
   table-layout: fixed;
 }
+.data-table .col-type { width: 32%; }
+.data-table .col-key { width: 14%; }
+.data-table .col-creator { width: 12%; }
+.data-table .col-owner { width: 14%; }
+.data-table .col-expires { width: 12%; }
+.data-table .col-actions { width: 16%; }
 .data-table th, .data-table td {
   padding: 8px 12px;
   text-align: left;
@@ -882,6 +888,11 @@ label.small {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+.data-table .type-cell,
+.data-table .owner-cell,
+.data-table .actions-cell {
+  overflow: visible;
 }
 .data-table th {
   background: rgba(255, 255, 255, 0.03);
@@ -921,6 +932,7 @@ label.small {
   letter-spacing: -0.01em;
   color: var(--text-2);
   background: rgba(255, 255, 255, 0.03);
+  flex: 0 0 auto;
 }
 .flag-ok { border-color: rgba(61, 214, 140, 0.4); color: var(--live); background: rgba(61, 214, 140, 0.1); }
 .flag-wait { border-color: rgba(240, 160, 75, 0.45); color: var(--warn); background: rgba(240, 160, 75, 0.1); }
@@ -1150,6 +1162,29 @@ label.small {
   font-weight: 650;
 }
 .stat-hero .stat-meta { margin-top: 10px; color: var(--text-2); font-size: 15px; }
+.life-meter {
+  margin-top: 16px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+}
+.life-meter-track {
+  height: 8px;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.life-meter-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--gold-2), var(--gold));
+}
+.life-meter-track.low .life-meter-fill {
+  background: linear-gradient(90deg, #d4893a, var(--warn));
+}
 .stat-card {
   min-height: 116px;
   display: flex;

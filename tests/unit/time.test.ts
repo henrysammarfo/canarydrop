@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { blocksToPhrase, lastRenewedPhrase, remainingPhrase, secondsToPhrase } from '@/lib/time';
+import {
+  blocksToPhrase,
+  canaryLifeBlocks,
+  canaryRemainingRatio,
+  lastRenewedPhrase,
+  remainingPhrase,
+  secondsToPhrase,
+} from '@/lib/time';
 
 describe('time phrases', () => {
   it('describes remaining seconds without dashes', () => {
@@ -30,5 +37,16 @@ describe('time phrases', () => {
 
   it('uses block duration when converting counts', () => {
     expect(blocksToPhrase(1800, 2)).toBe('in 1 hour');
+  });
+
+  it('reports how much of the 26 hour canary lifetime is left', () => {
+    const duration = 2;
+    const life = canaryLifeBlocks(duration);
+    expect(life).toBe(46_800n);
+    const current = 10_000n;
+    expect(canaryRemainingRatio(current + life, current, duration)).toBe(1);
+    expect(canaryRemainingRatio(current + life / 2n, current, duration)).toBe(0.5);
+    expect(canaryRemainingRatio(current, current, duration)).toBe(0);
+    expect(canaryRemainingRatio(current - 10n, current, duration)).toBe(0);
   });
 });

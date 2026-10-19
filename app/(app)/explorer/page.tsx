@@ -51,6 +51,7 @@ function TypeFlags({ item }: { item: Item }) {
     olderDemoDesk: item.olderDemo === 'Older demo desk, replaced',
     olderDemoCanary: item.olderDemo === 'Older demo canary, replaced',
   });
+  const sealed = isSealedOwner(item.owner);
   return (
     <span className="flag-row">
       <strong style={{ color: 'var(--text)', fontWeight: 600 }}>{item.type}</strong>
@@ -58,7 +59,11 @@ function TypeFlags({ item }: { item: Item }) {
         <Flag key={b.full} short={b.short} full={b.full} tone={b.short === 'Canonical' ? 'gold' : b.short === 'Impostor' ? 'wait' : 'muted'} />
       ))}
       {item.readonly && <Flag short="Readonly" full="Readonly: nobody can change it" />}
-      {!item.openExtend && item.readonly && <Flag short="Locked" full="No open extend" />}
+      {sealed ? (
+        <Flag short={SEALED_BADGE.short} full={SEALED_BADGE.full} tone="ok" />
+      ) : !item.openExtend && item.readonly ? (
+        <Flag short="Locked" full="No open extend" />
+      ) : null}
     </span>
   );
 }
@@ -197,14 +202,22 @@ export default function ExplorerPage() {
 
         <div className="explorer-table" style={{ marginTop: 18 }}>
           <Table caption="CanaryDrop entities on Tiramisu">
+            <colgroup>
+              <col className="col-type" />
+              <col className="col-key" />
+              <col className="col-creator" />
+              <col className="col-owner" />
+              <col className="col-expires" />
+              <col className="col-actions" />
+            </colgroup>
             <thead>
               <tr>
-                <th scope="col" style={{ width: '24%' }}>Type</th>
-                <th scope="col" style={{ width: '18%' }}>Key</th>
-                <th scope="col" style={{ width: '14%' }}>Creator</th>
-                <th scope="col" style={{ width: '16%' }}>Owner</th>
-                <th scope="col" style={{ width: '12%' }}>Expires</th>
-                <th scope="col" style={{ width: '16%' }}>Actions</th>
+                <th scope="col">Type</th>
+                <th scope="col">Key</th>
+                <th scope="col">Creator</th>
+                <th scope="col">Owner</th>
+                <th scope="col">Expires</th>
+                <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -212,7 +225,7 @@ export default function ExplorerPage() {
                 const exp = expiryView(it.expiresAt, currentBlock, blockDuration);
                 return (
                   <tr key={it.key}>
-                    <td>
+                    <td className="type-cell">
                       <TypeFlags item={it} />
                     </td>
                     <td>
@@ -225,10 +238,9 @@ export default function ExplorerPage() {
                         {shortHex(it.creator)}
                       </a>
                     </td>
-                    <td>
-                      <span className="flag-row">
-                        <span title={it.owner}>{shortHex(it.owner)}</span>
-                        {isSealedOwner(it.owner) && <Flag short={SEALED_BADGE.short} full={SEALED_BADGE.full} tone="ok" />}
+                    <td className="owner-cell">
+                      <span className="key-mono" title={isSealedOwner(it.owner) ? `${it.owner} (sealed)` : it.owner}>
+                        {shortHex(it.owner)}
                       </span>
                     </td>
                     <td>
@@ -275,9 +287,8 @@ export default function ExplorerPage() {
                   </span>
                   <span>
                     <span>Owner</span>
-                    <span className="flag-row">
+                    <span className="key-mono" title={isSealedOwner(it.owner) ? `${it.owner} (sealed)` : it.owner}>
                       {shortHex(it.owner)}
-                      {isSealedOwner(it.owner) && <Flag short={SEALED_BADGE.short} full={SEALED_BADGE.full} tone="ok" />}
                     </span>
                   </span>
                   <span>

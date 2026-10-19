@@ -8,6 +8,17 @@ test('overview keeps keys in one compact row', async ({ page }) => {
   await expect(page.locator('.keys-bar').getByText('Creator')).toBeVisible();
 });
 
+test('overview canary card fills the lifetime gap when alive', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/desk', { waitUntil: 'load' });
+  await page.getByText('Loading the live desk from Arkiv…').waitFor({ state: 'hidden', timeout: 45_000 }).catch(() => undefined);
+  const alive = page.getByText(/^Alive$/);
+  if ((await alive.count()) === 0) return;
+  await expect(page.getByRole('progressbar', { name: /canary lifetime remaining/i })).toBeVisible();
+  await expect(page.getByText(/of this lifetime is left/i)).toBeVisible();
+  await expect(page.getByText(/Next renewal due|This lifetime has ended/i)).toBeVisible();
+});
+
 test('desk first visit does not toast a generic error', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/desk', { waitUntil: 'load' });

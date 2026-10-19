@@ -8,7 +8,7 @@ import DemoBanner, { DemoSwitch } from '@/components/desk/DemoBanner';
 import RenewAction from '@/components/desk/RenewAction';
 import { useDesk } from '@/components/desk/DeskProvider';
 import { txUrl, shortHex } from '@/lib/chain';
-import { lastRenewedPhrase, remainingPhrase } from '@/lib/time';
+import { canaryRemainingRatio, lastRenewedPhrase, remainingPhrase } from '@/lib/time';
 
 export default function DeskOverviewPage() {
   const d = useDesk();
@@ -18,6 +18,8 @@ export default function DeskOverviewPage() {
     d.currentBlock != null
       ? lastRenewedPhrase(d.canaryExpiresAt, d.canaryCreatedAt, d.currentBlock, d.blockDuration)
       : null;
+  const lifeLeft = canCount ? canaryRemainingRatio(d.canaryExpiresAt!, d.currentBlock!, d.blockDuration) : 0;
+  const lifePct = Math.round(lifeLeft * 100);
   const waiting = d.loadingDesk || (!!d.loadError && !d.deskKey);
   const status = waiting ? 'Checking' : d.alive === null ? 'None yet' : d.alive ? 'Alive' : 'Gone';
   const statusClass = d.alive ? 'status-alive' : d.alive === false ? 'status-gone' : '';
@@ -54,10 +56,29 @@ export default function DeskOverviewPage() {
                     ? 'The canary is missing. That is the signal.'
                     : 'No canary is published for this desk yet.'}
           </p>
-          {d.alive && renewed && (
-            <p className="muted" style={{ marginTop: 6 }} title={d.canaryExpiresAt ? `Expires at block ${d.canaryExpiresAt.toString()}` : undefined}>
-              Last renewed {renewed}
-            </p>
+          {d.alive && canCount && (
+            <div className="life-meter">
+              <div
+                className={`life-meter-track${lifeLeft <= 0.2 ? ' low' : ''}`}
+                role="progressbar"
+                aria-label="Canary lifetime remaining"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={lifePct}
+                title={d.canaryExpiresAt ? `Expires at block ${d.canaryExpiresAt.toString()}` : undefined}
+              >
+                <div className="life-meter-fill" style={{ width: `${lifePct}%` }} />
+              </div>
+              <p className="muted">
+                {lifePct}% of this lifetime is left.
+                {renewed ? ` Last renewed ${renewed}.` : ''}
+                {remaining && remaining !== 'Expired'
+                  ? ` Next renewal due ${remaining}.`
+                  : remaining === 'Expired'
+                    ? ' This lifetime has ended.'
+                    : ''}
+              </p>
+            </div>
           )}
           {d.loadError && !d.deskKey && (
             <p className="muted" role="status" style={{ marginTop: 8, color: 'var(--warn)' }}>

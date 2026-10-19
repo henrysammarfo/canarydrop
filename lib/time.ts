@@ -1,3 +1,23 @@
+/** Daily canary lifetime used for renew math. */
+export const CANARY_LIFE_HOURS = 26;
+
+export function canaryLifeBlocks(durationSec: number): bigint {
+  return BigInt(Math.round((CANARY_LIFE_HOURS * 3600) / (durationSec || 2)));
+}
+
+/** 0 to 1, how much of the current 26 hour lifetime is still left. */
+export function canaryRemainingRatio(
+  expiresAt: bigint,
+  current: bigint,
+  durationSec: number,
+): number {
+  const life = Number(canaryLifeBlocks(durationSec));
+  if (!Number.isFinite(life) || life <= 0) return 0;
+  const left = Number(expiresAt - current);
+  if (!Number.isFinite(left)) return 0;
+  return Math.min(1, Math.max(0, left / life));
+}
+
 /** Convert remaining or elapsed chain time into a short English phrase. */
 
 export function secondsToPhrase(sec: number, { ago = false }: { ago?: boolean } = {}): string {
@@ -38,7 +58,7 @@ export function lastRenewedPhrase(
   durationSec: number,
 ): string {
   if (!expiresAt) return 'Not renewed yet';
-  const lifeBlocks = BigInt(Math.round((26 * 3600) / (durationSec || 2)));
+  const lifeBlocks = canaryLifeBlocks(durationSec);
   let last = expiresAt - lifeBlocks;
   if (createdAt && last < createdAt) last = createdAt;
   const agoBlocks = Number(current - last);
