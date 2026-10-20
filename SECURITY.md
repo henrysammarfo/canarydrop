@@ -1,5 +1,9 @@
 # CanaryDrop threat model
 
+> **In plain words:** CanaryDrop locks every tip on the sender's device, so our server only ever handles a locked message. Saved tips cannot be edited or deleted early by anyone, including us. Only the newsroom's own wallet can keep its canary alive. Below is the detailed list of what we defend against, and just as important, what we do not.
+>
+> A few terms used below: **Origin** and **CSRF token** are checks that make sure a request really came from our own website. **Rate limit** means a cap on how many requests one connection can make. **GLM** is the test token that pays network fees. **Nonce** is the running number each wallet attaches to its transactions.
+
 This is a testnet demo. It is not a production newsroom product. Residual risk remains. Nothing here is unhackable.
 
 ## What we protect

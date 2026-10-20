@@ -1,5 +1,7 @@
 # CanaryDrop: Arkiv schema
 
+> **In plain words:** this page lists every kind of record CanaryDrop saves on Arkiv, how long each one lasts, and the exact questions the app asks Arkiv. The short version: desks last 30 days and canaries 26 hours, both renewed by the newsroom; tips last 1 hour to 7 days, chosen by the source, and are sealed so nobody can change them; replies last 3 days. Nothing readable about a person is ever saved.
+
 ## Why each Arkiv feature
 
 | Feature | Why we use it |
@@ -69,14 +71,14 @@ Live: `watchEntityEvents({ onEntityCreated, onExpiryExtended, onOwnershipTransfe
 - `executeBatch({ creates:[reply], extensions:[desk 30d] })` (desk reply)
 
 ## Example on‑chain keys and tx hashes (Tiramisu)
-- Desk `0x874e543a36fd673980ca4f2cd992ef9ac1aca38218f1232452bb5d7a7fac6231` and canary `0x5a9cc9685585f462cc85dfdc2884f06309aa2cda9cc10acfeaa1a260e5a7cc70` created atomically — tx https://tiramisu.explorer.arkiv.network/tx/0x6558bfd29237fd4b131fbee1d74f13ac3ce1152d88a5ae05d24d5f33a1dc35be
+- Desk `0x874e543a36fd673980ca4f2cd992ef9ac1aca38218f1232452bb5d7a7fac6231` and canary `0x5a9cc9685585f462cc85dfdc2884f06309aa2cda9cc10acfeaa1a260e5a7cc70` created atomically: tx https://tiramisu.explorer.arkiv.network/tx/0x6558bfd29237fd4b131fbee1d74f13ac3ce1152d88a5ae05d24d5f33a1dc35be
 - Sealed tips:  
-  `0xd4f74471b97a44751650ccb4fd473a6056715d327497838f2a1c36da13e67f51` — https://tiramisu.explorer.arkiv.network/tx/0xfba666e2ed91c4cd35f0020959cfe48520247f3ab6a96efa1b5e0ed2868744d9  
-  `0xb4301aeffa5a5364d2de46b6485c04cc44fcf2000ebc1194a672769d5014cab8` — https://tiramisu.explorer.arkiv.network/tx/0x2401d9b57ae4545d4f2aee716476db731bcd7cc260c9c1ae42f1ec5e0b6df83c  
-  `0x4e65bf8206c285562c47d5893f15c7f78beb06337e80fe3414b1c196ebfc82b2` — https://tiramisu.explorer.arkiv.network/tx/0x96c37ab0a3592f02abe6ac75565fb5b0c400bb451156d2c156246728f3fc886f
-- Reply — tx https://tiramisu.explorer.arkiv.network/tx/0x3372344033724934a4e5cd09d9512fc1cf5cf221a5e05f11daecd814055227c1
-- Renew canary and desk (lifetime extension) — https://tiramisu.explorer.arkiv.network/tx/0x348fcd830adef7e6cbf5e8201d425e208ef01be8cc6321e41bfa1a6b5f5df466
-- Impersonator fake desk — `0x4d8e321f65850a6ea1d7bfa5bc59a2256e1cf9e09007011f69cb5d61645106ef` — https://tiramisu.explorer.arkiv.network/tx/0x953418573cb61d2e3174f1729162d0ee76e280c43e3633ccba3956b500ff4706
+  `0xd4f74471b97a44751650ccb4fd473a6056715d327497838f2a1c36da13e67f51`: https://tiramisu.explorer.arkiv.network/tx/0xfba666e2ed91c4cd35f0020959cfe48520247f3ab6a96efa1b5e0ed2868744d9  
+  `0xb4301aeffa5a5364d2de46b6485c04cc44fcf2000ebc1194a672769d5014cab8`: https://tiramisu.explorer.arkiv.network/tx/0x2401d9b57ae4545d4f2aee716476db731bcd7cc260c9c1ae42f1ec5e0b6df83c  
+  `0x4e65bf8206c285562c47d5893f15c7f78beb06337e80fe3414b1c196ebfc82b2`: https://tiramisu.explorer.arkiv.network/tx/0x96c37ab0a3592f02abe6ac75565fb5b0c400bb451156d2c156246728f3fc886f
+- Reply: tx https://tiramisu.explorer.arkiv.network/tx/0x3372344033724934a4e5cd09d9512fc1cf5cf221a5e05f11daecd814055227c1
+- Renew canary and desk (lifetime extension): https://tiramisu.explorer.arkiv.network/tx/0x348fcd830adef7e6cbf5e8201d425e208ef01be8cc6321e41bfa1a6b5f5df466
+- Impersonator fake desk: `0x4d8e321f65850a6ea1d7bfa5bc59a2256e1cf9e09007011f69cb5d61645106ef`: https://tiramisu.explorer.arkiv.network/tx/0x953418573cb61d2e3174f1729162d0ee76e280c43e3633ccba3956b500ff4706
 
 ## Kept off Arkiv on purpose
 Plaintext, private keys (desk key stays in the browser plus a downloaded backup; the source's receipt key only on their device), IP addresses (the relay keeps no logs; Vercel platform logs are a known limitation), and any identity of the source.
