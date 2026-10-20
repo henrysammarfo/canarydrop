@@ -1,5 +1,7 @@
 # Static build and self hosting
 
+> **In plain words:** CanaryDrop can be built as a folder of plain files that anyone can host, with no server at all. We publish a list of fingerprints (SHA256 hashes) for every file, so anyone can rebuild it and check they got exactly the same thing we did.
+
 Pinned tools: Node 24.22.0 (`.nvmrc`) with `engines.node` set to `24.x` so Vercel uses Node 24, `npm ci` from `package-lock.json`, `@arkiv-network/sdk` 0.8.1, Tiramisu chain 7738577. The static export uses a fixed `generateBuildId`, a clean build env (`HOME=/tmp/canarydrop-home`, `TZ=UTC`, `LANG=C`), content hashes instead of chunk hashes, and no size based lib split. App chrome lives on desk, explorer, how, and verify layouts so site pages do not pick up an `(app)/layout-*.js` chunk.
 
 The primary static mirror is a separate Vercel project that serves only `out/`. Placeholder URL: https://canarydrop-static.vercel.app. That project has no functions and no API routes. Config: `vercel.static.json` (`buildCommand` `npm run build:static`, `outputDirectory` `out`, plus CSP and no-referrer headers).

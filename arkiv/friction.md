@@ -1,5 +1,7 @@
 # Friction report: CanaryDrop on Arkiv Tiramisu
 
+> **In plain words:** this is our honest list of the bumps we hit while building on Arkiv, written for the Arkiv team. Each item says what happened, how much it hurt, and what we did about it. Every one can be checked again with `npm run friction`, which only reads from the network and needs no wallet.
+
 ## Top 5
 
 1. `$createdAt` has no index. We sort in JS and write `slot` as u64 YYYYMMDD (F1).
@@ -86,7 +88,7 @@ gt("$expiresAt", Date.now())
 Actual:
 
 ```
-InvalidValueError Invalid i32 value 1792389889768: outside the i32 range [-2147483648, 2147483647] — use u64(...) for large counters, timestamps and block heights (Date.now() does not fit an i32), or u256(...) beyond 2**64 - 1.
+InvalidValueError Invalid i32 value 1792389889768: outside the i32 range [-2147483648, 2147483647]: use u64(...) for large counters, timestamps and block heights (Date.now() does not fit an i32), or u256(...) beyond 2**64 - 1.
 ```
 
 Best Practices snippets that pass `Date.now() - 86400000` as a bare number will throw. The SDK error is good. The docs still lag.
@@ -100,7 +102,7 @@ Script: `arkiv/repro/f3-head-type.mjs`
 Raw bigint:
 
 ```
-InvalidPredicateError "$expiresAt" is a u64, but the value is a u256. System attributes have a fixed type — write u64(...) around the value.
+InvalidPredicateError "$expiresAt" is a u64, but the value is a u256. System attributes have a fixed type: write u64(...) around the value.
 ```
 
 Wrapped:
@@ -552,7 +554,7 @@ pub.select({ key: true }).toString()
 Actual:
 
 ```
-InvalidPredicateError A query needs at least one filter — the language has no spelling for 'match every entity". Add a where(...) predicate, or narrow by ownedBy(...) / createdBy(...).
+InvalidPredicateError A query needs at least one filter: the language has no spelling for 'match every entity". Add a where(...) predicate, or narrow by ownedBy(...) / createdBy(...).
 ```
 
 We always start from `eq("project", P)`. That is also why `getEntityCount()` cannot replace a project query.

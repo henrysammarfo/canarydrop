@@ -1,5 +1,7 @@
 # What Arkiv does not give us
 
+> **In plain words:** these are a few shared Ethereum standards we used (for signed statements, signing in, and one time reply addresses), plus a short wish list of things Arkiv could add to make apps like this easier.
+
 These are Ethereum standards we researched and used where they fit. Gaps are written as proposals, not as claims that Arkiv already has them.
 
 ## Used in this app
